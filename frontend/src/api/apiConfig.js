@@ -1,11 +1,12 @@
 import axios from 'axios';
 
-// Get base URL from environment variable or fallback to localhost
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+// On Vercel, frontend and backend share the same domain.
+// So we use an empty string (relative URL) unless VITE_API_BASE_URL is set.
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 // Configured axios instance for generic API calls
 const apiClient = axios.create({
-    baseURL: `${API_BASE_URL}/api`,
+    baseURL: API_BASE_URL ? `${API_BASE_URL}/api` : '/api',
     headers: {
         'Content-Type': 'application/json'
     }
