@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // In production: set VITE_API_BASE_URL to your backend URL on Vercel (e.g., https://tutution-erp-api.vercel.app)
 // In development: falls back to localhost
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000').replace(/\/$/, '');
 
 // Configured axios instance for generic API calls
 const apiClient = axios.create({
