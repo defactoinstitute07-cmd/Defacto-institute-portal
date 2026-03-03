@@ -1,0 +1,91 @@
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const path = require('path');
+require('dotenv').config();
+const rateLimit = require('express-rate-limit');
+
+const adminRoutes = require('./routes/adminRoutes');
+const adminWorkRoutes = require('./routes/admin.work');
+const studentRoutes = require('./routes/student.routes');
+const feeRoutes = require('./routes/fee.routes');
+const batchRoutes = require('./routes/batch.routes');
+const schedulerRoutes = require('./routes/scheduler.routes');
+const settingsRoutes = require('./routes/settings.routes');
+const teacherRoutes = require('./routes/teacher.routes');
+const teacherPayrollRoutes = require('./routes/teacher.payroll.routes');
+const expenseRoutes = require('./routes/expense.routes');
+
+const { initFeeScheduler, initSalaryScheduler } = require('./utils/scheduler');
+// Portal auth routes
+const studentAuthRoutes = require('./routes/student.auth.routes');
+const teacherAuthRoutes = require('./routes/teacher.auth.routes');
+
+const app = express();
+
+// Initialize schedulers
+initFeeScheduler();
+initSalaryScheduler();
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// Global security middleware
+const cleanObj = (obj) => {
+    if (!obj || typeof obj !== 'object') return obj;
+    for (const key in obj) {
+        if (key.startsWith('$') || key.includes('.')) {
+            const safeKey = key.replace(/^\$|\./g, '_');
+            obj[safeKey] = obj[key];
+            delete obj[key];
+        }
+        if (typeof obj[key] === 'object') cleanObj(obj[key]);
+    }
+    return obj;
+};
+app.use((req, res, next) => {
+    if (req.body) cleanObj(req.body);
+    if (req.query) cleanObj(req.query);
+    if (req.params) cleanObj(req.params);
+    next();
+});
+
+const globalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 200, // limit each IP to 200 requests per windowMs
+    message: 'Too many requests from this IP, please try again after 15 minutes',
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+app.use('/api', globalLimiter); // Apply to all /api routes
+
+// Serve uploaded teacher images
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Auth Routes
+app.use('/admin', adminRoutes);
+
+// API Routes (admin ERP)
+app.use('/api/admin', adminWorkRoutes);
+app.use('/api/students', studentRoutes);
+app.use('/api/fees', feeRoutes);
+app.use('/api/batches', batchRoutes);
+app.use('/api/scheduler', schedulerRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/teachers', teacherRoutes);
+app.use('/api/payroll', teacherPayrollRoutes);
+app.use('/api/expenses', expenseRoutes);
+
+// Portal auth routes
+app.use('/api/student', studentAuthRoutes);
+app.use('/api/teacher', teacherAuthRoutes);
+
+// Database Connection
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/erp_system';
+mongoose.connect(MONGODB_URI)
+    .then(() => console.log('Connected to MongoDB'))
+    .catch(err => console.error('MongoDB connection error:', err));
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => { console.log(`Server running on port ${PORT}`); });

@@ -1,0 +1,14 @@
+const express = require('express');
+const router = express.Router();
+const ctrl = require('../controllers/teacher.controller');
+const verifyPwd = require('../middleware/verifyAdminPassword');
+const upload = require('../middleware/upload');
+
+router.get('/', ctrl.getAllTeachers);
+router.get('/summary', ctrl.getSummary);
+
+router.post('/', upload.single('profileImage'), ctrl.createTeacher);
+router.put('/:id', upload.single('profileImage'), verifyPwd, ctrl.updateTeacher);
+router.delete('/:id', verifyPwd, ctrl.deleteTeacher);
+
+module.exports = router;
