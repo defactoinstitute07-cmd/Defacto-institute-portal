@@ -13,6 +13,7 @@ import ExpensesPage from './pages/ExpensesPage';
 import TeacherDashboard from './pages/TeacherDashboard';
 import StudentDashboard from './pages/StudentDashboard';
 import AISchedulerPage from './pages/AISchedulerPage';
+import TeacherPayrollDashboard from './pages/TeacherPayrollDashboard';
 import { API_BASE_URL } from './api/apiConfig';
 import AnalyticsPage from './pages/AnalyticsPage';
 
