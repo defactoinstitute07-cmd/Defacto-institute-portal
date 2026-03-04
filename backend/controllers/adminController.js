@@ -126,7 +126,7 @@ exports.updateProfile = async (req, res) => {
 
         const {
             adminName, coachingName, email, phone, bio, adminPassword,
-            roomsAvailable, registrationNumber, themeColors, classesOffered,
+            roomsAvailable, registrationNumber, classesOffered,
             instituteAddress, instituteEmail, institutePhone, emailNotificationsEnabled
         } = req.body;
 
@@ -134,10 +134,8 @@ exports.updateProfile = async (req, res) => {
         const valid = await bcrypt.compare(adminPassword, admin.password);
         if (!valid) return res.status(401).json({ message: 'Incorrect password' });
 
-        // Parse colors and classes
-        let parsedColors = admin.themeColors;
+        // Parse classes
         let parsedClasses = admin.classesOffered;
-        try { if (themeColors) parsedColors = JSON.parse(themeColors); } catch (e) { }
         try { if (classesOffered) parsedClasses = JSON.parse(classesOffered); } catch (e) { }
 
         // Update fields
@@ -148,7 +146,6 @@ exports.updateProfile = async (req, res) => {
         if (bio !== undefined) admin.bio = bio;
         if (roomsAvailable) admin.roomsAvailable = roomsAvailable;
         if (registrationNumber !== undefined) admin.registrationNumber = registrationNumber || undefined;
-        admin.themeColors = parsedColors;
         admin.classesOffered = parsedClasses;
 
         // New Institute Fields

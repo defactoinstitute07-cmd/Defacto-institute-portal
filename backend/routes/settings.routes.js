@@ -7,13 +7,12 @@ const Admin = require('../models/Admin');
 // UI themes, logo layout, and global dropdown parameters.
 router.get('/', async (req, res) => {
     try {
-        const admin = await Admin.findOne().select('coachingName instituteLogo themeColors classesOffered roomsAvailable instituteAddress instituteEmail institutePhone');
+        const admin = await Admin.findOne().select('coachingName instituteLogo classesOffered roomsAvailable instituteAddress instituteEmail institutePhone');
 
         if (!admin) {
             return res.json({
                 coachingName: 'Defacto ERP',
                 instituteLogo: '',
-                themeColors: [],
                 classesOffered: ['Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10', 'Class 11', 'Class 12'],
                 roomsAvailable: 5,
                 instituteAddress: '',
@@ -25,7 +24,6 @@ router.get('/', async (req, res) => {
         res.json({
             coachingName: admin.coachingName || 'Defacto ERP',
             instituteLogo: admin.instituteLogo,
-            themeColors: admin.themeColors || [],
             classesOffered: admin.classesOffered && admin.classesOffered.length ? admin.classesOffered : ['Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10', 'Class 11', 'Class 12'],
             roomsAvailable: admin.roomsAvailable || 5,
             instituteAddress: admin.instituteAddress || '',

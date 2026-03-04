@@ -27,6 +27,9 @@ const teacherAuthRoutes = require('./routes/teacher.auth.routes');
 
 const app = express();
 
+// Trust proxy for rate limiting on Vercel/proxies
+app.set('trust proxy', 1);
+
 // Schedulers and Workers
 if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
     startNotificationWorker();
@@ -120,8 +123,12 @@ app.use('/api/teacher', teacherAuthRoutes);
 // Database Connection
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/erp_system';
 mongoose.connect(MONGODB_URI)
-    .then(() => console.log('Connected to MongoDB'))
-    .catch(err => console.error('MongoDB connection error:', err));
+    .then(() => console.log('✅ Connected to MongoDB'))
+    .catch(err => {
+        console.error('❌ MongoDB connection error:', err);
+        // Explicitly log the URI (hiddenly if needed) or just the message
+        console.error('URI beginning:', MONGODB_URI.substring(0, 20) + '...');
+    });
 
 // Export for Vercel serverless
 module.exports = app;
