@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const Admin = require('../models/Admin');
+const adminController = require('../controllers/adminController');
+const { adminAuth } = require('../middleware/auth.middleware');
 
 // GET /api/settings
 // This is a public/unprotected route used strictly for fetching dynamic
@@ -36,5 +38,13 @@ router.get('/', async (req, res) => {
         res.status(500).json({ message: 'Settings API error', error: err.message });
     }
 });
+
+// GET /api/settings/db-stats
+// Returns MongoDB usage statistics (Required for admin dashboard)
+router.get('/db-stats', adminAuth, adminController.getDatabaseStats);
+
+// Email Template Management
+router.get('/email-templates', adminAuth, adminController.getAllEmailTemplates);
+router.put('/email-templates/:id', adminAuth, adminController.updateEmailTemplate);
 
 module.exports = router;

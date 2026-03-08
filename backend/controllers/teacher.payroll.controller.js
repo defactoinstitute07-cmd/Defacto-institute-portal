@@ -269,7 +269,7 @@ exports.markSalaryPaid = async (req, res) => {
                     recipientEmail: teacherInfo.email,
                     recipientName: teacherInfo.name,
                     subject: `Salary Credited — ${salary.monthYear}`,
-                    type: 'salary_paid',
+                    type: 'teacher_salary_paid',
                     data: {
                         monthYear: salary.monthYear,
                         amountPaid: paidAmount,

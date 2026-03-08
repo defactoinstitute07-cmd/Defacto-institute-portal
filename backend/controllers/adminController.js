@@ -1,4 +1,5 @@
 const Admin = require('../models/Admin');
+const EmailTemplate = require('../models/EmailTemplate');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { JWT_SECRET } = require('../middleware/auth.middleware');
@@ -201,5 +202,82 @@ exports.updateSettings = async (req, res) => {
         res.json({ message: 'Settings updated successfully', admin: updatedAdmin });
     } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });
+    }
+};
+
+// Get Database Stats
+exports.getDatabaseStats = async (req, res) => {
+    try {
+        const mongoose = require('mongoose');
+        const stats = await mongoose.connection.db.stats();
+
+        // MongoDB Atlas Free Tier (M0) is 512MB
+        const atlasLimitMB = 512;
+        const storageSizeMB = (stats.storageSize / (1024 * 1024)).toFixed(2);
+        const dataSizeMB = (stats.dataSize / (1024 * 1024)).toFixed(2);
+        const usagePercentage = ((storageSizeMB / atlasLimitMB) * 100).toFixed(2);
+
+        res.json({
+            dbName: stats.db,
+            collections: stats.collections,
+            objects: stats.objects,
+            dataSizeMB,
+            storageSizeMB,
+            limitMB: atlasLimitMB,
+            usagePercentage: Math.min(usagePercentage, Number(usagePercentage)) > 100 ? 100 : usagePercentage
+        });
+    } catch (error) {
+        console.error('[DBStatsError]', error);
+        res.status(500).json({ message: 'Failed to fetch database stats', error: error.message });
+    }
+};
+
+// --- Email Template Controllers ---
+
+// Get all templates
+exports.getAllEmailTemplates = async (req, res) => {
+    try {
+        let templates = await EmailTemplate.find();
+
+        // If no templates exist, seed default ones
+        if (templates.length === 0) {
+            const defaults = [
+                { event: 'student_registration', displayName: 'Student Registration', subject: 'Welcome to DeFacto Institute', body: '<p>Hello {{recipientName}}, welcome!</p><p>Your Roll No: {{data.rollNo}}</p><p>Password: {{data.password}}</p>', variables: ['recipientName', 'data.rollNo', 'data.password'] },
+                { event: 'student_login', displayName: 'Student Login Alert', subject: 'Security Alert: New Login', body: '<p>Hi {{recipientName}}, a new login was detected on your account at {{data.time}}.</p>', variables: ['recipientName', 'data.time', 'data.ip'] },
+                { event: 'exam_result_published', displayName: 'Test Result Published', subject: 'Your Exam Results are Out!', body: '<p>Hi {{recipientName}}, your results for {{data.examName}} are available.</p><p>Marks: {{data.marksObtained}} / {{data.totalMarks}}</p>', variables: ['recipientName', 'data.examName', 'data.marksObtained', 'data.totalMarks'] },
+                { event: 'test_scheduled', displayName: 'New Test Scheduled', subject: 'New Test Scheduled: {{data.examName}}', body: '<p>Hi {{recipientName}}, a new test has been scheduled.</p><p>Subject: {{data.subject}}</p><p>Date: {{data.date}}</p>', variables: ['recipientName', 'data.examName', 'data.subject', 'data.date'] },
+                { event: 'fee_generated', displayName: 'Fee Invoice Generated', subject: 'Fee Invoice Generated', body: '<p>Hello {{recipientName}}, your fee for {{data.month}} {{data.year}} has been generated.</p><p>Amount: ₹{{data.amount}}</p>', variables: ['recipientName', 'data.month', 'data.year', 'data.amount'] },
+                { event: 'fee_paid', displayName: 'Fee Payment Confirmation', subject: 'Payment Confirmation', body: '<p>Hi {{recipientName}}, we received your payment of ₹{{data.amountPaid}}.</p><p>Receipt: {{data.receiptNo}}</p>', variables: ['recipientName', 'data.amountPaid', 'data.receiptNo'] },
+                { event: 'teacher_registration', displayName: 'Teacher Registration', subject: 'Welcome to Faculty', body: '<p>Welcome {{recipientName}}! Your faculty account is ready.</p><p>Reg No: {{data.regNo}}</p>', variables: ['recipientName', 'data.regNo'] },
+                { event: 'teacher_login', displayName: 'Teacher Login Alert', subject: 'Faculty Portal Login', body: '<p>Faculty login alert for {{recipientName}} at {{data.time}}.</p>', variables: ['recipientName', 'data.time'] },
+                { event: 'teacher_salary_paid', displayName: 'Teacher Salary Paid', subject: 'Salary Credited', body: '<p>Hi {{recipientName}}, your salary for {{data.monthYear}} has been processed.</p><p>Amount: ₹{{data.amountPaid}}</p>', variables: ['recipientName', 'data.amountPaid', 'data.monthYear'] },
+                { event: 'password_reset', displayName: 'Password Reset', subject: 'Password Reset Request', body: '<p>Hi {{recipientName}}, use the link below to reset your password.</p><p>{{data.resetUrl}}</p>', variables: ['recipientName', 'data.resetUrl', 'data.token'] }
+            ];
+            await EmailTemplate.insertMany(defaults);
+            templates = await EmailTemplate.find();
+        }
+
+        res.json(templates);
+    } catch (err) {
+        res.status(500).json({ message: 'Error fetching templates', error: err.message });
+    }
+};
+
+// Update a template
+exports.updateEmailTemplate = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { enabled, subject, body } = req.body;
+
+        const template = await EmailTemplate.findByIdAndUpdate(
+            id,
+            { enabled, subject, body },
+            { new: true }
+        );
+
+        if (!template) return res.status(404).json({ message: 'Template not found' });
+        res.json({ message: 'Template updated', template });
+    } catch (err) {
+        res.status(500).json({ message: 'Error updating template', error: err.message });
     }
 };

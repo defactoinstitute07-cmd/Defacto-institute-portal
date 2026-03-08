@@ -10,6 +10,8 @@ const LoginPage = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
+    const [role, setRole] = useState('student'); // Default to student
+
     const handle = e => setForm({ ...form, [e.target.name]: e.target.value });
 
     const submit = async e => {
@@ -17,11 +19,29 @@ const LoginPage = () => {
         setError('');
         setLoading(true);
         try {
-            const { data } = await authApi.adminLogin({ identifier: form.identifier, password: form.password });
-            localStorage.setItem('token', data.token);
-            localStorage.setItem('role', 'admin');
-            localStorage.setItem('admin', JSON.stringify(data.admin));
-            navigate('/dashboard');
+            let data;
+            if (role === 'admin') {
+                const res = await authApi.adminLogin({ identifier: form.identifier, password: form.password });
+                data = res.data;
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('role', 'admin');
+                localStorage.setItem('admin', JSON.stringify(data.admin));
+                navigate('/dashboard');
+            } else if (role === 'teacher') {
+                const res = await authApi.teacherLogin({ email: form.identifier, password: form.password });
+                data = res.data;
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('role', 'teacher');
+                localStorage.setItem('teacher', JSON.stringify(data.teacher));
+                navigate('/teacher-dashboard');
+            } else if (role === 'student') {
+                const res = await authApi.studentLogin({ email: form.identifier, password: form.password });
+                data = res.data;
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('role', 'student');
+                localStorage.setItem('student', JSON.stringify(data.student));
+                navigate('/student-dashboard');
+            }
         } catch (err) {
             setError(err.response?.data?.message || 'Invalid credentials. Please try again.');
         } finally { setLoading(false); }
@@ -34,10 +54,18 @@ const LoginPage = () => {
             <div className="bg-decoration bottom-right" />
 
             <div className="login-card">
-                <div style={{ textAlign: 'center', marginBottom: 32 }}>
-                    
-                    <h1 className="title">Admin Login</h1>
-                    <p className="subtitle">Access your institute management panel</p>
+                <div style={{ textAlign: 'center', marginBottom: 24 }}>
+                    <div className="logo-container">
+                        <School size={32} color="#fff" />
+                    </div>
+                    <h1 className="title">Welcome Back</h1>
+                    <p className="subtitle">Sign in to your institute account</p>
+                </div>
+
+                <div className="role-tabs">
+                    <button type="button" className={`role-tab ${role === 'student' ? 'active' : ''}`} onClick={() => setRole('student')}>Student</button>
+                    <button type="button" className={`role-tab ${role === 'teacher' ? 'active' : ''}`} onClick={() => setRole('teacher')}>Teacher</button>
+                    <button type="button" className={`role-tab ${role === 'admin' ? 'active' : ''}`} onClick={() => setRole('admin')}>Admin</button>
                 </div>
 
                 <form onSubmit={submit}>
@@ -160,6 +188,10 @@ const LoginPage = () => {
 
                 .title { font-size: 1.75rem; fontWeight: 900; color: #0f172a; margin: 0; letter-spacing: -0.025em; }
                 .subtitle { color: #64748b; margin-top: 8px; font-size: 0.875rem; font-weight: 500; }
+
+                .role-tabs { display: flex; background: #f1f5f9; padding: 4px; border-radius: 12px; margin-bottom: 24px; }
+                .role-tab { flex: 1; padding: 10px; border: none; background: transparent; color: #64748b; font-weight: 700; font-size: 0.85rem; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+                .role-tab.active { background: #fff; color: #2563eb; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
 
                 .error-alert {
                     background: #fef2f2; border: 1px solid #fee2e2; color: #b91c1c;

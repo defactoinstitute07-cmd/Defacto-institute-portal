@@ -1,6 +1,7 @@
 const Teacher = require('../models/Teacher');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { queueNotification } = require('../services/emailService');
 const { TeacherSalaryProfile } = require('../models/TeacherPayroll');
 
 const { JWT_SECRET } = require('../middleware/auth.middleware');
@@ -24,6 +25,15 @@ exports.login = async (req, res) => {
 
         const profile = teacher.toObject();
         delete profile.password;
+
+        // Fire-and-forget login notification
+        queueNotification({
+            recipientEmail: teacher.email,
+            recipientName: teacher.name,
+            subject: 'Faculty Portal Login Alert',
+            type: 'teacher_login',
+            data: { time: new Date().toLocaleString() }
+        }).catch(err => console.error("Teacher Login Notification Error:", err));
 
         res.json({ message: 'Login successful', token, teacher: profile });
     } catch (err) {

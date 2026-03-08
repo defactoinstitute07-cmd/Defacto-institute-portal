@@ -22,6 +22,7 @@ import SettingsPage from './pages/SettingsPage';
 import ExamsPage from './pages/ExamsPage';
 
 import ProtectedRoute from './components/ProtectedRoute';
+import { Analytics } from '@vercel/analytics/react';
 
 function App() {
     useEffect(() => {
@@ -75,6 +76,7 @@ function App() {
                 {/* Fallback */}
                 <Route path="/" element={<Navigate to="/login" replace />} />
             </Routes>
+            <Analytics />
         </Router>
     );
 }

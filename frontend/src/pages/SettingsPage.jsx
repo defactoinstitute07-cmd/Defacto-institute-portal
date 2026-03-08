@@ -3,6 +3,8 @@ import ERPLayout from '../components/ERPLayout';
 import { getAdminProfile, updateAdminSettings } from '../api/adminApi';
 import { Mail, Loader2, Save, ShieldCheck } from 'lucide-react';
 import AlertMessage from '../components/common/AlertMessage';
+import DatabaseUsage from '../components/settings/DatabaseUsage';
+import EmailNotificationSettings from '../components/settings/EmailNotificationSettings';
 import '../index.css';
 
 const SettingsPage = () => {
@@ -123,6 +125,10 @@ const SettingsPage = () => {
                         </div>
                     </form>
                 </div>
+
+                <DatabaseUsage setAlert={setAlert} />
+
+                <EmailNotificationSettings setAlert={setAlert} />
             </div>
 
             <style>{`

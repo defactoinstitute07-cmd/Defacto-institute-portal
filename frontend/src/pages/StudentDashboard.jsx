@@ -25,7 +25,7 @@ const StudentDashboard = () => {
         if (!student._id) return;
         setLoading(true);
         try {
-            const { data } = await apiClient.get(`/exams/student/${student._id}/performance`);
+            const { data } = await apiClient.get(`/student/performance`);
             setPerformance(data);
         } catch (e) {
             console.error('Failed to load performance', e);
@@ -144,6 +144,42 @@ const StudentDashboard = () => {
                                             ) : (
                                                 <div style={{ padding: '20px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
                                                     Assessments history required for analysis.
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Subject & Overall Rank Integration */}
+                                    <div className="st-card" style={{ border: '1px solid #e2e8f0' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                                            <Trophy size={18} className="text-amber-500" />
+                                            <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 900, color: '#1e293b' }}>Batch Ranking</h3>
+                                        </div>
+
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px', borderRadius: 8, background: '#fffbeb', marginBottom: 12 }}>
+                                            <div style={{ background: '#f59e0b', color: '#fff', width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                                                {performance?.ranks?.overall ? `#${performance.ranks.overall}` : '-'}
+                                            </div>
+                                            <div>
+                                                <div style={{ fontSize: '0.85rem', fontWeight: 900, color: '#92400e' }}>Overall Rank</div>
+                                                <div style={{ fontSize: '0.75rem', color: '#b45309', marginTop: 2 }}>Out of {performance?.totalStudentsInBatch || 0} active students in batch</div>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-3 mt-4">
+                                            <div style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em' }}>Subject Wise Rank</div>
+                                            {performance?.ranks?.subjects && Object.keys(performance.ranks.subjects).length > 0 ? (
+                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                                                    {Object.keys(performance.ranks.subjects).map(sub => (
+                                                        <div key={sub} style={{ background: '#f8fafc', padding: '10px 12px', borderRadius: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>{sub}</span>
+                                                            <span style={{ fontSize: '0.85rem', fontWeight: 900, color: '#0f172a' }}>#{performance.ranks.subjects[sub]}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div style={{ padding: '10px', textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem' }}>
+                                                    Not enough data for subject ranks.
                                                 </div>
                                             )}
                                         </div>

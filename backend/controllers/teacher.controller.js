@@ -114,8 +114,8 @@ exports.createTeacher = async (req, res) => {
             queueNotification({
                 recipientEmail: teacher.email,
                 recipientName: teacher.name,
-                subject: `Welcome to ABC Institute — Your Faculty Account`,
-                type: 'teacher_admission',
+                subject: `Welcome to DeFacto Institute — Your Faculty Account`,
+                type: 'teacher_registration',
                 data: {
                     regNo: teacher.regNo,
                     designation: teacher.designation || 'Faculty'

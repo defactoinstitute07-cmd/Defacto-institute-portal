@@ -116,7 +116,7 @@ const initReminderScheduler = () => {
                     await queueNotification({
                         recipientEmail: s.email,
                         recipientName: s.name,
-                        subject: 'Fee Due Reminder - ABC Institute',
+                        subject: 'Fee Due Reminder - DeFacto Institute',
                         type: 'fee_reminder',
                         data: {
                             amount: fee.pendingAmount,

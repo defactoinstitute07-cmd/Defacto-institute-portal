@@ -136,8 +136,8 @@ exports.createStudent = async (req, res) => {
             await queueNotification({
                 recipientEmail: student.email,
                 recipientName: student.name,
-                subject: 'Welcome to ABC Institute',
-                type: 'registration',
+                subject: 'Welcome to DeFacto Institute',
+                type: 'student_registration',
                 data: {
                     rollNo: student.rollNo,
                     password: req.body.password || 'student@123'
@@ -196,7 +196,7 @@ exports.updateStudent = async (req, res) => {
                 await queueNotification({
                     recipientEmail: student.email,
                     recipientName: student.name,
-                    subject: 'New Batch Assigned - ABC Institute',
+                    subject: 'New Batch Assigned - DeFacto Institute',
                     type: 'batch_assignment',
                     data: {
                         batchName: batch?.name || 'Assigned Batch',
@@ -321,8 +321,8 @@ exports.bulkUpload = async (req, res) => {
                     await queueNotification({
                         recipientEmail: student.email,
                         recipientName: student.name,
-                        subject: 'Welcome to ABC Institute',
-                        type: 'registration',
+                        subject: 'Welcome to DeFacto Institute',
+                        type: 'student_registration',
                         data: {
                             rollNo: student.rollNo,
                             password: 'student@123'

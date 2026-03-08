@@ -194,7 +194,7 @@ exports.saveMarks = async (req, res) => {
                     recipientEmail: student.email,
                     recipientName: student.name,
                     subject: `Result Announced: ${exam.name} — ${result}`,
-                    type: 'result_announced',
+                    type: 'exam_result_published',
                     data: {
                         examName: exam.name,
                         subject: exam.subject,

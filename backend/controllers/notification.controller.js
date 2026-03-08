@@ -53,7 +53,7 @@ exports.sendCustomNotification = async (req, res) => {
                 await queueNotification({
                     recipientEmail: s.email,
                     recipientName: s.name,
-                    subject: subject || 'Notice from ABC Institute',
+                    subject: subject || 'Notice from DeFacto Institute',
                     type: 'custom',
                     data: { message }
                 });

@@ -6,7 +6,20 @@ const notificationSchema = new mongoose.Schema({
     subject: { type: String, required: true },
     type: {
         type: String,
-        enum: ['registration', 'batch_assignment', 'fee_generated', 'fee_reminder', 'exam', 'holiday', 'result', 'custom'],
+        enum: [
+            'student_registration',
+            'student_login',
+            'exam_result_published',
+            'test_scheduled',
+            'fee_generated',
+            'fee_paid',
+            'teacher_registration',
+            'teacher_login',
+            'teacher_salary_paid',
+            'password_reset',
+            'batch_assignment',
+            'custom'
+        ],
         required: true
     },
     template: { type: String, required: true },
