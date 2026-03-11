@@ -104,7 +104,7 @@ const AddExpenseModal = ({ fee, onClose, onSave }) => {
 
                         <div className="mf-row">
                             <div className="mf">
-                                <label>Amount (₹) *</label>
+                                <label>Amount (₹ ) *</label>
                                 <div className="relative">
                                     <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                                         <IndianRupee size={15} />

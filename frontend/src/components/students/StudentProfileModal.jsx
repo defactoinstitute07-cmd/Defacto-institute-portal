@@ -88,7 +88,7 @@ const StudentProfileModal = ({ isOpen, onClose, student, onDownloadID }) => {
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px 32px', color: '#475569', fontSize: '0.85rem', fontWeight: 700 }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Hash size={16} /> ROLL: {student.rollNo}</div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><GraduationCap size={16} /> {student.className || 'General'}</div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Building2 size={16} /> BATCH: {student.batchId?.name || student.batchName || '—'}</div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Building2 size={16} /> BATCH: {student.batchId?.name || student.batchName || 'â€”'}</div>
                                     </div>
                                 </div>
 
@@ -106,8 +106,8 @@ const StudentProfileModal = ({ isOpen, onClose, student, onDownloadID }) => {
 
                         {/* --- STATS GRID --- */}
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '32px' }}>
-                            <StatCard label="Monthly Fee" value={`₹${(student.fees || 0).toLocaleString()}`} radius={sharpRadius} borderColor={borderColor} />
-                            <StatCard label="Paid Amount" value={`₹${(student.feesPaid || 0).toLocaleString()}`} radius={sharpRadius} color={primaryColor} borderColor={borderColor} />
+                            <StatCard label="Monthly Fee" value={`₹ ${(student.fees || 0).toLocaleString()}`} radius={sharpRadius} borderColor={borderColor} />
+                            <StatCard label="Paid Amount" value={`₹ ${(student.feesPaid || 0).toLocaleString()}`} radius={sharpRadius} color={primaryColor} borderColor={borderColor} />
                             <StatCard label="Attendance" value="85%" radius={sharpRadius} borderColor={borderColor} />
                             <StatCard label="Enrollment Year" value={student.session?.split('-')[0] || '2026'} radius={sharpRadius} borderColor={borderColor} />
                         </div>
@@ -121,15 +121,15 @@ const StudentProfileModal = ({ isOpen, onClose, student, onDownloadID }) => {
                                 <div style={{ background: '#fff', borderRadius: sharpRadius, border: `2px solid ${borderColor}`, padding: '24px' }}>
                                     <SectionHeading title="Identity & Family Details" icon={UserCircle2} color="#000" />
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px' }}>
-                                        <DetailItem label="DATE OF BIRTH" value={student.dob ? new Date(student.dob).toLocaleDateString() : '—'} icon={Calendar} />
-                                        <DetailItem label="GENDER" value={student.gender || '—'} icon={User} />
-                                        <DetailItem label="FATHER'S NAME" value={student.fatherName || '—'} icon={Info} />
-                                        <DetailItem label="MOTHER'S NAME" value={student.motherName || '—'} icon={Info} />
-                                        <DetailItem label="MOBILE NUMBER" value={student.contact || '—'} icon={Phone} />
-                                        <DetailItem label="EMAIL ADDRESS" value={student.email || '—'} icon={Mail} />
+                                        <DetailItem label="DATE OF BIRTH" value={student.dob ? new Date(student.dob).toLocaleDateString() : 'â€”'} icon={Calendar} />
+                                        <DetailItem label="GENDER" value={student.gender || 'â€”'} icon={User} />
+                                        <DetailItem label="FATHER'S NAME" value={student.fatherName || 'â€”'} icon={Info} />
+                                        <DetailItem label="MOTHER'S NAME" value={student.motherName || 'â€”'} icon={Info} />
+                                        <DetailItem label="WHATSAPP NUMBER" value={student.contact || 'â€”'} icon={Phone} />
+                                        <DetailItem label="EMAIL ADDRESS" value={student.email || 'â€”'} icon={Mail} />
                                         <DetailItem label="ADMISSION DATE" value={new Date(student.admissionDate || student.joinedAt).toLocaleDateString()} icon={Calendar} />
-                                        <DetailItem label="ACADEMIC SESSION" value={student.session || '—'} icon={Calendar} />
-                                        <DetailItem label="REGISTRATION FEE" value={`₹${student.registrationFee || 0}`} icon={IndianRupee} />
+                                        <DetailItem label="ACADEMIC SESSION" value={student.session || 'â€”'} icon={Calendar} />
+                                        <DetailItem label="REGISTRATION FEE" value={`₹ ${student.registrationFee || 0}`} icon={IndianRupee} />
                                     </div>
                                 </div>
 
@@ -158,8 +158,8 @@ const StudentProfileModal = ({ isOpen, onClose, student, onDownloadID }) => {
                                 {/* Financial Status */}
                                 <div style={{ background: '#fff', borderRadius: sharpRadius, border: `2px solid ${borderColor}`, padding: '24px' }}>
                                     <SectionHeading title="Fee Status" icon={Wallet} color="#000" />
-                                    <SidebarInfo label="Subscription Amount" value={`₹${(student.fees || 0).toLocaleString()} / month`} />
-                                    <SidebarInfo label="Amount Disbursed" value={`₹${(student.feesPaid || 0).toLocaleString()}`} />
+                                    <SidebarInfo label="Subscription Amount" value={`₹ ${(student.fees || 0).toLocaleString()} / month`} />
+                                    <SidebarInfo label="Amount Disbursed" value={`₹ ${(student.feesPaid || 0).toLocaleString()}`} />
                                     <div style={{
                                         marginTop: '20px',
                                         padding: '12px',
@@ -181,7 +181,7 @@ const StudentProfileModal = ({ isOpen, onClose, student, onDownloadID }) => {
                                 <div style={{ background: '#fff', borderRadius: sharpRadius, border: `2px solid ${borderColor}`, padding: '24px' }}>
                                     <SectionHeading title="Residence" icon={MapPin} color="#000" />
                                     <p style={{ fontSize: '0.65rem', fontWeight: 900, color: '#000', textTransform: 'uppercase', marginBottom: '8px' }}>Full Address</p>
-                                    <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1e293b', lineHeight: 1.5 }}>{student.address || '—'}</p>
+                                    <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1e293b', lineHeight: 1.5 }}>{student.address || 'â€”'}</p>
                                 </div>
 
                                 {/* Administrative Actions */}

@@ -201,7 +201,7 @@ const CreateFeeModal = ({ onClose, onSave }) => {
                                     }}
                                     onFocus={() => setIsDropdownOpen(true)}
                                     style={{
-                                        width: '100%', padding: '10px 14px', borderRadius: 8,
+                                        width: '100%', padding: '10px 14px', borderRadius: 6,
                                         border: '1px solid #e2e8f0', fontSize: '0.9rem', outline: 'none'
                                     }}
                                     required={!form.studentId}
@@ -210,7 +210,7 @@ const CreateFeeModal = ({ onClose, onSave }) => {
                                     <div style={{
                                         position: 'absolute', top: '100%', left: 0, right: 0,
                                         background: '#fff', border: '1px solid #e2e8f0',
-                                        borderRadius: 8, marginTop: 4, maxHeight: 220,
+                                        borderRadius: 6, marginTop: 4, maxHeight: 220,
                                         overflowY: 'auto', zIndex: 10, boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)'
                                     }}>
                                         {searching ? (
@@ -238,7 +238,7 @@ const CreateFeeModal = ({ onClose, onSave }) => {
                                                     <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Roll: {s.rollNo}</div>
                                                 </div>
                                                 {s.batchId && (
-                                                    <div style={{ fontSize: '0.75rem', background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: 12 }}>
+                                                    <div style={{ fontSize: '0.75rem', background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: 6 }}>
                                                         {s.batchId.name || 'Assigned'}
                                                     </div>
                                                 )}
@@ -267,7 +267,7 @@ const CreateFeeModal = ({ onClose, onSave }) => {
                                     </select>
                                 </div>
                                 <div className="mf">
-                                    <label>Fee Amount (₹) *</label>
+                                    <label>Fee Amount (₹ ) *</label>
                                     <input
                                         type="number"
                                         value={form.amount}

@@ -39,7 +39,7 @@ const DatabaseUsage = ({ setAlert }) => {
         <div className="card" style={{ padding: 32, marginBottom: 24 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, borderBottom: '1px solid #e2e8f0', paddingBottom: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ padding: 12, background: '#eff6ff', borderRadius: 12 }}>
+                    <div style={{ padding: 12, background: '#eff6ff', borderRadius: 6 }}>
                         <Database size={24} color="#3b82f6" />
                     </div>
                     <div>
@@ -58,19 +58,19 @@ const DatabaseUsage = ({ setAlert }) => {
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 20, marginBottom: 32 }}>
-                <div style={{ padding: 16, background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                <div style={{ padding: 16, background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, color: '#64748b', fontSize: '0.85rem' }}>
                         <Activity size={14} /> DB Name
                     </div>
                     <div style={{ fontSize: '1.1rem', fontWeight: '600', color: '#1e293b' }}>{stats.dbName}</div>
                 </div>
-                <div style={{ padding: 16, background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                <div style={{ padding: 16, background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, color: '#64748b', fontSize: '0.85rem' }}>
                         <Layers size={14} /> Collections
                     </div>
                     <div style={{ fontSize: '1.1rem', fontWeight: '600', color: '#1e293b' }}>{stats.collections}</div>
                 </div>
-                <div style={{ padding: 16, background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                <div style={{ padding: 16, background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, color: '#64748b', fontSize: '0.85rem' }}>
                         <HardDrive size={14} /> Used Storage
                     </div>
@@ -107,3 +107,4 @@ const DatabaseUsage = ({ setAlert }) => {
 };
 
 export default DatabaseUsage;
+

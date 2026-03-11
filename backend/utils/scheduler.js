@@ -3,7 +3,7 @@ const feeController = require('../controllers/fee.controller');
 const payrollController = require('../controllers/teacher.payroll.controller');
 const Fee = require('../models/Fee');
 const Student = require('../models/Student');
-const { queueNotification } = require('../services/emailService');
+const { logNotificationEvent } = require('../services/activityLogService');
 
 /**
  * Automates monthly fee generation for all active students.
@@ -75,7 +75,7 @@ const initSalaryScheduler = () => {
 };
 
 /**
- * Daily check for due fees. Sends reminders 3 days before and on the due date.
+ * Daily check for due fees. Logs reminder events 3 days before and on the due date.
  * Runs every day at 09:00 AM.
  */
 const initReminderScheduler = () => {
@@ -99,7 +99,7 @@ const initReminderScheduler = () => {
                 }
             }).populate('studentId');
 
-            console.log(`[Scheduler] Found ${targetFees.length} potential fee reminders to send.`);
+            console.log(`[Scheduler] Found ${targetFees.length} potential fee reminders to log.`);
 
             for (const fee of targetFees) {
                 const s = fee.studentId;
@@ -113,7 +113,7 @@ const initReminderScheduler = () => {
                 if (feeDueDate.getTime() === threeDaysFromNow.getTime()) shouldNotify = true;
 
                 if (shouldNotify) {
-                    await queueNotification({
+                    await logNotificationEvent({
                         recipientEmail: s.email,
                         recipientName: s.name,
                         subject: 'Fee Due Reminder - DeFacto Institute',
@@ -130,7 +130,8 @@ const initReminderScheduler = () => {
         }
     });
 
-    console.log('[Scheduler] Fee reminder service initialized (Daily at 9:00 AM).');
+    console.log('[Scheduler] Fee reminder service initialized (Daily at 9:00 AM, internal logs only).');
 };
 
 module.exports = { initFeeScheduler, initSalaryScheduler, initReminderScheduler };
+

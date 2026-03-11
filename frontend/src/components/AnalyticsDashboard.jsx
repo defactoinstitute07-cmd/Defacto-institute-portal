@@ -90,7 +90,7 @@ const AnalyticsDashboard = ({ data }) => {
             <div>
                 <p className="text-slate-500 text-xs md:text-sm font-medium mb-1 uppercase tracking-wider">{title}</p>
                 <h3 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight">
-                    ₹{value.toLocaleString('en-IN')}
+                    ₹ {value.toLocaleString('en-IN')}
                 </h3>
             </div>
         </div>
@@ -138,7 +138,7 @@ const AnalyticsDashboard = ({ data }) => {
                             <BarChart data={summary.barData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
-                                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} tickFormatter={(v) => `₹${v / 1000}k`} />
+                                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} tickFormatter={(v) => `₹ ${v / 1000}k`} />
                                 <Tooltip
                                     cursor={{ fill: '#f8fafc' }}
                                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
@@ -198,10 +198,10 @@ const AnalyticsDashboard = ({ data }) => {
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
-                        <InsightItem label="Highest Expense" value={summary.highestExpense.name} subValue={`₹${summary.highestExpense.value.toLocaleString()}`} color="text-indigo-400" />
-                        <InsightItem label="Monthly Income" value={`₹${summary.monthlyEarnings.toLocaleString()}`} subValue="Current Month" color="text-emerald-400" />
-                        <InsightItem label="Monthly Expense" value={`₹${summary.monthlyExpenses.toLocaleString()}`} subValue="Current Month" color="text-rose-400" />
-                        <InsightItem label="Net Savings" value={`₹${summary.netSavings.toLocaleString()}`} subValue="Available Balance" color="text-sky-400" badge="Healthy" />
+                        <InsightItem label="Highest Expense" value={summary.highestExpense.name} subValue={`₹ ${summary.highestExpense.value.toLocaleString()}`} color="text-indigo-400" />
+                        <InsightItem label="Monthly Income" value={`₹ ${summary.monthlyEarnings.toLocaleString()}`} subValue="Current Month" color="text-emerald-400" />
+                        <InsightItem label="Monthly Expense" value={`₹ ${summary.monthlyExpenses.toLocaleString()}`} subValue="Current Month" color="text-rose-400" />
+                        <InsightItem label="Net Savings" value={`₹ ${summary.netSavings.toLocaleString()}`} subValue="Available Balance" color="text-sky-400" badge="Healthy" />
                     </div>
                 </div>
             </div>

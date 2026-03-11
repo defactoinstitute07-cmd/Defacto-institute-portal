@@ -77,7 +77,7 @@ const MarksEntryModal = ({ exam, onClose, onSave }) => {
                     max-width: 850px;
                     max-height: 95vh;
                     background: #f8fafc;
-                    border-radius: 12px;
+                    border-radius: 0.375rem;
                     display: flex;
                     flex-direction: column;
                     box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
@@ -111,7 +111,7 @@ const MarksEntryModal = ({ exam, onClose, onSave }) => {
                 {/* Header */}
                 <div className="modal-header" style={{ background: '#0f172a', padding: '20px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div style={{ width: 40, height: 40, borderRadius: 8, background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ width: 40, height: 40, borderRadius: 6, background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <Edit3 size={20} color="#fff" />
                         </div>
                         <div>
@@ -212,11 +212,11 @@ const MarksEntryModal = ({ exam, onClose, onSave }) => {
                         <Users size={16} /> {rows.length} Total Students
                     </div>
                     <div className="footer-btns" style={{ display: 'flex', gap: 10 }}>
-                        <button onClick={onClose} style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
+                        <button onClick={onClose} style={{ padding: '10px 20px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontWeight: 600 }}>Cancel</button>
                         <button 
                             disabled={saving || success} 
                             onClick={handleSave}
-                            style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}
+                            style={{ padding: '10px 20px', borderRadius: 6, border: 'none', background: '#2563eb', color: '#fff', cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}
                         >
                             {saving ? <Loader2 size={16} className="spin" /> : <Save size={16} />}
                             {saving ? 'Saving...' : 'Save Marks'}

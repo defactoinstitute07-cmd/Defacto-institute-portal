@@ -7,21 +7,21 @@ const ExpenseStats = ({ metrics, fmt }) => {
     const cards = [
         {
             title: "Total Expenses (All Time)",
-            value: `₹${fmt(metrics.totalOverall || 0)}`,
+            value: `₹ ${fmt(metrics.totalOverall || 0)}`,
             icon: Activity,
             color: "var(--erp-primary)",
             bg: "rgba(79, 70, 229, 0.1)"
         },
         {
             title: "Expenses This Month",
-            value: `₹${fmt(metrics.thisMonthTotal || 0)}`,
+            value: `₹ ${fmt(metrics.thisMonthTotal || 0)}`,
             icon: TrendingUp,
             color: "var(--erp-error)",
             bg: "rgba(239, 68, 68, 0.1)"
         },
         {
             title: "To Be Paid (Pending)",
-            value: `₹${fmt(metrics.pendingTotal || 0)}`,
+            value: `₹ ${fmt(metrics.pendingTotal || 0)}`,
             icon: Clock,
             color: "var(--erp-warning)",
             bg: "rgba(245, 158, 11, 0.1)"
@@ -36,7 +36,7 @@ const ExpenseStats = ({ metrics, fmt }) => {
 
     cards.push({
         title: `Top Category (${topCategory.category})`,
-        value: `₹${fmt(topCategory.amount)}`,
+        value: `₹ ${fmt(topCategory.amount)}`,
         icon: PieChart,
         color: "var(--erp-primary)",
         bg: "rgba(79, 70, 229, 0.1)"

@@ -170,7 +170,7 @@ const ExamsPage = () => {
                     <select
                         value={filterBatch}
                         onChange={e => { setFilterBatch(e.target.value); setFilterSubject(''); setSelectedExam(null); if (tab === 'leaderboard') { if (leaderboardType === 'improvers') fetchImprovers(e.target.value); else fetchScorers(e.target.value); } }}
-                        style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: '0.9rem', fontWeight: 600, color: '#1e293b', outline: 'none' }}
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: '0.9rem', fontWeight: 600, color: '#1e293b', outline: 'none' }}
                     >
                         <option value="">All Batches</option>
                         {uniqueBatches.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
@@ -181,7 +181,7 @@ const ExamsPage = () => {
                     <select
                         value={filterSubject}
                         onChange={e => { setFilterSubject(e.target.value); setSelectedExam(null); }}
-                        style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: '0.9rem', fontWeight: 600, color: '#1e293b', outline: 'none' }}
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: '0.9rem', fontWeight: 600, color: '#1e293b', outline: 'none' }}
                     >
                         <option value="">{filterBatch ? 'All Subjects' : 'Select Batch first...'}</option>
                         {availableSubjects.map(s => <option key={s} value={s}>{s}</option>)}
@@ -190,21 +190,21 @@ const ExamsPage = () => {
                 {(filterBatch || filterSubject) && (
                     <button
                         onClick={() => { setFilterBatch(''); setFilterSubject(''); setSelectedExam(null); }}
-                        style={{ background: '#f1f5f9', border: 'none', padding: '10px 16px', borderRadius: 8, color: '#64748b', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                        style={{ background: '#f1f5f9', border: 'none', padding: '10px 16px', borderRadius: 6, color: '#64748b', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
                     >
                         Reset Filters
                     </button>
                 )}
             </div>
 
-            <div className="ex-tabs" style={{ display: 'flex', gap: 4, background: '#f1f5f9', padding: 4, borderRadius: 10, marginBottom: 24, width: 'fit-content' }}>
+            <div className="ex-tabs" style={{ display: 'flex', gap: 4, background: '#f1f5f9', padding: 4, borderRadius: 6, marginBottom: 24, width: 'fit-content' }}>
                 {[
                     { key: 'tests', label: 'Tests', Icon: ClipboardList },
                     { key: 'results', label: 'Results', Icon: CheckCircle2 },
                     { key: 'leaderboard', label: 'Leaderboards', Icon: Trophy },
                 ].map(({ key, label, Icon }) => (
                     <button key={key} onClick={() => setTab(key)} style={{
-                        padding: '8px 22px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700,
+                        padding: '8px 22px', borderRadius: 6, border: 'none', cursor: 'pointer', fontWeight: 700,
                         fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 6,
                         background: tab === key ? '#fff' : 'transparent',
                         color: tab === key ? 'var(--erp-primary)' : '#64748b',
@@ -227,7 +227,7 @@ const ExamsPage = () => {
                     ) : (
                         <>
                             <div className="erp-table-wrap">
-                                <table className="erp-table">
+                                <table className="erp-table stackable">
                                     <thead>
                                         <tr style={{ background: '#f8fafc' }}>
                                             <th>Test Name</th>
@@ -241,12 +241,12 @@ const ExamsPage = () => {
                                     <tbody>
                                         {displayedExams.map(exam => (
                                             <tr key={exam._id}>
-                                                <td><div className="td-bold">{exam.name}</div></td>
-                                                <td><span style={{ background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: 20, fontSize: '0.78rem', fontWeight: 700 }}>{exam.batchId?.name || '—'}</span></td>
-                                                <td className="td-sm">{exam.subject}</td>
-                                                <td className="td-sm"><span style={{ fontWeight: 700 }}>{exam.totalMarks}</span> / <span style={{ color: '#64748b' }}>{exam.passingMarks}</span></td>
-                                                <td>{statusBadge(exam.status)}</td>
-                                                <td>
+                                                <td data-label="Test Name"><div className="td-bold">{exam.name}</div></td>
+                                                <td data-label="Batch"><span style={{ background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: 6, fontSize: '0.78rem', fontWeight: 700 }}>{exam.batchId?.name || '—'}</span></td>
+                                                <td className="td-sm" data-label="Subject">{exam.subject}</td>
+                                                <td className="td-sm" data-label="Total / Passing"><span style={{ fontWeight: 700 }}>{exam.totalMarks}</span> / <span style={{ color: '#64748b' }}>{exam.passingMarks}</span></td>
+                                                <td data-label="Status">{statusBadge(exam.status)}</td>
+                                                <td data-label="Actions">
                                                     <div style={{ display: 'flex', gap: 6 }}>
                                                         <button
                                                             className="btn btn-sm btn-outline"
@@ -305,7 +305,7 @@ const ExamsPage = () => {
                                 const exam = exams.find(x => x._id === e.target.value);
                                 if (exam) fetchResults(exam);
                             }}
-                            style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: '0.9rem', fontWeight: 700, color: '#1e293b', minWidth: 260, width: '100%', outline: 'none' }}
+                            style={{ padding: '10px 12px', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: '0.9rem', fontWeight: 700, color: '#1e293b', minWidth: 260, width: '100%', outline: 'none' }}
                             disabled={!filterBatch || !filterSubject}
                         >
                             <option value="">{!filterBatch ? 'Choose Batch first...' : !filterSubject ? 'Choose Subject first...' : '-- Select Test --'}</option>
@@ -349,7 +349,7 @@ const ExamsPage = () => {
                                     </div>
                                 ) : (
                                     <div className="erp-table-wrap">
-                                        <table className="erp-table">
+                                        <table className="erp-table stackable">
                                             <thead>
                                                 <tr>
                                                     <th>#</th>
@@ -368,19 +368,19 @@ const ExamsPage = () => {
                                                     const grade = passed ? 'PASS' : 'FAIL';
                                                     return (
                                                         <tr key={r._id} style={{ ...style }}>
-                                                            <td style={{ color: '#64748b', fontSize: '0.8rem' }}>{idx + 1}</td>
-                                                            <td><div className="td-bold" style={{ color: style.color }}>{r.studentId?.name || '—'}</div></td>
-                                                            <td className="td-sm">{r.studentId?.rollNo || '—'}</td>
-                                                            <td><span style={{ fontSize: '1.1rem', fontWeight: 900, color: style.color }}>{r.marksObtained}</span></td>
-                                                            <td className="td-sm">{selectedExam.totalMarks}</td>
-                                                            <td>
+                                                            <td style={{ color: '#64748b', fontSize: '0.8rem' }} data-label="#">{idx + 1}</td>
+                                                            <td data-label="Student"><div className="td-bold" style={{ color: style.color }}>{r.studentId?.name || '—'}</div></td>
+                                                            <td className="td-sm" data-label="Roll No.">{r.studentId?.rollNo || '—'}</td>
+                                                            <td data-label="Marks Obtained"><span style={{ fontSize: '1.1rem', fontWeight: 900, color: style.color }}>{r.marksObtained}</span></td>
+                                                            <td className="td-sm" data-label="Out of">{selectedExam.totalMarks}</td>
+                                                            <td data-label="Result">
                                                                 <span style={{
                                                                     background: style.borderLeft.replace('3px solid ', '') + '22',
                                                                     color: style.color,
-                                                                    padding: '3px 10px', borderRadius: 20, fontWeight: 800, fontSize: '0.75rem'
+                                                                    padding: '3px 10px', borderRadius: 6, fontWeight: 800, fontSize: '0.75rem'
                                                                 }}>{grade}</span>
                                                             </td>
-                                                            <td className="td-sm">{r.remarks || '—'}</td>
+                                                            <td className="td-sm" data-label="Remarks">{r.remarks || '—'}</td>
                                                         </tr>
                                                     );
                                                 })}
@@ -403,7 +403,7 @@ const ExamsPage = () => {
 
             {tab === 'leaderboard' && (
                 <div className="card" style={{ padding: 24 }}>
-                    <div style={{ display: 'flex', gap: 8, background: '#f8fafc', padding: '4px', borderRadius: 8, border: '1px solid #e2e8f0', marginBottom: 20, width: 'fit-content' }}>
+                    <div style={{ display: 'flex', gap: 8, background: '#f8fafc', padding: '4px', borderRadius: 6, border: '1px solid #e2e8f0', marginBottom: 20, width: 'fit-content' }}>
                         <button
                             onClick={() => setLeaderboardType('improvers')}
                             style={{
@@ -442,7 +442,7 @@ const ExamsPage = () => {
                             </div>
                         ) : (
                             <div className="erp-table-wrap">
-                                <table className="erp-table">
+                                <table className="erp-table stackable">
                                     <thead>
                                         <tr style={{ background: '#f8fafc' }}>
                                             <th style={{ width: 80 }}>Rank</th>
@@ -455,23 +455,23 @@ const ExamsPage = () => {
                                     <tbody>
                                         {improvers.map((imp, i) => (
                                             <tr key={i}>
-                                                <td style={{ fontWeight: 800 }}>
+                                                <td style={{ fontWeight: 800 }} data-label="Rank">
                                                     {i === 0 ? <Award size={20} color="#eab308" style={{ verticalAlign: 'middle' }} /> :
                                                         i === 1 ? <Award size={20} color="#94a3b8" style={{ verticalAlign: 'middle' }} /> :
                                                             i === 2 ? <Award size={20} color="#b45309" style={{ verticalAlign: 'middle' }} /> :
                                                                 `#${i + 1}`}
                                                 </td>
-                                                <td><div className="td-bold">{imp.name}</div></td>
-                                                <td>
+                                                <td data-label="Student Name"><div className="td-bold">{imp.name}</div></td>
+                                                <td data-label="Improvement">
                                                     <span style={{
                                                         color: '#15803d', fontWeight: 800, background: '#f0fdf4',
-                                                        padding: '4px 12px', borderRadius: 20, fontSize: '0.85rem'
+                                                        padding: '4px 12px', borderRadius: 6, fontSize: '0.85rem'
                                                     }}>
                                                         +{imp.improvement}%
                                                     </span>
                                                 </td>
-                                                <td className="td-bold">{imp.current}%</td>
-                                                <td className="td-sm">{imp.last}%</td>
+                                                <td className="td-bold" data-label="Current Avg %">{imp.current}%</td>
+                                                <td className="td-sm" data-label="Previous Avg %">{imp.last}%</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -488,7 +488,7 @@ const ExamsPage = () => {
                             </div>
                         ) : (
                             <div className="erp-table-wrap">
-                                <table className="erp-table">
+                                <table className="erp-table stackable">
                                     <thead>
                                         <tr style={{ background: '#f8fafc' }}>
                                             <th style={{ width: 80 }}>Rank</th>
@@ -501,22 +501,22 @@ const ExamsPage = () => {
                                     <tbody>
                                         {scorers.map((s, i) => (
                                             <tr key={i}>
-                                                <td style={{ fontWeight: 800 }}>
+                                                <td style={{ fontWeight: 800 }} data-label="Rank">
                                                     {i === 0 ? <Trophy size={20} color="#eab308" style={{ verticalAlign: 'middle' }} /> :
                                                         i === 1 ? <Star size={20} color="#94a3b8" style={{ verticalAlign: 'middle' }} /> :
                                                             i === 2 ? <Sparkles size={20} color="#b45309" style={{ verticalAlign: 'middle' }} /> :
                                                                 `#${i + 1}`}
                                                 </td>
-                                                <td><div className="td-bold">{s.name}</div></td>
-                                                <td>
+                                                <td data-label="Student Name"><div className="td-bold">{s.name}</div></td>
+                                                <td data-label="Overall Avg %">
                                                     <div style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--erp-primary)' }}>{s.avgScore}%</div>
                                                 </td>
-                                                <td className="td-sm">{s.testsTaken} Tests</td>
-                                                <td>
+                                                <td className="td-sm" data-label="Tests Taken">{s.testsTaken} Tests</td>
+                                                <td data-label="Standing">
                                                     <span style={{
                                                         background: s.avgScore >= 90 ? '#f0fdf4' : s.avgScore >= 75 ? '#eff6ff' : '#f8fafc',
                                                         color: s.avgScore >= 90 ? '#15803d' : s.avgScore >= 75 ? '#1e40af' : '#64748b',
-                                                        padding: '4px 12px', borderRadius: 20, fontSize: '0.75rem', fontWeight: 800
+                                                        padding: '4px 12px', borderRadius: 6, fontSize: '0.75rem', fontWeight: 800
                                                     }}>
                                                         {s.avgScore >= 90 ? 'Outstanding' : s.avgScore >= 75 ? 'Distinguished' : 'Standard'}
                                                     </span>

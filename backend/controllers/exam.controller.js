@@ -2,7 +2,7 @@ const Exam = require('../models/Exam');
 const ExamResult = require('../models/ExamResult');
 const Student = require('../models/Student');
 const Batch = require('../models/Batch');
-const { queueNotification } = require('../services/emailService');
+const { logNotificationEvent } = require('../services/activityLogService');
 
 // GET /api/exams — list all exams
 exports.getAllExams = async (req, res) => {
@@ -31,12 +31,12 @@ exports.createExam = async (req, res) => {
         await exam.save();
         await exam.populate('batchId', 'name subjects');
 
-        // Email Notification: Test Scheduled to all active students in batch
+        // Log test scheduling events for all active students in the batch.
         const students = await Student.find({ batchId, status: 'active' }).select('name email').lean();
 
         students.forEach(student => {
             if (student.email) {
-                queueNotification({
+                logNotificationEvent({
                     recipientEmail: student.email,
                     recipientName: student.name,
                     subject: `New Test Scheduled: ${name}`,
@@ -49,11 +49,11 @@ exports.createExam = async (req, res) => {
                         totalMarks,
                         passingMarks
                     }
-                }).catch(e => console.error('[ExamEmail] test_scheduled error:', e));
+                }).catch(e => console.error('[ExamNotificationLog] test_scheduled error:', e));
             }
         });
 
-        res.status(201).json({ message: 'Test created and students notified', exam });
+        res.status(201).json({ message: 'Test created successfully', exam });
     } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });
     }
@@ -175,7 +175,7 @@ exports.saveMarks = async (req, res) => {
             await exam.save();
         }
 
-        // Email Notification: Result Announced to each student
+        // Log result announcements for each student.
         const studentIds = marks.map(m => m.studentId);
         const students = await Student.find({ _id: { $in: studentIds } }).select('name email _id').lean();
         const studentMap = {};
@@ -190,7 +190,7 @@ exports.saveMarks = async (req, res) => {
                 const result = pass ? 'PASS' : 'FAIL';
                 const resultColor = pass ? '#15803d' : (mo >= grace ? '#a16207' : '#be123c');
 
-                queueNotification({
+                logNotificationEvent({
                     recipientEmail: student.email,
                     recipientName: student.name,
                     subject: `Result Announced: ${exam.name} — ${result}`,
@@ -204,7 +204,7 @@ exports.saveMarks = async (req, res) => {
                         result,
                         resultColor
                     }
-                }).catch(e => console.error('[ExamEmail] result_announced error:', e));
+                }).catch(e => console.error('[ExamNotificationLog] result_announced error:', e));
             }
         });
 
@@ -403,3 +403,4 @@ exports.getBatchTopScorers = async (req, res) => {
         res.status(500).json({ message: 'Server error', error: err.message });
     }
 };
+

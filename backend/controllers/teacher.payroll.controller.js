@@ -9,7 +9,7 @@ const {
 const Teacher = require('../models/Teacher');
 const Admin = require('../models/Admin');
 const Expense = require('../models/Expense');
-const { queueNotification } = require('../services/emailService');
+const { logNotificationEvent } = require('../services/activityLogService');
 
 
 // ==========================================
@@ -261,11 +261,11 @@ exports.markSalaryPaid = async (req, res) => {
             console.error('[PayrollToExpense] Failed to create expense record:', expErr);
         }
 
-        // Email Notification: Salary Paid
+        // Log salary payment activity instead of sending email.
         try {
             const teacherInfo = await Teacher.findById(salary.teacherId).select('name email');
             if (teacherInfo && teacherInfo.email) {
-                queueNotification({
+                logNotificationEvent({
                     recipientEmail: teacherInfo.email,
                     recipientName: teacherInfo.name,
                     subject: `Salary Credited — ${salary.monthYear}`,
@@ -276,10 +276,10 @@ exports.markSalaryPaid = async (req, res) => {
                         paymentMethod,
                         transactionId: payment.transactionId
                     }
-                }).catch(e => console.error('[SalaryEmail] Error:', e));
+                }).catch(e => console.error('[SalaryNotificationLog] Error:', e));
             }
-        } catch (emailErr) {
-            console.error('[SalaryEmail] Lookup error:', emailErr);
+        } catch (notificationErr) {
+            console.error('[SalaryNotificationLog] Lookup error:', notificationErr);
         }
 
         res.json({ message: 'Payment recorded successfully', payment });
@@ -396,3 +396,4 @@ exports.bulkGenerateSalaries = async (req, res) => {
         res.status(500).json({ message: 'Server error during bulk generation', error: error.message });
     }
 };
+

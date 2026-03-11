@@ -73,7 +73,7 @@ const RecordPaymentModal = ({ fee, onClose, onSave }) => {
                     max-width: 900px;
                     max-height: 95vh;
                     background: #f8fafc;
-                    border-radius: 12px;
+                    border-radius: 0.375rem;
                     overflow: hidden;
                     display: flex;
                     flex-direction: column;
@@ -163,17 +163,17 @@ const RecordPaymentModal = ({ fee, onClose, onSave }) => {
                         <div className="bill-summary" style={{ padding: '24px 32px', background: '#f8fafc', borderBottom: `1px solid ${borderColor}` }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
                                 <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Total Billed</span>
-                                <span style={{ fontSize: '1rem', fontWeight: 800 }}>₹{totalDue.toLocaleString()}</span>
+                                <span style={{ fontSize: '1rem', fontWeight: 800 }}>₹ {totalDue.toLocaleString()}</span>
                             </div>
 
                             <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 16 }}>
-                                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Monthly Base Fee: <span style={{ fontWeight: 700, color: '#1e293b' }}>₹{(fee.monthlyTuitionFee || 0).toLocaleString()}</span></div>
+                                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Monthly Base Fee: <span style={{ fontWeight: 700, color: '#1e293b' }}>₹ {(fee.monthlyTuitionFee || 0).toLocaleString()}</span></div>
                                 <div style={{
                                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                                     paddingTop: 12, borderTop: `1px solid ${borderColor}`, marginTop: 8
                                 }}>
                                     <div style={{ fontSize: '0.75rem', fontWeight: 900, color: accentBlue }}>REMAINING</div>
-                                    <div style={{ fontSize: '1.25rem', fontWeight: 900, color: accentBlue }}>₹{remainingBalance.toLocaleString()}</div>
+                                    <div style={{ fontSize: '1.25rem', fontWeight: 900, color: accentBlue }}>₹ {remainingBalance.toLocaleString()}</div>
                                 </div>
                             </div>
                         </div>
@@ -190,7 +190,7 @@ const RecordPaymentModal = ({ fee, onClose, onSave }) => {
                                 <div className="mf">
                                     <label style={{ fontSize: '0.7rem', fontWeight: 800, color: labelColor, display: 'block', marginBottom: 8 }}>AMOUNT TO PAY *</label>
                                     <div style={{ position: 'relative' }}>
-                                        <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontWeight: 800, color: '#94a3b8' }}>₹</span>
+                                        <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontWeight: 800, color: '#94a3b8' }}>₹ </span>
                                         <input
                                             type="number" required max={remainingBalance} step="0.01"
                                             style={{ borderRadius: sharpRadius, padding: '12px 12px 12px 28px', border: `1px solid ${borderColor}`, fontSize: '0.9rem', fontWeight: 700, background: '#fcfdfd', width: '100%', boxSizing: 'border-box' }}

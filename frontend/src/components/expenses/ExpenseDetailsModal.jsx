@@ -31,7 +31,7 @@ const ExpenseDetailsModal = ({ isOpen, onClose, expense, onMarkPaid }) => {
                     <div className="mb-6 flex justify-between items-start">
                         <div>
                             <h3 className="text-xl font-bold text-slate-800 mb-1">{expense.title}</h3>
-                            <div className="text-2xl font-black text-slate-900">₹{fmtAmount(expense.amount)}</div>
+                            <div className="text-2xl font-black text-slate-900">₹ {fmtAmount(expense.amount)}</div>
                         </div>
                         <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase border ${expense.status === 'Paid' ? 'bg-slate-100 text-slate-700 border-slate-200' : 'bg-orange-50 text-orange-600 border-orange-200'}`}>
                             {expense.status === 'Paid' ? <span className="flex items-center gap-1"><CheckCircle size={12} /> Paid</span> : <span className="flex items-center gap-1"><Clock size={12} /> Pending</span>}

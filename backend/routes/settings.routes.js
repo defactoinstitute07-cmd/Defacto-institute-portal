@@ -43,8 +43,4 @@ router.get('/', async (req, res) => {
 // Returns MongoDB usage statistics (Required for admin dashboard)
 router.get('/db-stats', adminAuth, adminController.getDatabaseStats);
 
-// Email Template Management
-router.get('/email-templates', adminAuth, adminController.getAllEmailTemplates);
-router.put('/email-templates/:id', adminAuth, adminController.updateEmailTemplate);
-
 module.exports = router;

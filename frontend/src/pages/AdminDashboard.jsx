@@ -40,7 +40,7 @@ const AdminDashboard = () => {
         { label: 'Total Students', value: fmt(data.totalStudents), sub: 'enrolled', icon: GraduationCap, cls: 'ic-indigo' },
         { label: 'Active Batches', value: fmt(data.activeBatches), sub: 'currently running', icon: BookOpen, cls: 'ic-indigo' },
         { label: 'Total Teachers', value: fmt(data.totalTeachers), sub: 'across batches', icon: Users, cls: 'ic-indigo' },
-        { label: 'Fees Collected', value: `₹${fmt(data.totalFeesPaid)}`, sub: 'collected so far', icon: IndianRupee, cls: 'ic-indigo' },
+        { label: 'Fees Collected', value: `₹ ${fmt(data.totalFeesPaid)}`, sub: 'collected so far', icon: IndianRupee, cls: 'ic-indigo' },
     ] : [];
 
     if (!data && !loading) return null;
@@ -95,7 +95,7 @@ const AdminDashboard = () => {
                     <SkeletonTable rows={5} />
                 ) : data?.recentAdmissions?.length ? (
                     <div className="erp-table-wrap">
-                        <table className="erp-table">
+                        <table className="erp-table stackable">
                             <thead>
                                 <tr style={{ background: '#f8fafc' }}>
                                     <th style={{ borderRadius: '2px 0 0 2px' }}>Student</th>
@@ -106,16 +106,16 @@ const AdminDashboard = () => {
                             <tbody>
                                 {data.recentAdmissions.map(s => (
                                     <tr key={s._id}>
-                                        <td>
+                                        <td data-label="Student">
                                             <div className="td-bold" style={{ fontSize: '0.85rem' }}>{s.name}</div>
                                             <div className="td-sm">{s.rollNo || '—'}</div>
                                         </td>
-                                        <td className="td-sm">
+                                        <td data-label="Joined">
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600 }}>
                                                 <Calendar size={12} style={{ color: '#64748b' }} /> {fmtDate(s.joinedAt)}
                                             </div>
                                         </td>
-                                        <td>
+                                        <td data-label="Status">
                                             {s.feesPaid >= s.fees && s.fees > 0
                                                 ? <span className="badge badge-active">Fully Paid</span>
                                                 : <span className="badge badge-unpaid">Pending</span>

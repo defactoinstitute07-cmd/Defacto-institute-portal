@@ -183,7 +183,7 @@ const TeacherBulkGenerateModal = ({ isOpen, onClose, onConfirm, selectedCount, t
                     color: #fff;
                     border: none;
                     padding: 12px;
-                    border-radius: 8px;
+                    border-radius: 0.375rem;
                     font-weight: 800;
                     cursor: pointer;
                     font-size: 0.8rem;
@@ -193,7 +193,7 @@ const TeacherBulkGenerateModal = ({ isOpen, onClose, onConfirm, selectedCount, t
                     color: #475569;
                     border: none;
                     padding: 12px;
-                    border-radius: 8px;
+                    border-radius: 0.375rem;
                     font-weight: 800;
                     cursor: pointer;
                     font-size: 0.8rem;
@@ -206,3 +206,4 @@ const TeacherBulkGenerateModal = ({ isOpen, onClose, onConfirm, selectedCount, t
 };
 
 export default TeacherBulkGenerateModal;
+

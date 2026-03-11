@@ -68,12 +68,12 @@ const PaymentHistoryModal = ({ fee, onClose, onViewReceipt }) => {
                     <div style={{ background: 'var(--erp-bg2)', padding: '16px', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', marginBottom: '24px', textAlign: 'center' }}>
                         <div style={{ flex: 1 }}>
                             <div className="td-sm">Total Fee</div>
-                            <div className="td-bold">₹{(fee.totalFee || 0).toLocaleString()}</div>
+                            <div className="td-bold">₹ {(fee.totalFee || 0).toLocaleString()}</div>
                         </div>
                         <div style={{ width: 1, background: 'var(--erp-border)', margin: '0 16px' }} />
                         <div style={{ flex: 1 }}>
                             <div className="td-sm" style={{ color: 'var(--erp-success)' }}>Paid</div>
-                            <div className="td-bold" style={{ color: 'var(--erp-success)' }}>₹{(fee.amountPaid || 0).toLocaleString()}</div>
+                            <div className="td-bold" style={{ color: 'var(--erp-success)' }}>₹ {(fee.amountPaid || 0).toLocaleString()}</div>
                         </div>
                         <div style={{ width: 1, background: 'var(--erp-border)', margin: '0 16px' }} />
                         <div style={{ flex: 1 }}>
@@ -108,7 +108,7 @@ const PaymentHistoryModal = ({ fee, onClose, onViewReceipt }) => {
                                     </div>
                                     <div className="card" style={{ padding: '16px', background: '#fff' }}>
                                         <div className="flex justify-between items-center mb-2">
-                                            <div className="td-bold" style={{ fontSize: '1rem' }}>₹{(pay.paidAmount || 0).toLocaleString()}</div>
+                                            <div className="td-bold" style={{ fontSize: '1rem' }}>₹ {(pay.paidAmount || 0).toLocaleString()}</div>
                                             <button
                                                 className="btn btn-outline btn-sm"
                                                 style={{ padding: '5px 10px', display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.78rem', fontWeight: 700 }}

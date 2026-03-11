@@ -5,7 +5,7 @@ const Fee = require('../models/Fee');
 const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
 const feeController = require('./fee.controller');
-const { queueNotification } = require('../services/emailService');
+const { logNotificationEvent } = require('../services/activityLogService');
 
 // GET /api/students/stats
 exports.getStudentStats = async (req, res) => {
@@ -120,6 +120,7 @@ exports.createStudent = async (req, res) => {
             password: data.password || 'student@123',
             phoneLockedByAdmin: !!(data.contact || data.phone),
             contact: data.contact || data.phone,
+            portalAccess: { signupStatus: 'no' },
             fees: data.fees || 0,
             registrationFee: data.registrationFee || 0,
             fatherName: data.fatherName,
@@ -131,9 +132,9 @@ exports.createStudent = async (req, res) => {
         const student = new Student(studentData);
         await student.save();
 
-        // QUEUE WELCOME EMAIL
+        // Log onboarding activity instead of sending email.
         if (student.email) {
-            await queueNotification({
+            await logNotificationEvent({
                 recipientEmail: student.email,
                 recipientName: student.name,
                 subject: 'Welcome to DeFacto Institute',
@@ -180,6 +181,14 @@ exports.updateStudent = async (req, res) => {
 
         const isActivatingBatch = !oldStudent.batchId && data.batchId;
 
+        if (data.password !== undefined) {
+            if (String(data.password).trim()) {
+                data.password = await bcrypt.hash(String(data.password).trim(), 10);
+            } else {
+                delete data.password;
+            }
+        }
+
         if (isActivatingBatch && oldStudent.status === 'batch_pending') {
             data.status = 'active';
         }
@@ -190,10 +199,10 @@ exports.updateStudent = async (req, res) => {
         if (isActivatingBatch) {
             await feeController.ensureMonthlyFeeForStudents([student._id]);
 
-            // QUEUE BATCH ASSIGNMENT NOTIFICATION
+            // Log batch assignment activity instead of sending email.
             if (student.email && data.batchId) {
                 const batch = await require('../models/Batch').findById(data.batchId);
-                await queueNotification({
+                await logNotificationEvent({
                     recipientEmail: student.email,
                     recipientName: student.name,
                     subject: 'New Batch Assigned - DeFacto Institute',
@@ -312,13 +321,14 @@ exports.bulkUpload = async (req, res) => {
                     fatherName: String(getValue(['fatherName', 'FATHER NAME', "FATHER'S NAME", 'Father Name']) || '').trim(),
                     motherName: String(getValue(['motherName', 'MOTHER NAME', "MOTHER'S NAME", 'Mother Name']) || '').trim(),
                     currentYear: String(getValue(['currentYear', 'CURRENT YEAR']) || '1').trim(),
-                    password: 'student@123'
+                    password: 'student@123',
+                    portalAccess: { signupStatus: 'no' }
                 });
                 await student.save();
 
-                // QUEUE WELCOME EMAIL
+                // Log onboarding activity instead of sending email.
                 if (student.email) {
-                    await queueNotification({
+                    await logNotificationEvent({
                         recipientEmail: student.email,
                         recipientName: student.name,
                         subject: 'Welcome to DeFacto Institute',
@@ -407,4 +417,5 @@ exports.getStudentById = async (req, res) => {
         res.status(500).json({ message: 'Server error', error: err.message });
     }
 };
+
 

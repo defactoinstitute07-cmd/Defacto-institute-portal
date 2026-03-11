@@ -27,7 +27,7 @@ const ToastItem = ({ toast, onRemove }) => {
         <div style={{
             display: 'flex', alignItems: 'flex-start', gap: 10,
             background: colors.bg, border: `1px solid ${colors.border}`,
-            borderRadius: 10, padding: '12px 16px', minWidth: 280, maxWidth: 380,
+            borderRadius: 6, padding: '12px 16px', minWidth: 280, maxWidth: 380,
             boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
             animation: 'slideInRight 0.25s cubic-bezier(0.22,1,0.36,1)',
             position: 'relative'
@@ -73,3 +73,4 @@ export const useToast = () => {
 };
 
 export default ToastContainer;
+

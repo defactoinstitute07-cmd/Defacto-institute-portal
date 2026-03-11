@@ -18,11 +18,13 @@ const teacherRoutes = require('./routes/teacher.routes');
 const teacherPayrollRoutes = require('./routes/teacher.payroll.routes');
 const expenseRoutes = require('./routes/expense.routes');
 const eventRoutes = require('./routes/event.routes');
-const notificationRoutes = require('./routes/notification.routes');
 const examRoutes = require('./routes/exam.routes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const attendanceRoutes = require('./routes/attendance.routes');
+const subjectRoutes = require('./routes/subject.routes');
+const teacherAssignmentRoutes = require('./routes/teacherAssignment.routes');
 
 const { initFeeScheduler, initSalaryScheduler, initReminderScheduler } = require('./utils/scheduler');
-const { startWorker: startNotificationWorker } = require('./services/notificationQueue');
 // Portal auth routes
 const studentAuthRoutes = require('./routes/student.auth.routes');
 const teacherAuthRoutes = require('./routes/teacher.auth.routes');
@@ -33,14 +35,6 @@ const app = express();
 // Trust proxy for rate limiting on Vercel/proxies
 app.set('trust proxy', 1);
 
-// Schedulers and Workers
-if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
-    startNotificationWorker();
-    console.log('[NotificationQueue] Background worker initialized with Gmail credentials.');
-} else {
-    console.warn('[NotificationQueue] Warning: GMAIL_USER or GMAIL_APP_PASSWORD not set. Emails will be queued but not sent.');
-}
-
 if (process.env.NODE_ENV !== 'production') {
     initFeeScheduler();
     initSalaryScheduler();
@@ -50,6 +44,7 @@ if (process.env.NODE_ENV !== 'production') {
 // Middleware
 const allowedOrigins = [
     'http://localhost:5173',
+    'http://localhost:5174', // Added for user's current frontend port
     'http://localhost:3000',
     'https://tutution-erp-demo.vercel.app',
     'https://tutution-erp-frontend.vercel.app',
@@ -125,8 +120,11 @@ app.use('/api/teachers', teacherRoutes);
 app.use('/api/payroll', teacherPayrollRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/events', eventRoutes);
-app.use('/api/notifications', notificationRoutes);
 app.use('/api/exams', examRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/attendance', attendanceRoutes);
+app.use('/api/subjects', subjectRoutes);
+app.use('/api/teacher-assignments', teacherAssignmentRoutes);
 
 // Portal auth routes
 app.use('/api/student', studentAuthRoutes);

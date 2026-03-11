@@ -46,14 +46,14 @@ router.get('/', auth, async (req, res) => {
         const attendanceTrend = await Attendance.aggregate([
             {
                 $match: {
-                    date: { $gte: sevenDaysAgo, $lte: today }
+                    attendanceDate: { $gte: sevenDaysAgo, $lte: today }
                 }
             },
             {
                 $group: {
                     _id: {
-                        date: { $dateToString: { format: '%Y-%m-%d', date: '$date' } },
-                        status: '$status'
+                        date: { $dateToString: { format: '%Y-%m-%d', date: '$attendanceDate' } },
+                        status: { $toLower: '$status' }
                     },
                     count: { $sum: 1 }
                 }

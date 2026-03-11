@@ -319,9 +319,9 @@ const TeacherPayrollDashboard = () => {
             ) : stats && (
                 <div className="payroll-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 20, marginBottom: 32 }}>
                     <StatCard title="Profiles Set" value={`${stats.teachersWithProfiles}/${stats.totalTeachers}`} icon={Users} color="#059669" bg="#ecfdf5" />
-                    <StatCard title="Liability" value={`₹${stats.totalLiability.toLocaleString()}`} icon={DollarSign} color="#2563eb" bg="#eff6ff" />
-                    <StatCard title="Disbursed" value={`₹${stats.totalPaid.toLocaleString()}`} icon={CheckCircle2} color="#059669" bg="#ecfdf5" />
-                    <StatCard title="Pending" value={`₹${stats.totalPending.toLocaleString()}`} icon={AlertTriangle} color="#dc2626" bg="#fef2f2" />
+                    <StatCard title="Liability" value={`₹ ${stats.totalLiability.toLocaleString()}`} icon={DollarSign} color="#2563eb" bg="#eff6ff" />
+                    <StatCard title="Disbursed" value={`₹ ${stats.totalPaid.toLocaleString()}`} icon={CheckCircle2} color="#059669" bg="#ecfdf5" />
+                    <StatCard title="Pending" value={`₹ ${stats.totalPending.toLocaleString()}`} icon={AlertTriangle} color="#dc2626" bg="#fef2f2" />
                 </div>
             )}
 
@@ -333,7 +333,7 @@ const TeacherPayrollDashboard = () => {
                 </div>
 
                 <div style={{ overflowX: 'auto' }}>
-                    <table className="erp-table" style={{ width: '100%' }}>
+                    <table className="erp-table stackable" style={{ width: '100%' }}>
                         <thead>
                             <tr style={{ background: '#f8fafc' }}>
                                 <th style={{ padding: '14px 20px', textAlign: 'left', fontSize: '0.7rem', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>Faculty Member</th>
@@ -354,7 +354,7 @@ const TeacherPayrollDashboard = () => {
                                 </tr>
                             ) : salaries.map(salary => (
                                 <tr key={salary._id} style={{ borderBottom: `1px solid ${borderColor}` }}>
-                                    <td style={{ padding: '16px 20px' }}>
+                                    <td style={{ padding: '16px 20px' }} data-label="Faculty Member">
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                                             <div style={{ width: 36, height: 36, borderRadius: sharpRadius, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' }}>
                                                 <User size={18} color="#94a3b8" style={{ position: 'absolute' }} />
@@ -370,15 +370,15 @@ const TeacherPayrollDashboard = () => {
                                             <div style={{ fontWeight: 700, color: headingColor }}>{salary.teacherId?.name}</div>
                                         </div>
                                     </td>
-                                    <td style={{ padding: '16px 20px', fontWeight: 600 }}>₹{salary.baseSalary.toLocaleString()}</td>
-                                    <td style={{ padding: '16px 20px', color: '#059669', fontWeight: 700 }}>+₹{(salary.extraClassesAmount + salary.bonusAmount).toLocaleString()}</td>
-                                    <td style={{ padding: '16px 20px' }}>
-                                        <div style={{ fontWeight: 900, color: primaryColor, fontSize: '0.95rem' }}>₹{salary.netSalary.toLocaleString()}</div>
+                                    <td style={{ padding: '16px 20px', fontWeight: 600 }} data-label="Fixed Base">₹ {salary.baseSalary.toLocaleString()}</td>
+                                    <td style={{ padding: '16px 20px', color: '#059669', fontWeight: 700 }} data-label="Incentives">+₹ {(salary.extraClassesAmount + salary.bonusAmount).toLocaleString()}</td>
+                                    <td style={{ padding: '16px 20px' }} data-label="Net Pay">
+                                        <div style={{ fontWeight: 900, color: primaryColor, fontSize: '0.95rem' }}>₹ {salary.netSalary.toLocaleString()}</div>
                                         {salary.totalPaid > 0 && (
-                                            <div style={{ fontSize: '0.65rem', color: '#059669', fontWeight: 700 }}>Paid: ₹{salary.totalPaid.toLocaleString()}</div>
+                                            <div style={{ fontSize: '0.65rem', color: '#059669', fontWeight: 700 }}>Paid: ₹ {salary.totalPaid.toLocaleString()}</div>
                                         )}
                                     </td>
-                                    <td style={{ padding: '16px 20px' }}>
+                                    <td style={{ padding: '16px 20px' }} data-label="Status">
                                         <span style={{
                                             padding: '4px 10px', borderRadius: '2px', fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase',
                                             background: salary.status === 'Paid' ? '#ecfdf5' : salary.status === 'Processing' ? '#eff6ff' : '#fffbeb',
@@ -390,7 +390,7 @@ const TeacherPayrollDashboard = () => {
                                             {salary.status}
                                         </span>
                                     </td>
-                                    <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                                    <td style={{ padding: '16px 20px', textAlign: 'right' }} data-label="Action">
                                         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                                             {(salary.status === 'Pending' || salary.status === 'Processing') && (
                                                 <button className="btn btn-primary" style={{ height: 32, padding: '0 12px', background: primaryColor, fontSize: '0.7rem', borderRadius: sharpRadius }} onClick={async () => {
@@ -461,8 +461,8 @@ const TeacherPayrollDashboard = () => {
                             <div className="modal-body d-modal-body" style={{ padding: '32px' }}>
                                 <div style={{ padding: '24px', background: '#f8fafc', borderRadius: sharpRadius, border: `1px solid ${borderColor}`, textAlign: 'center', marginBottom: 24 }}>
                                     <div style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>REMAINING BALANCE</div>
-                                    <div style={{ fontSize: '2.5rem', fontWeight: 900, color: primaryColor }}>₹{(selectedSalary.netSalary - (selectedSalary.totalPaid || 0)).toLocaleString()}</div>
-                                    <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}>Total Amount: ₹{selectedSalary.netSalary.toLocaleString()} • Already Paid: ₹{(selectedSalary.totalPaid || 0).toLocaleString()}</div>
+                                    <div style={{ fontSize: '2.5rem', fontWeight: 900, color: primaryColor }}>₹ {(selectedSalary.netSalary - (selectedSalary.totalPaid || 0)).toLocaleString()}</div>
+                                    <div style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 600 }}>Total Amount: ₹ {selectedSalary.netSalary.toLocaleString()} • Already Paid: ₹ {(selectedSalary.totalPaid || 0).toLocaleString()}</div>
                                 </div>
 
                                 <div className="mf" style={{ marginBottom: 16 }}>

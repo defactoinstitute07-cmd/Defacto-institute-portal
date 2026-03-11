@@ -36,8 +36,8 @@ const StudentTable = ({
     }
 
     return (
-        <div className="erp-table-wrap overflow-x-auto">
-            <table className="erp-table w-full">
+        <div className="erp-table-wrap">
+            <table className="erp-table stackable w-full">
                 <thead>
                     <tr>
                         <th className="!pl-6">Student Profile</th>
@@ -51,7 +51,7 @@ const StudentTable = ({
                 <tbody>
                     {students.map(s => (
                         <tr key={s._id} className="hover:bg-slate-50 transition-colors">
-                            <td className="!pl-6">
+                            <td data-label="Student Profile" className="!pl-6">
                                 <div className="flex items-center gap-3 cursor-pointer group" onClick={() => navigate(`/students/${s._id}`)}>
                                     <div className="w-10 h-10 rounded-sm bg-slate-100 flex items-center justify-center text-slate-400 overflow-hidden border">
                                         {s.profileImage ? <img src={s.profileImage} alt="" className="w-full h-full object-cover" /> : <User size={20} />}
@@ -62,11 +62,10 @@ const StudentTable = ({
                                     </div>
                                 </div>
                             </td>
-                            <td>
+                            <td data-label="Batch Details">
                                 <div className="text-sm font-semibold text-slate-700">{s.batchId?.name || 'Unassigned'}</div>
-
                             </td>
-                            <td>
+                            <td data-label="Status">
                                 <div style={{ marginTop: 4 }}>
                                     <span style={{
                                         padding: '2px 8px', borderRadius: '2px', fontSize: '10px', fontWeight: 800,
@@ -79,20 +78,20 @@ const StudentTable = ({
                                     </span>
                                 </div>
                             </td>
-                            <td>
-                                <div className="text-sm font-bold text-slate-700">₹{(s.feesPaid || 0).toLocaleString()}</div>
+                            <td data-label="Fee Status">
+                                <div className="text-sm font-bold text-slate-700">₹ {(s.feesPaid || 0).toLocaleString()}</div>
                                 <div className="w-24 h-1.5 bg-slate-100 rounded-sm mt-1.5 overflow-hidden">
                                     <div className="h-full bg-blue-500" style={{ width: `${Math.min(100, ((s.feesPaid || 0) / (s.fees || 1)) * 100)}%` }}></div>
                                 </div>
-                                <div className="text-[10px] text-slate-400 mt-0.5">Total: ₹{(s.fees || 0).toLocaleString()}</div>
+                                <div className="text-[10px] text-slate-400 mt-0.5">Total: ₹ {(s.fees || 0).toLocaleString()}</div>
                             </td>
-                            <td>
+                            <td data-label="Attendance">
                                 <div className="flex items-center gap-2">
                                     <span className="text-sm font-medium">85%</span>
                                     <div className="badge badge-primary badge-xs"></div>
                                 </div>
                             </td>
-                            <td className="text-right !pr-6">
+                            <td data-label="Actions" className="text-right !pr-6">
                                 <div className="flex justify-end gap-1">
                                     <button className="btn btn-ghost btn-outline btn-sm !text-blue-600" title="View Profile" onClick={() => navigate(`/students/${s._id}`)}>
                                         <Eye size={13} />

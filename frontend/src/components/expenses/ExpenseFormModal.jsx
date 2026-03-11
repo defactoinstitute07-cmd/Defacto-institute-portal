@@ -177,7 +177,7 @@ const ExpenseFormModal = ({ isOpen, onClose, onSuccess, expense = null }) => {
 
                                 <div>
                                     <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 900, color: '#475569', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                        Amount (₹)*
+                                        Amount (₹ )*
                                     </label>
                                     <div style={{ position: 'relative' }}>
                                         <IndianRupee size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#059669' }} />

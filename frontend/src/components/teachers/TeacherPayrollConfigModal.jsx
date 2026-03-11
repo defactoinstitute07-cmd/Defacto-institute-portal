@@ -96,7 +96,7 @@ const CurrentMonthBanner = ({ salary, onGenerate, generating, selectedMonth }) =
                 </div>
                 <div style={{ fontSize: '0.8rem', color: isPaid ? 'var(--erp-primary)' : '#b45309', marginTop: 6, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <Banknote size={14} /> Net: <strong>₹{salary.netSalary?.toLocaleString()}</strong>
+                        <Banknote size={14} /> Net: <strong>₹ {salary.netSalary?.toLocaleString()}</strong>
                     </span>
                     <span style={{ opacity: 0.3 }}>|</span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -336,10 +336,10 @@ const TeacherPayrollConfigModal = ({ teacher, onClose, onSave, toast }) => {
 
                             <div className="mf" style={{ marginBottom: 40 }}>
                                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', fontWeight: 900, color: labelColor }}>
-                                    <DollarSign size={13} style={{ color: primaryColor }} /> BASE SALARY (₹) *
+                                    <DollarSign size={13} style={{ color: primaryColor }} /> BASE SALARY (₹ ) *
                                 </label>
                                 <div style={{ position: 'relative' }}>
-                                    <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontWeight: 900, color: '#94a3b8' }}>₹</span>
+                                    <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontWeight: 900, color: '#94a3b8' }}>₹ </span>
                                     <input
                                         type="number" required min="0"
                                         style={{ borderRadius: sharpRadius, padding: '12px 12px 12px 32px', border: `1.5px solid ${borderColor}`, fontWeight: 800, fontSize: '1.1rem' }}

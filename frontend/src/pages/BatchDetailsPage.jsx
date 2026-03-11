@@ -188,7 +188,7 @@ const BatchDetailsPage = () => {
                             </div>
                             <div>
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Revenue</p>
-                                <p className="text-2xl font-black text-slate-800">₹{(batch.totalEarnings || 0).toLocaleString()}</p>
+                                <p className="text-2xl font-black text-slate-800">₹ {(batch.totalEarnings || 0).toLocaleString()}</p>
                             </div>
                         </div>
 
@@ -330,7 +330,7 @@ const BatchDetailsPage = () => {
                                 <SkeletonTable rows={10} />
                             ) : (
                                 <div className="overflow-x-auto">
-                                    <table className="w-full text-left">
+                                    <table className="w-full text-left stackable">
                                         <thead className="bg-slate-50 border-b border-slate-100">
                                             <tr>
                                                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Student</th>
@@ -343,7 +343,7 @@ const BatchDetailsPage = () => {
                                         <tbody className="divide-y divide-slate-50">
                                             {filteredStudents.map(student => (
                                                 <tr key={student._id} className="hover:bg-slate-50/50 transition-colors group">
-                                                    <td className="px-6 py-4">
+                                                    <td className="px-6 py-4" data-label="Student">
                                                         <div className="flex items-center gap-3">
                                                             <div className="w-8 h-8 rounded-full bg-slate-100 flex-shrink-0 overflow-hidden">
                                                                 {student.profileImage ? (
@@ -357,20 +357,20 @@ const BatchDetailsPage = () => {
                                                             <span className="font-bold text-slate-700">{student.name}</span>
                                                         </div>
                                                     </td>
-                                                    <td className="px-6 py-4">
+                                                    <td className="px-6 py-4" data-label="Roll No">
                                                         <span className="text-sm font-semibold text-slate-500">{student.rollNo}</span>
                                                     </td>
-                                                    <td className="px-6 py-4">
-                                                        <span className="text-sm font-bold text-slate-700">₹{(student.feesPaid || 0).toLocaleString()}</span>
+                                                    <td className="px-6 py-4" data-label="Fees Paid">
+                                                        <span className="text-sm font-bold text-slate-700">₹ {(student.feesPaid || 0).toLocaleString()}</span>
                                                     </td>
-                                                    <td className="px-6 py-4">
-                                                        <div className="flex justify-center">
+                                                    <td className="px-6 py-4" data-label="Status">
+                                                        <div className="flex sm:justify-center">
                                                             <span className={`px-2 py-0.5 rounded-sm text-[10px] font-black uppercase ${student.status === 'active' ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-rose-50 text-rose-600 border border-rose-100'}`}>
                                                                 {student.status}
                                                             </span>
                                                         </div>
                                                     </td>
-                                                    <td className="px-6 py-4 text-right">
+                                                    <td className="px-6 py-4 text-right" data-label="Actions">
                                                         <Link
                                                             to={`/students/${student._id}`}
                                                             className="inline-flex items-center justify-center p-2 rounded-md bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-100 hover:bg-indigo-50 transition-all opacity-0 group-hover:opacity-100"

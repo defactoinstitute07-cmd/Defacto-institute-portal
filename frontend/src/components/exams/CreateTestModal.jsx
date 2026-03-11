@@ -38,11 +38,11 @@ const CreateTestModal = ({ onClose, onSave }) => {
     return (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.7)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
             onClick={e => e.target === e.currentTarget && onClose()}>
-            <div style={{ width: '100%', maxWidth: 520, background: '#f8fafc', borderRadius: 12, overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
+            <div style={{ width: '100%', maxWidth: 520, background: '#f8fafc', borderRadius: 6, overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
                 {/* Header */}
                 <div style={{ background: '#0f172a', padding: '20px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                        <div style={{ width: 44, height: 44, borderRadius: 8, background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ width: 44, height: 44, borderRadius: 6, background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <BookOpen size={22} color="#fff" />
                         </div>
                         <div>
@@ -50,7 +50,7 @@ const CreateTestModal = ({ onClose, onSave }) => {
                             <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.78rem', margin: 0 }}>Set up a test for a batch & subject</p>
                         </div>
                     </div>
-                    <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, color: '#fff', padding: '6px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', fontWeight: 700 }}>
+                    <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6, color: '#fff', padding: '6px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', fontWeight: 700 }}>
                         <X size={14} /> CLOSE
                     </button>
                 </div>
@@ -121,3 +121,4 @@ const CreateTestModal = ({ onClose, onSave }) => {
 };
 
 export default CreateTestModal;
+

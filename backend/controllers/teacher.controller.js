@@ -4,7 +4,7 @@ const Student = require('../models/Student');
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
 const path = require('path');
-const { queueNotification } = require('../services/emailService');
+const { logNotificationEvent } = require('../services/activityLogService');
 
 // GET /api/teachers
 exports.getAllTeachers = async (req, res) => {
@@ -109,9 +109,9 @@ exports.createTeacher = async (req, res) => {
 
         await teacher.save();
 
-        // Email Notification: Teacher Admission
+        // Log teacher onboarding activity instead of sending email.
         if (teacher.email) {
-            queueNotification({
+            logNotificationEvent({
                 recipientEmail: teacher.email,
                 recipientName: teacher.name,
                 subject: `Welcome to DeFacto Institute — Your Faculty Account`,
@@ -120,7 +120,7 @@ exports.createTeacher = async (req, res) => {
                     regNo: teacher.regNo,
                     designation: teacher.designation || 'Faculty'
                 }
-            }).catch(e => console.error('[TeacherEmail] Admission notification error:', e));
+            }).catch(e => console.error('[TeacherNotificationLog] Admission logging error:', e));
         }
 
         res.status(201).json({ message: 'Teacher created', teacher });
@@ -318,3 +318,4 @@ exports.bulkUpload = async (req, res) => {
         res.status(500).json({ message: 'Server error', error: err.message });
     }
 };
+

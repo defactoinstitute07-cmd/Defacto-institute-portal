@@ -1,8 +1,7 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import axios from 'axios';
-import SignupPage from './pages/SignupPage';
-import LoginPage from './pages/LoginPage';
+import AdminLoginPage from './pages/AdminLoginPage';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminProfilePage from './pages/AdminProfilePage';
 import StudentsPage from './pages/StudentsPage';
@@ -17,18 +16,19 @@ import { API_BASE_URL } from './api/apiConfig';
 import AnalyticsPage from './pages/AnalyticsPage';
 import BatchDetailsPage from './pages/BatchDetailsPage';
 import StudentProfilePage from './pages/StudentProfilePage';
-import NotificationHistoryPage from './pages/NotificationHistoryPage';
 import SettingsPage from './pages/SettingsPage';
 import ExamsPage from './pages/ExamsPage';
+import NotificationsPage from './pages/NotificationsPage';
+import AttendancePage from './pages/AttendancePage';
 
 import ProtectedRoute from './components/ProtectedRoute';
 import { Analytics } from '@vercel/analytics/react';
 
 function App() {
     useEffect(() => {
-        // Set default values in case network fails - Match index.css charcoal theme
-        document.documentElement.style.setProperty('--erp-primary', '#0f172a');
-        document.documentElement.style.setProperty('--erp-secondary', '#2563eb');
+        // Default to the dashboard accent until institute-specific settings are loaded.
+        document.documentElement.style.setProperty('--erp-primary', '#5b57d9');
+        document.documentElement.style.setProperty('--erp-secondary', '#8d85ff');
 
         // Fetch baseline institute settings (Publicly accessible)
         axios.get(`${API_BASE_URL}/api/settings`)
@@ -48,8 +48,10 @@ function App() {
     return (
         <Router>
             <Routes>
-                <Route path="/signup" element={<SignupPage />} />
-                <Route path="/login" element={<LoginPage />} />
+                {/* Admin Login Only Route */}
+                <Route path="/login" element={<AdminLoginPage />} />
+                <Route path="/admin-login" element={<Navigate to="/login" replace />} />
+                <Route path="/signup" element={<Navigate to="/login" replace />} />
 
                 {/* Admin Routes */}
                 <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard /></ProtectedRoute>} />
@@ -63,7 +65,8 @@ function App() {
                 <Route path="/payroll" element={<ProtectedRoute allowedRoles={['admin']}><TeacherPayrollDashboard /></ProtectedRoute>} />
                 <Route path="/expenses" element={<ProtectedRoute allowedRoles={['admin']}><ExpensesPage /></ProtectedRoute>} />
                 <Route path="/analytics" element={<ProtectedRoute allowedRoles={['admin']}><AnalyticsPage /></ProtectedRoute>} />
-                <Route path="/notifications" element={<ProtectedRoute allowedRoles={['admin']}><NotificationHistoryPage /></ProtectedRoute>} />
+                <Route path="/notifications" element={<ProtectedRoute allowedRoles={['admin']}><NotificationsPage /></ProtectedRoute>} />
+                <Route path="/attendance" element={<ProtectedRoute allowedRoles={['admin']}><AttendancePage /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute allowedRoles={['admin']}><SettingsPage /></ProtectedRoute>} />
                 <Route path="/exams" element={<ProtectedRoute allowedRoles={['admin']}><ExamsPage /></ProtectedRoute>} />
 
@@ -75,6 +78,7 @@ function App() {
 
                 {/* Fallback */}
                 <Route path="/" element={<Navigate to="/login" replace />} />
+                <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
             <Analytics />
         </Router>

@@ -1,10 +1,10 @@
 const Exam = require('../models/Exam');
 const Holiday = require('../models/Holiday');
 const Student = require('../models/Student');
-const { queueNotification } = require('../services/emailService');
+const { logNotificationEvent } = require('../services/activityLogService');
 
 /**
- * Creates an exam and notifies students in the batch.
+ * Creates an exam and logs student notification events for the batch.
  */
 exports.createExam = async (req, res) => {
     try {
@@ -12,11 +12,11 @@ exports.createExam = async (req, res) => {
         const exam = new Exam({ name, subject, batchId, date, time });
         await exam.save();
 
-        // Notify students in this batch
+        // Log notification events for students in this batch.
         const students = await Student.find({ batchId, status: 'active' });
         for (const s of students) {
             if (s.email) {
-                await queueNotification({
+                await logNotificationEvent({
                     recipientEmail: s.email,
                     recipientName: s.name,
                     subject: `Exam Scheduled: ${name}`,
@@ -31,14 +31,14 @@ exports.createExam = async (req, res) => {
             }
         }
 
-        res.status(201).json({ message: 'Exam created and students notified', exam });
+        res.status(201).json({ message: 'Exam created successfully', exam });
     } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });
     }
 };
 
 /**
- * Announces a holiday and notifies all students.
+ * Announces a holiday and logs student notification events.
  */
 exports.announceHoliday = async (req, res) => {
     try {
@@ -46,11 +46,11 @@ exports.announceHoliday = async (req, res) => {
         const holiday = new Holiday({ title, date, reason });
         await holiday.save();
 
-        // Notify all active students
+        // Log notification events for all active students.
         const students = await Student.find({ status: 'active' });
         for (const s of students) {
             if (s.email) {
-                await queueNotification({
+                await logNotificationEvent({
                     recipientEmail: s.email,
                     recipientName: s.name,
                     subject: `Holiday Announcement: ${title}`,
@@ -62,14 +62,14 @@ exports.announceHoliday = async (req, res) => {
             }
         }
 
-        res.status(201).json({ message: 'Holiday announced and students notified', holiday });
+        res.status(201).json({ message: 'Holiday announced successfully', holiday });
     } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });
     }
 };
 
 /**
- * Notifies students about results.
+ * Logs result availability events for students.
  */
 exports.notifyResults = async (req, res) => {
     try {
@@ -78,7 +78,7 @@ exports.notifyResults = async (req, res) => {
 
         for (const s of students) {
             if (s.email) {
-                await queueNotification({
+                await logNotificationEvent({
                     recipientEmail: s.email,
                     recipientName: s.name,
                     subject: `Results Available: ${examName}`,
@@ -90,8 +90,9 @@ exports.notifyResults = async (req, res) => {
             }
         }
 
-        res.json({ message: 'Result notifications queued' });
+        res.json({ message: 'Result availability logged successfully' });
     } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });
     }
 };
+

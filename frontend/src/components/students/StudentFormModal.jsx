@@ -181,7 +181,7 @@ const StudentFormModal = ({
                 {/* Contact Info */}
                 <div style={{ display: 'flex', gap: 16 }} className="flex-mob-stack">
                   <div style={{ flex: 1 }}>
-                    <label style={{ fontWeight: 800, fontSize: '0.7rem', color: '#475569' }}>MOBILE NUMBER</label>
+                    <label style={{ fontWeight: 800, fontSize: '0.7rem', color: '#475569' }}>WHATSAPP NUMBER</label>
                     <input name="phone" value={form.phone} onChange={handleForm} placeholder="+91 0000000000" style={inputStyle} />
                   </div>
                   <div style={{ flex: 1 }}>
@@ -213,7 +213,7 @@ const StudentFormModal = ({
                   <label style={{ fontWeight: 800, fontSize: '0.7rem', color: '#475569' }}>
                     {selectedStudent ? 'UPDATE PASSWORD (OPTIONAL)' : 'SET PASSWORD (DEFAULT: STUDENT@123)'}
                   </label>
-                  <input type="password" name="password" value={form.password || ''} onChange={handleForm} placeholder="••••••••" style={inputStyle} />
+                  <input type="password" name="password" value={form.password || ''} onChange={handleForm} placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" style={inputStyle} />
                 </div>
               </div>
             )}
@@ -259,8 +259,8 @@ const StudentFormModal = ({
                               }}
                             >
                               <div style={{ fontWeight: 700, fontSize: '0.85rem', color: isSelected ? '#065f46' : '#1e293b' }}>{b.name}</div>
-                              <div style={{ fontSize: '0.75rem', color: isFull ? '#dc2626' : '#64748b', marginTop: 4 }}>{b.enrolled}/{b.capacity || "∞"} Seats</div>
-                              {isSelected && <div style={{ position: 'absolute', top: -6, right: -6, background: '#059669', color: '#fff', borderRadius: '50%', width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>✓</div>}
+                              <div style={{ fontSize: '0.75rem', color: isFull ? '#dc2626' : '#64748b', marginTop: 4 }}>{b.enrolled}/{b.capacity || "âˆž"} Seats</div>
+                              {isSelected && <div style={{ position: 'absolute', top: -6, right: -6, background: '#059669', color: '#fff', borderRadius: '50%', width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>âœ“</div>}
                             </div>
                           );
                         })}
@@ -271,11 +271,11 @@ const StudentFormModal = ({
                 {/* Fees and Status */}
                 <div style={{ display: 'flex', gap: 16 }} className="flex-mob-stack">
                   <div style={{ flex: 1 }}>
-                    <label style={{ fontWeight: 800, fontSize: '0.7rem', color: '#475569' }}>MONTHLY FEE (₹)</label>
+                    <label style={{ fontWeight: 800, fontSize: '0.7rem', color: '#475569' }}>MONTHLY FEE (₹ )</label>
                     <input type="number" name="fees" value={form.fees} onChange={handleForm} readOnly={!!form.batchId} style={{ ...inputStyle, background: form.batchId ? '#f1f5f9' : '#fff' }} />
                   </div>
                   <div style={{ flex: 1 }}>
-                    <label style={{ fontWeight: 800, fontSize: '0.7rem', color: '#475569' }}>REGISTRATION FEE (₹)</label>
+                    <label style={{ fontWeight: 800, fontSize: '0.7rem', color: '#475569' }}>REGISTRATION FEE (₹ )</label>
                     <input type="number" name="registrationFee" value={form.registrationFee} onChange={handleForm} style={inputStyle} />
                   </div>
                 </div>

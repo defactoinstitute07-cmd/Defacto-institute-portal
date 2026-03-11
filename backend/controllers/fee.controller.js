@@ -3,7 +3,7 @@ const Student = require('../models/Student');
 const Batch = require('../models/Batch');
 const AuditLog = require('../models/AuditLog');
 const crypto = require('crypto');
-const { queueNotification } = require('../services/emailService');
+const { logNotificationEvent } = require('../services/activityLogService');
 
 // GET /api/fees — all fees with optional filters
 exports.getAllFees = async (req, res) => {
@@ -182,10 +182,10 @@ exports.createFee = async (req, res) => {
             });
         }
 
-        // Email Notification
+        // Log fee generation activity instead of sending email.
         const studentInfo = await Student.findById(studentId).select('name email');
         if (studentInfo && studentInfo.email) {
-            queueNotification({
+            logNotificationEvent({
                 recipientEmail: studentInfo.email,
                 recipientName: studentInfo.name,
                 subject: `Fee Invoice Generated: ${month} ${currentYear}`,
@@ -196,7 +196,7 @@ exports.createFee = async (req, res) => {
                     amount: numericAmount,
                     dueDate: new Date(dueDate).toLocaleDateString()
                 }
-            }).catch(e => console.error('[FeeEmail] Error queuing notification:', e));
+            }).catch(e => console.error('[FeeNotificationLog] Error logging event:', e));
         }
 
         res.status(201).json({ message: 'Fee record created successfully', fee });
@@ -257,7 +257,7 @@ exports.capturePayment = async (req, res) => {
         // --- NEW STRICT VALIDATION BOUNDS ---
         if (paid > fee.pendingAmount) {
             return res.status(400).json({
-                message: `Payment amount (₹${paid}) exceeds remaining balance (₹${fee.pendingAmount}).`
+                message: `Payment amount (₹ ${paid}) exceeds remaining balance (₹ ${fee.pendingAmount}).`
             });
         }
 
@@ -301,10 +301,10 @@ exports.capturePayment = async (req, res) => {
             ipAddress: req.ip
         });
 
-        // Email Notification: Fee Paid
+        // Log fee payment activity instead of sending email.
         const studentInfo = await Student.findById(fee.studentId).select('name email');
         if (studentInfo && studentInfo.email) {
-            queueNotification({
+            logNotificationEvent({
                 recipientEmail: studentInfo.email,
                 recipientName: studentInfo.name,
                 subject: `Payment Received — Receipt ${receiptNo}`,
@@ -315,7 +315,7 @@ exports.capturePayment = async (req, res) => {
                     paymentMode: mode || 'Cash',
                     remainingBalance: fee.pendingAmount
                 }
-            }).catch(e => console.error('[FeeEmail] fee_paid notification error:', e));
+            }).catch(e => console.error('[FeeNotificationLog] fee_paid logging error:', e));
         }
 
         res.json({ message: 'Payment recorded successfully', fee, receiptNo });
@@ -400,12 +400,12 @@ async function _generateFeeRecords(students, month, year, dueDate) {
             const result = await Fee.insertMany(feeRecords, { ordered: false });
             count = result.length;
 
-            // Queue Email Notifications for all newly generated fees
+            // Log fee generation activity for all newly generated fees.
             const successfulFees = result;
             successfulFees.forEach(fee => {
                 const student = eligibleStudents.find(s => s._id.toString() === fee.studentId.toString());
                 if (student && student.email) {
-                    queueNotification({
+                    logNotificationEvent({
                         recipientEmail: student.email,
                         recipientName: student.name,
                         subject: `Fee Invoice Generated: ${month} ${year}`,
@@ -416,19 +416,19 @@ async function _generateFeeRecords(students, month, year, dueDate) {
                             amount: fee.totalFee, // Sending the total including registration if applicable
                             dueDate: fee.dueDate.toLocaleDateString()
                         }
-                    }).catch(e => console.error('[FeeEmail] Bulk - Error queuing notification:', e));
+                    }).catch(e => console.error('[FeeNotificationLog] Bulk logging error:', e));
                 }
             });
         }
     } catch (error) {
         count = error.result?.nInserted || 0;
 
-        // Email the ones that succeeded even in a partial bulk failure
+        // Log the ones that succeeded even in a partial bulk failure.
         if (error.insertedDocs && error.insertedDocs.length > 0) {
             error.insertedDocs.forEach(fee => {
                 const student = eligibleStudents.find(s => s._id.toString() === fee.studentId.toString());
                 if (student && student.email) {
-                    queueNotification({
+                    logNotificationEvent({
                         recipientEmail: student.email,
                         recipientName: student.name,
                         subject: `Fee Invoice Generated: ${month} ${year}`,
@@ -439,7 +439,7 @@ async function _generateFeeRecords(students, month, year, dueDate) {
                             amount: fee.totalFee,
                             dueDate: fee.dueDate.toLocaleDateString()
                         }
-                    }).catch(e => console.error('[FeeEmail] Bulk Partial - Error queuing:', e));
+                    }).catch(e => console.error('[FeeNotificationLog] Bulk partial logging error:', e));
                 }
             });
         }
@@ -575,3 +575,4 @@ exports.addBulkSurcharge = async (req, res) => {
         res.status(500).json({ message: 'Internal server error while processing bulk surcharge', error: err.message });
     }
 };
+

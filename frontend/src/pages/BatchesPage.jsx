@@ -148,11 +148,11 @@ const BatchRow = ({ batch, onEdit, onDelete }) => {
 
     return (
         <tr>
-            <td>
+            <td data-label="Batch">
                 <div className="td-bold">{batch.name}</div>
                 <div className="td-sm">{batch.course || '—'}</div>
             </td>
-            <td>
+            <td data-label="Subjects">
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                     {batch.subjects?.length
                         ? batch.subjects.map(s => (
@@ -162,34 +162,34 @@ const BatchRow = ({ batch, onEdit, onDelete }) => {
                     }
                 </div>
             </td>
-            <td>
+            <td data-label="Schedule">
                 {batch.schedule?.length
                     ? <div>{schedDays || '—'}<div className="td-sm">{batch.schedule.length} slot{batch.schedule.length !== 1 ? 's' : ''}/week</div></div>
                     : <span className="td-sm">—</span>
                 }
             </td>
-            <td>
+            <td data-label="Enrollment">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                     <Users size={13} color="var(--erp-muted2)" />
                     <span className="td-bold">{batch.studentCount || 0}</span>
                     {batch.capacity && <span className="td-sm">/ {batch.capacity}</span>}
                 </div>
             </td>
-            <td>
+            <td data-label="Earnings">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     <IndianRupee size={12} color="var(--erp-success)" />
                     <span className="td-bold" style={{ color: 'var(--erp-success)' }}>
                         {(batch.earnings || 0).toLocaleString('en-IN')}
                     </span>
                 </div>
-                {batch.fees > 0 && <div className="td-sm">₹{batch.fees.toLocaleString()}/student</div>}
+                {batch.fees > 0 && <div className="td-sm">₹ {batch.fees.toLocaleString()}/student</div>}
             </td>
-            <td>
+            <td data-label="Status">
                 <span className={`badge ${batch.isActive ? 'badge-active' : 'badge-overdue'}`}>
                     {batch.isActive ? 'Active' : 'Inactive'}
                 </span>
             </td>
-            <td>
+            <td data-label="Actions">
                 <div className="flex gap-2">
                     <button className="btn btn-outline btn-sm" onClick={() => navigate(`/batches/${batch._id}`)} title="View batch details">
                         <Eye size={13} />
@@ -613,7 +613,7 @@ const BatchesPage = () => {
                 ) : (
                     <>
                         <div className="erp-table-wrap">
-                            <table className="erp-table">
+                            <table className="erp-table stackable">
                                 <thead>
                                     <tr>
                                         <th>Batch</th>
@@ -749,7 +749,7 @@ const BatchesPage = () => {
 
                                     <div className="b-grid-2" style={{ display: 'flex', gap: 20, marginBottom: 20 }}>
                                         <div style={{ flex: 1 }}>
-                                            <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Fees (₹ / Month)</label>
+                                            <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Fees (₹  / Month)</label>
                                             <input
                                                 type="number"
                                                 style={{ width: '100%', padding: '12px 16px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.95rem', marginTop: 6 }}
@@ -803,7 +803,7 @@ const BatchesPage = () => {
 
                                     <div style={{ marginBottom: 30 }}>
                                         {!form.course ? (
-                                            <div style={{ fontSize: '0.85rem', color: '#94a3b8', padding: '16px', background: '#f8fafc', borderRadius: 8, textAlign: 'center' }}>
+                                            <div style={{ fontSize: '0.85rem', color: '#94a3b8', padding: '16px', background: '#f8fafc', borderRadius: 6, textAlign: 'center' }}>
                                                 Select a course above to load available subjects
                                             </div>
                                         ) : subjLoading ? (
@@ -924,7 +924,7 @@ const BatchesPage = () => {
                                     </div>
 
                                     {form.classroom && (
-                                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 20, marginBottom: 24, borderLeft: '4px solid #0f172a' }}>
+                                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: 20, marginBottom: 24, borderLeft: '4px solid #0f172a' }}>
                                             <div>
                                                 <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
                                                     <Calendar size={16} /> Manual Schedule Builder
@@ -1020,3 +1020,4 @@ const BatchesPage = () => {
 };
 
 export default BatchesPage;
+

@@ -254,10 +254,10 @@ const TeacherSalaryProfile = () => {
                                                     <td style={{ ...tableCell, fontWeight: 900, color: headingColor }}>
                                                         {new Date(s.monthYear + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' }).toUpperCase()}
                                                     </td>
-                                                    <td style={tableCell}>₹{s.baseSalary.toLocaleString()}</td>
-                                                    <td style={{ ...tableCell, color: '#059669', fontWeight: 700 }}>+₹{(s.extraClassesAmount + s.bonusAmount).toLocaleString()}</td>
-                                                    <td style={{ ...tableCell, color: '#dc2626', fontWeight: 700 }}>-₹{(s.leaveDeductions + s.advanceDeductions).toLocaleString()}</td>
-                                                    <td style={{ ...tableCell, fontWeight: 900, color: headingColor }}>₹{s.netSalary.toLocaleString()}</td>
+                                                    <td style={tableCell}>₹ {s.baseSalary.toLocaleString()}</td>
+                                                    <td style={{ ...tableCell, color: '#059669', fontWeight: 700 }}>+₹ {(s.extraClassesAmount + s.bonusAmount).toLocaleString()}</td>
+                                                    <td style={{ ...tableCell, color: '#dc2626', fontWeight: 700 }}>-₹ {(s.leaveDeductions + s.advanceDeductions).toLocaleString()}</td>
+                                                    <td style={{ ...tableCell, fontWeight: 900, color: headingColor }}>₹ {s.netSalary.toLocaleString()}</td>
                                                     <td style={{ ...tableCell, textAlign: 'center' }}>
                                                         <span style={{
                                                             padding: '4px 10px', borderRadius: '2px', fontSize: '0.65rem', fontWeight: 900,

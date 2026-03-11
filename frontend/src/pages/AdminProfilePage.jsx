@@ -21,8 +21,7 @@ const AdminProfilePage = () => {
         adminName: '', coachingName: '', email: '', phone: '', bio: '',
         registrationNumber: '', roomsAvailable: '',
         themeColor1: '#1b3a7a', themeColor2: '#c53030', classesOffered: '',
-        instituteAddress: '', instituteEmail: '', institutePhone: '',
-        emailNotificationsEnabled: true
+        instituteAddress: '', instituteEmail: '', institutePhone: ''
     });
     const [logoPreview, setLogoPreview] = useState('');
     const [logoFile, setLogoFile] = useState(null);
@@ -46,8 +45,7 @@ const AdminProfilePage = () => {
                 classesOffered: (data.classesOffered || []).join(', '),
                 instituteAddress: data.instituteAddress || '',
                 instituteEmail: data.instituteEmail || '',
-                institutePhone: data.institutePhone || '',
-                emailNotificationsEnabled: data.emailNotificationsEnabled !== false
+                institutePhone: data.institutePhone || ''
             });
             setLogoPreview(data.instituteLogo || '');
         } catch (err) {
@@ -190,47 +188,96 @@ const AdminProfilePage = () => {
                     {/* Content Body */}
                     <div className="p-6 sm:p-10 pt-10">
                         {!editMode ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                <InfoBlock icon={<Mail />} label="Registry Email" value={profile?.email} />
-                                <InfoBlock icon={<Phone />} label="Primary Line" value={profile?.phone} />
-                                <InfoBlock icon={<FileDigit />} label="License ID" value={profile?.registrationNumber} />
-                                <InfoBlock icon={<Home />} label="Terminal Rooms" value={profile?.roomsAvailable} />
-                                <InfoBlock icon={<MapPin />} label="Institute Address" value={profile?.instituteAddress} full />
+                            <div className="space-y-8">
+                                <section className="rounded-md border border-slate-200 bg-slate-50/70 p-5 sm:p-6">
+                                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                                        <div>
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-2">Contact Management</p>
+                                            <h4 className="text-sm font-bold text-slate-900">Admin and institute phone lines</h4>
+                                            <p className="text-sm text-slate-500 mt-1">Keep the admin direct number and the institute public number separate so both can be updated cleanly.</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setEditMode(true)}
+                                            className="inline-flex items-center justify-center gap-2 bg-white border border-slate-200 hover:border-blue-500 text-slate-700 hover:text-blue-600 px-4 py-2 rounded-md text-xs font-bold uppercase tracking-wider transition-colors"
+                                        >
+                                            <Pencil size={14} />
+                                            Update Numbers
+                                        </button>
+                                    </div>
 
-                                <div className="md:col-span-2 lg:col-span-3 pt-6 border-t border-slate-100 mt-4">
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-4">Brand Palette</p>
-                                    <div className="flex flex-wrap gap-4">
-                                        <ColorChip label="Primary" color={form.themeColor1} />
-                                        <ColorChip label="Secondary" color={form.themeColor2} />
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
+                                        <ContactPanel
+                                            icon={<Phone />}
+                                            label="Admin Phone Number"
+                                            value={profile?.phone}
+                                            emptyText="No admin phone number added yet"
+                                        />
+                                        <ContactPanel
+                                            icon={<Phone />}
+                                            label="Institute Phone Number"
+                                            value={profile?.institutePhone}
+                                            emptyText="No institute phone number added yet"
+                                        />
+                                    </div>
+                                </section>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    <InfoBlock icon={<Mail />} label="Admin Email" value={profile?.email} />
+                                    <InfoBlock icon={<Mail />} label="Institute Email" value={profile?.instituteEmail} />
+                                    <InfoBlock icon={<FileDigit />} label="License ID" value={profile?.registrationNumber} />
+                                    <InfoBlock icon={<Home />} label="Terminal Rooms" value={profile?.roomsAvailable} />
+                                    <InfoBlock icon={<MapPin />} label="Institute Address" value={profile?.instituteAddress} full />
+
+                                    <div className="md:col-span-2 lg:col-span-3 pt-6 border-t border-slate-100 mt-4">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-4">Brand Palette</p>
+                                        <div className="flex flex-wrap gap-4">
+                                            <ColorChip label="Primary" color={form.themeColor1} />
+                                            <ColorChip label="Secondary" color={form.themeColor2} />
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         ) : (
-                            <form id="profile-form" onSubmit={handleSaveRequest} className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                <FormInput label="Admin Name" name="adminName" value={form.adminName} onChange={handle} />
-                                <FormInput label="Institute Name" name="coachingName" value={form.coachingName} onChange={handle} />
-                                <FormInput label="Contact Email" name="email" value={form.email} onChange={handle} type="email" />
-                                <FormInput label="Contact Phone" name="phone" value={form.phone} onChange={handle} />
-                                <div className="md:col-span-2">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">Short Biography</label>
-                                    <textarea className="w-full bg-slate-50 border border-slate-200 p-3 text-sm font-medium rounded-md focus:border-blue-500 outline-none transition-all min-h-[100px]" name="bio" value={form.bio} onChange={handle} />
-                                </div>
-                                <FormInput label="Rooms Available" name="roomsAvailable" value={form.roomsAvailable} onChange={handle} type="number" />
-                                <FormInput label="Registry ID" name="registrationNumber" value={form.registrationNumber} onChange={handle} />
-
-                                <div className="md:col-span-2 p-4 bg-slate-50 rounded-md border border-slate-200 flex items-center justify-between mt-4">
-                                    <div>
-                                        <p className="text-xs font-bold text-slate-700 uppercase">System Notifications</p>
-                                        <p className="text-[11px] text-slate-500 font-medium">Auto-dispatch transactional emails for records.</p>
+                            <form id="profile-form" onSubmit={handleSaveRequest} className="space-y-6">
+                                <section className="rounded-md border border-slate-200 p-5 sm:p-6">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-4">Identity</p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                        <FormInput label="Admin Name" name="adminName" value={form.adminName} onChange={handle} />
+                                        <FormInput label="Institute Name" name="coachingName" value={form.coachingName} onChange={handle} />
                                     </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => setForm({ ...form, emailNotificationsEnabled: !form.emailNotificationsEnabled })}
-                                        className={`w-11 h-6 rounded-md flex items-center px-1 transition-colors ${form.emailNotificationsEnabled ? 'bg-blue-600' : 'bg-slate-300'}`}
-                                    >
-                                        <div className={`w-4 h-4 bg-white rounded-sm transition-transform ${form.emailNotificationsEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
-                                    </button>
-                                </div>
+                                </section>
+
+                                <section className="rounded-md border border-slate-200 bg-slate-50/70 p-5 sm:p-6">
+                                    <div className="mb-4">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-2">Contact Numbers</p>
+                                        <h4 className="text-sm font-bold text-slate-900">Add or update phone numbers</h4>
+                                        <p className="text-sm text-slate-500 mt-1">Use the admin number for direct account contact and the institute number for public-facing communication.</p>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                        <FormInput label="Admin Phone Number" name="phone" value={form.phone} onChange={handle} type="tel" placeholder="+91 98765 43210" />
+                                        <FormInput label="Institute Phone Number" name="institutePhone" value={form.institutePhone} onChange={handle} type="tel" placeholder="+91 98765 43210" />
+                                        <FormInput label="Admin Email" name="email" value={form.email} onChange={handle} type="email" placeholder="admin@institute.com" />
+                                        <FormInput label="Institute Email" name="instituteEmail" value={form.instituteEmail} onChange={handle} type="email" placeholder="info@institute.com" />
+                                    </div>
+                                </section>
+
+                                <section className="rounded-md border border-slate-200 p-5 sm:p-6">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-4">Operations</p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                        <FormInput label="Rooms Available" name="roomsAvailable" value={form.roomsAvailable} onChange={handle} type="number" />
+                                        <FormInput label="Registry ID" name="registrationNumber" value={form.registrationNumber} onChange={handle} />
+                                        <div className="md:col-span-2">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">Institute Address</label>
+                                            <textarea className="w-full bg-slate-50 border border-slate-200 p-3 text-sm font-medium rounded-md focus:border-blue-500 outline-none transition-all min-h-[88px]" name="instituteAddress" value={form.instituteAddress} onChange={handle} />
+                                        </div>
+                                        <div className="md:col-span-2">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">Short Biography</label>
+                                            <textarea className="w-full bg-slate-50 border border-slate-200 p-3 text-sm font-medium rounded-md focus:border-blue-500 outline-none transition-all min-h-[100px]" name="bio" value={form.bio} onChange={handle} />
+                                        </div>
+                                    </div>
+                                </section>
                             </form>
                         )}
                     </div>
@@ -258,6 +305,16 @@ const InfoBlock = ({ icon, label, value, full }) => (
             <span className="text-[10px] font-bold uppercase tracking-widest">{label}</span>
         </div>
         <p className="text-sm font-bold text-slate-800 break-words">{value || 'N/A'}</p>
+    </div>
+);
+
+const ContactPanel = ({ icon, label, value, emptyText }) => (
+    <div className="rounded-md border border-slate-200 bg-white px-4 py-4">
+        <div className="flex items-center gap-2 text-slate-400 mb-2">
+            {React.cloneElement(icon, { size: 14 })}
+            <span className="text-[10px] font-bold uppercase tracking-widest">{label}</span>
+        </div>
+        <p className="text-sm font-bold text-slate-800 break-words">{value || emptyText}</p>
     </div>
 );
 

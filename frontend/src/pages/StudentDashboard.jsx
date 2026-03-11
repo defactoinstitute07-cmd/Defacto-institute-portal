@@ -41,9 +41,9 @@ const StudentDashboard = () => {
     return (
         <div className="erp-shell">
             <style>{`
-                .st-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-                .st-stat { display: flex; align-items: center; gap: 16px; padding: 20px; border-radius: 12px; background: #fff; border: 1px solid #f1f5f9; }
-                .st-icon { width: 48px; height: 48px; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+                .st-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 0.375rem; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+                .st-stat { display: flex; align-items: center; gap: 16px; padding: 20px; border-radius: 0.375rem; background: #fff; border: 1px solid #f1f5f9; }
+                .st-icon { width: 48px; height: 48px; border-radius: 0.375rem; display: flex; align-items: center; justify-content: center; }
                 @media (max-width: 768px) {
                     .st-stats-grid { grid-template-columns: 1fr 1fr !important; }
                     .st-main-grid { grid-template-columns: 1fr !important; }
@@ -52,7 +52,7 @@ const StudentDashboard = () => {
             <div className="erp-main" style={{ marginLeft: 0 }}>
                 <div className="topbar">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div style={{ background: 'var(--erp-primary)', color: '#fff', width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900 }}>S</div>
+                        <div style={{ background: 'var(--erp-primary)', color: '#fff', width: 32, height: 32, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900 }}>S</div>
                         <h2 className="tb-title" style={{ margin: 0 }}>Student Portal</h2>
                     </div>
                     <div className="tb-right">
@@ -72,7 +72,7 @@ const StudentDashboard = () => {
                             <p style={{ color: '#64748b', fontSize: '1rem', marginTop: 4 }}>Track your growth and identify improvement areas.</p>
                         </div>
                         <div style={{ display: 'flex', gap: 12 }}>
-                            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '8px 16px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '8px 16px', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <CheckCircle2 size={16} className="text-green-500" />
                                 <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#475569' }}>Status: Active</span>
                             </div>
@@ -111,7 +111,7 @@ const StudentDashboard = () => {
                                 <div className="space-y-6">
                                     <div className="st-card" style={{ border: '2px solid #e0f2fe', background: '#f8fafc' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-                                            <div style={{ background: '#0284c7', color: '#fff', padding: 8, borderRadius: 8 }}><BrainCircuit size={20} /></div>
+                                            <div style={{ background: '#0284c7', color: '#fff', padding: 8, borderRadius: 6 }}><BrainCircuit size={20} /></div>
                                             <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 900, color: '#0c4a6e' }}>AI Performance Insight</h3>
                                         </div>
                                         <p style={{ fontSize: '0.9rem', color: '#334155', lineHeight: 1.6, fontStyle: 'italic' }}>
@@ -127,13 +127,13 @@ const StudentDashboard = () => {
                                         <div className="space-y-3">
                                             {performance && Object.keys(performance.chapters).length > 0 ? (
                                                 Object.keys(performance.chapters).map(ch => (
-                                                    <div key={ch} style={{ padding: '12px 16px', background: '#f8fafc', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <div key={ch} style={{ padding: '12px 16px', background: '#f8fafc', borderRadius: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                         <div>
                                                             <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#334155' }}>{ch}</div>
                                                             <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: 2 }}>Score: {performance.chapters[ch].score}%</div>
                                                         </div>
                                                         <span style={{
-                                                            fontSize: '0.7rem', fontWeight: 900, padding: '4px 10px', borderRadius: 20,
+                                                            fontSize: '0.7rem', fontWeight: 900, padding: '4px 10px', borderRadius: 6,
                                                             background: performance.chapters[ch].status === 'Strong' ? '#dcfce7' : performance.chapters[ch].status === 'Average' ? '#fef9c3' : '#fee2e2',
                                                             color: performance.chapters[ch].status === 'Strong' ? '#166534' : performance.chapters[ch].status === 'Average' ? '#854d0e' : '#991b1b'
                                                         }}>
@@ -156,7 +156,7 @@ const StudentDashboard = () => {
                                             <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 900, color: '#1e293b' }}>Batch Ranking</h3>
                                         </div>
 
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px', borderRadius: 8, background: '#fffbeb', marginBottom: 12 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px', borderRadius: 6, background: '#fffbeb', marginBottom: 12 }}>
                                             <div style={{ background: '#f59e0b', color: '#fff', width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
                                                 {performance?.ranks?.overall ? `#${performance.ranks.overall}` : '-'}
                                             </div>
@@ -196,13 +196,13 @@ const StudentDashboard = () => {
                                         <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8' }}>Session 2026-27</div>
                                     </div>
                                     <div style={{ maxHeight: 500, overflowY: 'auto' }}>
-                                        {performance?.history.length === 0 ? (
+                                        {performance?.history?.length === 0 ? (
                                             <div style={{ padding: 60, textAlign: 'center', color: '#94a3b8' }}>
                                                 <History size={48} style={{ opacity: 0.1, marginBottom: 12 }} />
                                                 <p style={{ fontWeight: 600 }}>No test results published yet.</p>
                                             </div>
                                         ) : (
-                                            <table className="erp-table" style={{ border: 'none' }}>
+                                            <table className="erp-table stackable" style={{ border: 'none' }}>
                                                 <thead style={{ background: '#f8fafc', position: 'sticky', top: 0 }}>
                                                     <tr>
                                                         <th>Test Detail</th>
@@ -213,17 +213,17 @@ const StudentDashboard = () => {
                                                 <tbody>
                                                     {performance?.history.slice().reverse().map((h, i) => (
                                                         <tr key={i} style={{ borderBottom: '1px solid #f8fafc' }}>
-                                                            <td>
+                                                            <td data-label="Test Detail">
                                                                 <div style={{ fontWeight: 800, fontSize: '0.9rem', color: '#1e293b' }}>{h.testName}</div>
                                                                 <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: 2, display: 'flex', gap: 6, alignItems: 'center' }}>
                                                                     <BookOpen size={10} /> {h.subject} · {h.chapter}
                                                                 </div>
                                                             </td>
-                                                            <td>
+                                                            <td data-label="Score Achieved">
                                                                 <div style={{ fontSize: '1rem', fontWeight: 900, color: '#1e293b' }}>{h.percentage.toFixed(1)}%</div>
                                                                 <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8' }}>{h.marks} / {h.maxMarks}</div>
                                                             </td>
-                                                            <td style={{ textAlign: 'right' }}>
+                                                            <td style={{ textAlign: 'right' }} data-label="Status">
                                                                 <span style={{
                                                                     fontSize: '0.7rem', fontWeight: 900, padding: '4px 10px', borderRadius: 4,
                                                                     background: h.isPresent ? '#e0f2fe' : '#fee2e2',
@@ -249,3 +249,4 @@ const StudentDashboard = () => {
 };
 
 export default StudentDashboard;
+

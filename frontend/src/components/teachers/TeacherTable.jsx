@@ -23,7 +23,7 @@ const TeacherTable = ({
 
     return (
         <div className="erp-table-wrap">
-            <table className="erp-table">
+            <table className="erp-table stackable">
                 <thead>
                     <tr>
                         <th>Teacher Profile</th>
@@ -37,7 +37,7 @@ const TeacherTable = ({
                 <tbody>
                     {teachers.map(t => (
                         <tr key={t._id}>
-                            <td>
+                            <td data-label="Teacher Profile">
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                     <Avatar src={t.profileImage} name={t.name} size={38} BASE={BASE} imgSrc={imgSrc} />
                                     <div>
@@ -46,8 +46,8 @@ const TeacherTable = ({
                                     </div>
                                 </div>
                             </td>
-                            <td><span className="chip">{t.regNo || '—'}</span></td>
-                            <td>
+                            <td data-label="Employee ID"><span className="chip">{t.regNo || '—'}</span></td>
+                            <td data-label="Assignments">
                                 {t.assignments?.length > 0 ? (
                                     <>
                                         {t.assignments.slice(0, 2).map((a, i) => (
@@ -64,18 +64,18 @@ const TeacherTable = ({
                                     </>
                                 ) : <span className="td-sm">Not assigned</span>}
                             </td>
-                            <td>
-                                <span className="td-bold" style={{ color: 'var(--erp-teacher)' }}>₹{fmt(t.salary)}</span>
-                                <div className="td-sm">₹{fmt(t.salary * 12)} / year</div>
+                            <td data-label="Monthly Salary">
+                                <span className="td-bold" style={{ color: 'var(--erp-teacher)' }}>₹ {fmt(t.salary)}</span>
+                                <div className="td-sm">₹ {fmt(t.salary * 12)} / year</div>
                             </td>
-                            <td>
+                            <td data-label="Status">
                                 <span className={`badge ${t.status === 'active' ? 'badge-active' : 'badge-overdue'}`}>
                                     {t.status === 'active' ? 'Active' : 'Inactive'}
                                 </span>
                             </td>
-                            <td>
+                            <td data-label="Actions">
                                 <div className="flex gap-2">
-                                   
+
 
                                     <button
                                         className="btn btn-outline btn-sm !text-emerald-600 border-emerald-600 hover:bg-emerald-600 hover:text-white"
@@ -92,7 +92,7 @@ const TeacherTable = ({
                                     >
                                         <Pencil size={13} />
                                     </button>
-                                     <button
+                                    <button
                                         className="btn btn-outline btn-sm !text-emerald-600 border-emerald-600 hover:bg-emerald-600 hover:text-white"
                                         onClick={() => onPayroll(t)}
                                         title="Generate Payroll"
@@ -112,7 +112,8 @@ const TeacherTable = ({
                     ))}
                 </tbody>
             </table>
-        </div >
+        </div>
+
     );
 };
 

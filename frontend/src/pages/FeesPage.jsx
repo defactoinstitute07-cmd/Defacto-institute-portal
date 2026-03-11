@@ -407,7 +407,7 @@ const FeesPage = () => {
             isOpen: true,
             type: 'verify',
             title: 'Authorize Payment',
-            desc: `You are recording a payment of ₹${formData.amountPaid} for "${selFee.studentId?.name}". Please enter admin password to confirm.`,
+            desc: `You are recording a payment of ₹ ${formData.amountPaid} for "${selFee.studentId?.name}". Please enter admin password to confirm.`,
             onConfirm: (pwd) => confirmPayment(formData, pwd),
             loading: false,
             error: ''
@@ -534,7 +534,7 @@ const FeesPage = () => {
             isOpen: true,
             type: 'verify',
             title: 'Authorize Bulk Surcharge',
-            desc: `Applying ₹${formData.amount} surcharge to ${selectedIds.length} students. This will alter multiple financial records. Authorize?`,
+            desc: `Applying ₹ ${formData.amount} surcharge to ${selectedIds.length} students. This will alter multiple financial records. Authorize?`,
             onConfirm: (pwd) => confirmBulkSurcharge(formData, pwd),
             loading: false,
             error: ''
@@ -559,10 +559,10 @@ const FeesPage = () => {
 
     // Stats Configuration
     const stats = [
-        { label: 'Total Revenue', value: '₹' + fmt(metrics?.totalCollected), icon: Wallet, color: 'indigo', bg: 'bg-indigo-500/10', text: 'text-indigo-600' },
-        { label: `Pending Dues (${metrics?.pendingStudents || 0} Students)`, value: '₹' + fmt(metrics?.totalPending), icon: Clock, color: 'blue', bg: 'bg-blue-500/10', text: 'text-blue-600' },
-        { label: 'Overdue Dues', value: '₹' + fmt(metrics?.overdueAmount), icon: AlertCircle, color: 'red', bg: 'bg-red-500/10', text: 'text-red-600' },
-        { label: 'This Month', value: '₹' + fmt(metrics?.monthlyCollection), icon: LineChart, color: 'indigo', bg: 'bg-indigo-500/10', text: 'text-indigo-600' },
+        { label: 'Total Revenue', value: '₹ ' + fmt(metrics?.totalCollected), icon: Wallet, color: 'indigo', bg: 'bg-indigo-500/10', text: 'text-indigo-600' },
+        { label: `Pending Dues (${metrics?.pendingStudents || 0} Students)`, value: '₹ ' + fmt(metrics?.totalPending), icon: Clock, color: 'blue', bg: 'bg-blue-500/10', text: 'text-blue-600' },
+        { label: 'Overdue Dues', value: '₹ ' + fmt(metrics?.overdueAmount), icon: AlertCircle, color: 'red', bg: 'bg-red-500/10', text: 'text-red-600' },
+        { label: 'This Month', value: '₹ ' + fmt(metrics?.monthlyCollection), icon: LineChart, color: 'indigo', bg: 'bg-indigo-500/10', text: 'text-indigo-600' },
     ];
 
     const getStatusStyles = (s) => {
@@ -677,7 +677,7 @@ const FeesPage = () => {
                     </div>
                 ) : (
                     <div className="erp-table-wrap">
-                        <table className="erp-table">
+                        <table className="erp-table stackable">
                             <thead>
                                 <tr>
                                     <th className="w-10 text-center">
@@ -699,7 +699,7 @@ const FeesPage = () => {
                             <tbody>
                                 {fees.map(f => (
                                     <tr key={f._id} className={selectedIds.includes(f._id) ? 'bg-indigo-50/50' : ''}>
-                                        <td className="text-center">
+                                        <td className="text-center" data-label="Select">
                                             <input
                                                 type="checkbox"
                                                 className="checkbox checkbox-sm checkbox-primary"
@@ -707,7 +707,7 @@ const FeesPage = () => {
                                                 onChange={() => toggleSelect(f._id)}
                                             />
                                         </td>
-                                        <td>
+                                        <td data-label="Student">
                                             <div className="flex items-center gap-3">
                                                 <div className="tb-avatar" style={{ width: 32, height: 32, fontSize: 13 }}>
                                                     {f.studentId?.name?.charAt(0)}
@@ -718,37 +718,37 @@ const FeesPage = () => {
                                                 </div>
                                             </div>
                                         </td>
-                                        <td>
+                                        <td data-label="Period">
                                             <div className="td-bold">{f.month} {f.year}</div>
                                         </td>
-                                        <td>
-                                            <div className="td-bold">₹{fmt(f.totalFee || 0)}</div>
+                                        <td data-label="Financials">
+                                            <div className="td-bold">₹ {fmt(f.totalFee || 0)}</div>
                                             <div className="flex flex-wrap gap-x-2 gap-y-1 mt-1">
-                                                <span style={{ fontSize: '0.65rem', color: 'var(--erp-success)', fontWeight: 700 }}>Pd: ₹{fmt(f.amountPaid)}</span>
+                                                <span style={{ fontSize: '0.65rem', color: 'var(--erp-success)', fontWeight: 700 }}>Pd: ₹ {fmt(f.amountPaid)}</span>
                                                 {f.pendingAmount > 0 && (
-                                                    <span style={{ fontSize: '0.65rem', color: 'var(--erp-accent)', fontWeight: 700 }}>Rem: ₹{fmt(f.pendingAmount)}</span>
+                                                    <span style={{ fontSize: '0.65rem', color: 'var(--erp-accent)', fontWeight: 700 }}>Rem: ₹ {fmt(f.pendingAmount)}</span>
                                                 )}
-                                                <span style={{ fontSize: '0.65rem', color: 'var(--erp-muted)', fontWeight: 700 }}>Tui: ₹{fmt(f.monthlyTuitionFee || 0)}</span>
+                                                <span style={{ fontSize: '0.65rem', color: 'var(--erp-muted)', fontWeight: 700 }}>Tui: ₹ {fmt(f.monthlyTuitionFee || 0)}</span>
                                                 {f.registrationFee > 0 && (
-                                                    <span style={{ fontSize: '0.65rem', color: 'var(--erp-primary)', fontWeight: 700, background: 'rgba(27,58,122,0.1)', padding: '0 4px', borderRadius: '4px' }}>Reg: ₹{fmt(f.registrationFee)}</span>
+                                                    <span style={{ fontSize: '0.65rem', color: 'var(--erp-primary)', fontWeight: 700, background: 'rgba(27,58,122,0.1)', padding: '0 4px', borderRadius: '4px' }}>Reg: ₹ {fmt(f.registrationFee)}</span>
                                                 )}
                                                 {f.otherExpenses?.length > 0 && (
                                                     <span style={{ fontSize: '0.65rem', color: '#ca8a04', fontWeight: 700, background: 'rgba(202,138,4,0.1)', padding: '0 4px', borderRadius: '4px' }}>
-                                                        Exp: ₹{fmt(f.otherExpenses.reduce((s, e) => s + (e.amount || 0), 0))}
+                                                        Exp: ₹ {fmt(f.otherExpenses.reduce((s, e) => s + (e.amount || 0), 0))}
                                                     </span>
                                                 )}
                                                 {f.fine > 0 && (
-                                                    <span style={{ fontSize: '0.65rem', color: 'var(--erp-error)', fontWeight: 700, background: 'rgba(239,68,68,0.1)', padding: '0 4px', borderRadius: '4px' }}>Fine: ₹{fmt(f.fine)}</span>
+                                                    <span style={{ fontSize: '0.65rem', color: 'var(--erp-error)', fontWeight: 700, background: 'rgba(239,68,68,0.1)', padding: '0 4px', borderRadius: '4px' }}>Fine: ₹ {fmt(f.fine)}</span>
                                                 )}
                                             </div>
                                         </td>
-                                        <td>
+                                        <td data-label="Timeline">
                                             <div style={{ fontSize: '0.8rem', color: f.status === 'overdue' ? 'var(--erp-error)' : 'inherit' }}>
                                                 {f.dueDate ? new Date(f.dueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                                             </div>
                                             <div className="td-sm">Due Date</div>
                                         </td>
-                                        <td className="text-center">
+                                        <td className="text-center" data-label="Status">
                                             <span className={`badge ${f.status === 'paid' ? 'badge-active' : f.status === 'overdue' ? 'badge-overdue' : ''}`}
                                                 style={{
                                                     background: f.status === 'partial' ? '#fffbeb' : '',
@@ -758,7 +758,7 @@ const FeesPage = () => {
                                                 {f.status}
                                             </span>
                                         </td>
-                                        <td>
+                                        <td className="text-right" data-label="Actions">
                                             <div className="flex justify-end gap-2">
                                                 <button className="btn btn-outline btn-sm" onClick={() => { setSelFee(f); setModal('history'); }} title="History">
                                                     <History size={13} />
@@ -914,7 +914,7 @@ const FeesPage = () => {
                                 </div>
                                 <div className="mf-row mt-4">
                                     <div className="mf">
-                                        <label>Amount (₹)</label>
+                                        <label>Amount (₹ )</label>
                                         <input
                                             type="number"
                                             placeholder="0.00"

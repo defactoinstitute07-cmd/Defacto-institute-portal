@@ -240,12 +240,12 @@ const StudentsPage = () => {
             doc.setFontSize(10);
             doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 22);
             const tableData = students.map(s => [s.rollNo || '-', s.name || '-', s.className || '-', s.batchId?.name || '-', s.contact || '-', s.status || '-']);
-            autoTable(doc, { head: [['Roll No', 'Name', 'Class', 'Batch', 'Contact', 'Status']], body: tableData, startY: 30 });
+            autoTable(doc, { head: [['Roll No', 'Name', 'Class', 'Batch', 'WhatsApp', 'Status']], body: tableData, startY: 30 });
             doc.save(`Students_Export_${new Date().toISOString().slice(0, 10)}.pdf`);
             addToast('Exported as PDF');
         } else {
             const csvRows = [];
-            const headers = ['Student Name', 'Roll No', 'Class', 'Batch', 'Phone', 'Email', 'Admission Date', 'Status', 'Total Fees', 'Fees Paid'];
+            const headers = ['Student Name', 'Roll No', 'Class', 'Batch', 'WhatsApp Number', 'Email', 'Admission Date', 'Status', 'Total Fees', 'Fees Paid'];
             csvRows.push(headers.join(','));
 
             students.forEach(s => {
@@ -402,7 +402,7 @@ const StudentsPage = () => {
         y += 8;
 
         drawField('Course', s.className, 6, y);
-        drawField('Contact', s.contact, 30, y);
+        drawField('WhatsApp', s.contact, 30, y);
 
         // Signature line
         doc.setDrawColor(150);

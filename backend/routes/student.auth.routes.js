@@ -4,6 +4,7 @@ const ctrl = require('../controllers/student.auth.controller');
 const { verifyStudent } = require('../middleware/auth.middleware');
 
 // Public
+router.post('/signup', ctrl.signup);
 router.post('/login', ctrl.login);
 
 // Protected (student JWT required)

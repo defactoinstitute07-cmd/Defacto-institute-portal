@@ -171,7 +171,7 @@ const TeacherProfileModal = ({ teacher, onClose, fmt, imgSrc }) => {
                                         <DetailItem label="QUALIFICATIONS" value={teacher.qualifications || '—'} icon={GraduationCap} />
                                         <DetailItem label="EXPERIENCE" value={teacher.experience || '—'} icon={Clock} />
                                         <DetailItem label="JOINING DATE" value={teacher.joiningDate ? new Date(teacher.joiningDate).toLocaleDateString() : '—'} icon={Calendar} />
-                                        <DetailItem label="BASE SALARY" value={teacher.salary ? `₹${fmt(teacher.salary)}` : '—'} icon={IndianRupee} />
+                                        <DetailItem label="BASE SALARY" value={teacher.salary ? `₹ ${fmt(teacher.salary)}` : '—'} icon={IndianRupee} />
                                         <DetailItem label="DEPARTMENT" value={teacher.department || '—'} icon={Building2} />
                                         <DetailItem label="SYSTEM ROLE" value={teacher.systemRole || 'Teacher'} icon={ShieldCheck} />
                                     </div>
@@ -224,9 +224,9 @@ const TeacherProfileModal = ({ teacher, onClose, fmt, imgSrc }) => {
                                             {payrollHistory.length > 0 ? payrollHistory.map((s, i) => (
                                                 <tr key={i} style={{ borderBottom: `1px solid ${borderColor}` }}>
                                                     <td style={{ ...tableCell, fontWeight: 800 }}>{new Date(s.monthYear + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' }).toUpperCase()}</td>
-                                                    <td style={tableCell}>₹{fmt(s.baseSalary)}</td>
-                                                    <td style={{ ...tableCell, color: '#059669', fontWeight: 700 }}>+₹{fmt((s.bonusAmount || 0) + (s.extraClassesAmount || 0))}</td>
-                                                    <td style={{ ...tableCell, textAlign: 'right', fontWeight: 900 }}>₹{fmt(s.netSalary)}</td>
+                                                    <td style={tableCell}>₹ {fmt(s.baseSalary)}</td>
+                                                    <td style={{ ...tableCell, color: '#059669', fontWeight: 700 }}>+₹ {fmt((s.bonusAmount || 0) + (s.extraClassesAmount || 0))}</td>
+                                                    <td style={{ ...tableCell, textAlign: 'right', fontWeight: 900 }}>₹ {fmt(s.netSalary)}</td>
                                                 </tr>
                                             )) : (
                                                 <tr><td colSpan="4" style={{ padding: 32, textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem' }}>No payroll history available</td></tr>

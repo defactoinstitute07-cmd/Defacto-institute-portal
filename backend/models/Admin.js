@@ -63,10 +63,6 @@ const adminSchema = new mongoose.Schema({
         type: Number,
         required: [true, 'Number of rooms is required']
     },
-    emailNotificationsEnabled: {
-        type: Boolean,
-        default: true
-    },
     createdAt: {
         type: Date,
         default: Date.now

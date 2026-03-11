@@ -45,7 +45,7 @@ const ExpenseTable = ({
 
     return (
         <div className="erp-table-wrap overflow-x-auto">
-            <table className="erp-table w-full">
+            <table className="erp-table stackable w-full">
                 <thead>
                     <tr>
                         <th className="!pl-6">Date</th>
@@ -61,11 +61,11 @@ const ExpenseTable = ({
                         const colors = catColors[exp.category] || catColors['Other'];
                         return (
                             <tr key={exp._id} className="hover:bg-slate-50 transition-colors">
-                                <td className="!pl-6 whitespace-nowrap">
+                                <td className="!pl-6 whitespace-nowrap" data-label="Date">
                                     <div className="text-sm font-semibold text-slate-700">{fmtDate(exp.date)}</div>
                                     <div className="text-xs text-slate-400 font-medium">#{exp._id.slice(-6).toUpperCase()}</div>
                                 </td>
-                                <td>
+                                <td data-label="Expense Details">
                                     <div className="font-bold text-slate-800">{exp.title}</div>
                                     {exp.description && (
                                         <div className="text-xs text-slate-500 font-medium max-w-[200px] truncate" title={exp.description}>
@@ -73,21 +73,21 @@ const ExpenseTable = ({
                                         </div>
                                     )}
                                 </td>
-                                <td>
+                                <td data-label="Category">
                                     <span className="px-2.5 py-1 rounded-md text-xs font-bold" style={{ backgroundColor: colors.bg, color: colors.text }}>
                                         {exp.category}
                                     </span>
                                 </td>
-                                <td>
+                                <td data-label="Payment Mode">
                                     <div className="flex items-center gap-1.5 text-sm font-medium text-slate-600">
                                         {exp.paymentMode}
                                     </div>
                                 </td>
-                                <td>
-                                    <div className="text-sm font-extrabold text-slate-800">₹{fmt(exp.amount)}</div>
+                                <td data-label="Amount">
+                                    <div className="text-sm font-extrabold text-slate-800">₹ {fmt(exp.amount)}</div>
                                     <div className={`text-[10px] uppercase font-bold ${exp.status === 'Pending' ? 'text-orange-500' : 'text-indigo-600'}`}>{exp.status}</div>
                                 </td>
-                                <td className="text-right !pr-6">
+                                <td className="text-right !pr-6" data-label="Actions">
                                     <div className="flex justify-end gap-1">
                                         <button
                                             className="btn btn-ghost btn-outline btn-sm !text-slate-600"

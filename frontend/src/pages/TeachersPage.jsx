@@ -218,13 +218,13 @@ const TeachersPage = () => {
                     <p style={{ fontSize: '0.95rem', color: '#64748b' }}>Manage instructors, academic assignments, and payroll configurations.</p>
                 </div>
                 <div style={{ display: 'flex', gap: 12 }}>
-                    <button className="btn btn-outline" style={{ height: 44, padding: '0 16px', borderRadius: 12 }} onClick={() => setShowBulkModal(true)}>
+                    <button className="btn btn-outline" style={{ height: 44, padding: '0 16px', borderRadius: 6 }} onClick={() => setShowBulkModal(true)}>
                         <Upload size={18} /> Bulk Import
                     </button>
-                    <button className="btn btn-outline" style={{ height: 44, padding: '0 16px', borderRadius: 12 }} onClick={() => exportData('pdf')} title="Export PDF">
+                    <button className="btn btn-outline" style={{ height: 44, padding: '0 16px', borderRadius: 6 }} onClick={() => exportData('pdf')} title="Export PDF">
                         <FileDown size={18} />Export PDF
                     </button>
-                    <button className="btn btn-primary" style={{ height: 44, padding: '0 20px', borderRadius: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }} onClick={openCreate}>
+                    <button className="btn btn-primary" style={{ height: 44, padding: '0 20px', borderRadius: 6, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }} onClick={openCreate}>
                         <Plus size={18} /> Add New Faculty
                     </button>
                 </div>
@@ -275,7 +275,7 @@ const TeachersPage = () => {
                     <div style={{ padding: '20px 0', borderTop: '1px solid #f1f5f9', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
                         <div className="text-sm text-slate-500 font-medium">Showing {teachers.length} of {total} records</div>
                         {page < totalPages && (
-                            <button className="btn btn-outline" disabled={loading} onClick={() => setPage(p => p + 1)} style={{ borderRadius: 10, fontWeight: 700 }}>
+                            <button className="btn btn-outline" disabled={loading} onClick={() => setPage(p => p + 1)} style={{ borderRadius: 6, fontWeight: 700 }}>
                                 {loading ? <><div className="spinner w-4 h-4 border-2 mr-2" /> Loading...</> : 'Load More Records'}
                             </button>
                         )}
@@ -374,3 +374,4 @@ const TeachersPage = () => {
 };
 
 export default TeachersPage;
+
