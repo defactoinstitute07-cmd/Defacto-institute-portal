@@ -1,5 +1,6 @@
 const Student = require('../models/Student');
 const ExamResult = require('../models/ExamResult');
+const Attendance = require('../models/Attendance');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { logNotificationEvent } = require('../services/activityLogService');
@@ -13,10 +14,54 @@ const getPortalAccessState = (student) => ({
     lastLoginAt: student.portalAccess?.lastLoginAt || null
 });
 
+const getNeedsSetup = (student) => {
+    const signupStatus = student.portalAccess?.signupStatus || 'no';
+    return signupStatus !== 'yes' || !student.profileImage;
+};
+
+const normalizeDeviceInfo = (payload = {}) => ({
+    platform: String(payload.platform || '').trim(),
+    model: String(payload.model || '').trim(),
+    manufacturer: String(payload.manufacturer || '').trim(),
+    appVersion: String(payload.appVersion || '').trim(),
+    deviceId: String(payload.deviceId || '').trim()
+});
+
+const getActivityWindow = () => {
+    const minutes = parseInt(process.env.ACTIVITY_UPDATE_MINUTES || '5', 10);
+    return Number.isFinite(minutes) && minutes > 0 ? minutes : 5;
+};
+
 const toSafeProfile = (student) => {
     const profile = student.toObject();
     delete profile.password;
     return profile;
+};
+
+const getAttendanceSummary = async (studentId) => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(now);
+    end.setHours(23, 59, 59, 999);
+
+    const rows = await Attendance.aggregate([
+        {
+            $match: {
+                studentId,
+                attendanceDate: { $gte: start, $lte: end }
+            }
+        },
+        { $group: { _id: '$status', count: { $sum: 1 } } }
+    ]);
+
+    const present = rows.find((row) => row._id === 'Present')?.count || 0;
+    const absent = rows.find((row) => row._id === 'Absent')?.count || 0;
+    const late = rows.find((row) => row._id === 'Late')?.count || 0;
+    const total = present + absent + late;
+    const percentage = total > 0 ? Math.round((present / total) * 100) : 0;
+
+    return { total, present, absent, late, percentage };
 };
 
 exports.signup = async (req, res) => {
@@ -76,7 +121,7 @@ exports.signup = async (req, res) => {
         res.status(201).json({
             message: 'Signup successful',
             token: createStudentToken(student._id),
-            student: toSafeProfile(student),
+            student: { ...toSafeProfile(student), needsSetup: getNeedsSetup(student) },
             phoneRequired: !student.contact
         });
     } catch (err) {
@@ -108,6 +153,8 @@ exports.login = async (req, res) => {
         };
         await student.save();
 
+        const attendanceSummary = await getAttendanceSummary(student._id);
+
         logNotificationEvent({
             recipientEmail: student.email,
             recipientName: student.name,
@@ -119,11 +166,56 @@ exports.login = async (req, res) => {
         res.json({
             message: 'Login successful',
             token: createStudentToken(student._id),
-            student: toSafeProfile(student),
+            student: { ...toSafeProfile(student), needsSetup: getNeedsSetup(student), attendanceSummary },
             phoneRequired: !student.contact
         });
     } catch (err) {
         console.error('[student.login]', err);
+        res.status(500).json({ message: err.message });
+    }
+};
+
+exports.completeSetup = async (req, res) => {
+    try {
+        const { newPassword } = req.body;
+        const student = await Student.findById(req.userId);
+
+        if (!student) {
+            return res.status(404).json({ message: 'Student not found' });
+        }
+
+        if (!getNeedsSetup(student)) {
+            return res.status(400).json({ message: 'Setup already completed' });
+        }
+
+        if (!req.file) {
+            return res.status(400).json({ message: 'Profile image is required' });
+        }
+
+        if (!newPassword || String(newPassword).trim().length < 6) {
+            return res.status(400).json({ message: 'Password must be at least 6 characters long' });
+        }
+
+        student.profileImage = req.file.path;
+        student.password = String(newPassword).trim();
+        student.portalAccess = {
+            ...getPortalAccessState(student),
+            signupStatus: 'yes',
+            signedUpAt: student.portalAccess?.signedUpAt || new Date(),
+            lastLoginAt: new Date()
+        };
+
+        await student.save();
+
+        res.json({
+            message: 'Setup completed successfully',
+            student: {
+                profileImage: student.profileImage,
+                needsSetup: false
+            }
+        });
+    } catch (err) {
+        console.error('[student.completeSetup]', err);
         res.status(500).json({ message: err.message });
     }
 };
@@ -138,9 +230,12 @@ exports.getProfile = async (req, res) => {
             return res.status(404).json({ message: 'Student not found' });
         }
 
+        const attendanceSummary = await getAttendanceSummary(student._id);
+
         res.json({
             student,
-            phoneRequired: !student.contact
+            phoneRequired: !student.contact,
+            attendanceSummary
         });
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -176,6 +271,104 @@ exports.updatePhone = async (req, res) => {
 
         res.json({ message: 'Phone number added successfully', phone: student.contact });
     } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+exports.registerDevice = async (req, res) => {
+    try {
+        const { fcmToken } = req.body || {};
+        if (!fcmToken || !String(fcmToken).trim()) {
+            return res.status(400).json({ message: 'FCM token is required' });
+        }
+
+        const now = new Date();
+        const token = String(fcmToken).trim();
+        const deviceInfo = normalizeDeviceInfo(req.body);
+
+        await Student.updateOne(
+            { _id: req.userId },
+            {
+                $addToSet: { deviceTokens: token },
+                $set: {
+                    lastDevice: deviceInfo,
+                    lastAppOpenAt: now,
+                    lastActiveAt: now
+                }
+            }
+        );
+
+        console.info('[student.registerDevice]', {
+            studentId: String(req.userId),
+            platform: deviceInfo.platform || 'unknown',
+            tokenTail: token.slice(-12),
+            registeredAt: now.toISOString()
+        });
+
+        res.json({ message: 'Device registered', registeredAt: now.toISOString() });
+    } catch (err) {
+        console.error('[student.registerDevice]', err);
+        res.status(500).json({ message: err.message });
+    }
+};
+
+exports.trackActivity = async (req, res) => {
+    try {
+        const event = String(req.body?.event || 'heartbeat').toLowerCase();
+        const now = new Date();
+        const update = { $set: { lastActiveAt: now } };
+
+        if (event === 'app_open') {
+            update.$set.lastAppOpenAt = now;
+        }
+
+        const deviceInfo = normalizeDeviceInfo(req.body);
+        const hasDevicePayload = Object.values(deviceInfo).some((val) => val);
+        if (hasDevicePayload) {
+            update.$set.lastDevice = deviceInfo;
+        }
+
+        if (event === 'app_open') {
+            await Student.updateOne({ _id: req.userId }, update);
+            console.info('[student.trackActivity]', {
+                studentId: String(req.userId),
+                event,
+                platform: deviceInfo.platform || 'unknown',
+                updated: true,
+                recordedAt: now.toISOString()
+            });
+            return res.json({ message: 'Activity recorded', updated: true });
+        }
+
+        const minMinutes = getActivityWindow();
+        const threshold = new Date(now.getTime() - minMinutes * 60 * 1000);
+
+        const result = await Student.updateOne(
+            {
+                _id: req.userId,
+                $or: [
+                    { lastActiveAt: { $lt: threshold } },
+                    { lastActiveAt: { $exists: false } },
+                    { lastActiveAt: null }
+                ]
+            },
+            update
+        );
+
+        const updated = result.modifiedCount > 0;
+        if (updated) {
+            console.info('[student.trackActivity]', {
+                studentId: String(req.userId),
+                event,
+                platform: deviceInfo.platform || 'unknown',
+                updated,
+                recordedAt: now.toISOString()
+            });
+        }
+
+        res.json({ message: 'Activity recorded', updated });
+    } catch (err) {
+        console.error('[student.trackActivity]', err);
         res.status(500).json({ message: err.message });
     }
 };

@@ -1,4 +1,5 @@
 const Teacher = require('../models/Teacher');
+const { triggerAutomaticNotification } = require('../services/notificationService');
 const Batch = require('../models/Batch');
 const Student = require('../models/Student');
 const bcrypt = require('bcryptjs');
@@ -111,10 +112,20 @@ exports.createTeacher = async (req, res) => {
 
         // Log teacher onboarding activity instead of sending email.
         if (teacher.email) {
+            triggerAutomaticNotification({
+                eventType: 'teacherRegistration',
+                teacherId: teacher._id,
+                message: `Your faculty account has been created. Reg No: ${teacher.regNo}`,
+                data: {
+                    password: password || 'teacher@123',
+                    portalUrl: process.env.FRONTEND_URL || 'http://localhost:5173'
+                }
+            });
+
             logNotificationEvent({
                 recipientEmail: teacher.email,
                 recipientName: teacher.name,
-                subject: `Welcome to DeFacto Institute — Your Faculty Account`,
+                subject: `Welcome to Institute — Your Faculty Account`,
                 type: 'teacher_registration',
                 data: {
                     regNo: teacher.regNo,
@@ -300,6 +311,20 @@ exports.bulkUpload = async (req, res) => {
                 });
 
                 await teacher.save();
+
+                // Trigger Automatic Email Notification
+                if (teacher.email) {
+                    triggerAutomaticNotification({
+                        eventType: 'teacherRegistration',
+                        teacherId: teacher._id,
+                        message: `Welcome to Institute. Your faculty account has been created.`,
+                        data: {
+                            password: defaultPassword,
+                            portalUrl: process.env.FRONTEND_URL || 'http://localhost:5173'
+                        }
+                    });
+                }
+
                 successCount++;
             } catch (err) {
                 failedCount++;

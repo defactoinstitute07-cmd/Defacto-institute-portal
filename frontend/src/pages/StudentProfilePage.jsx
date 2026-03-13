@@ -7,6 +7,7 @@ import {
     Calendar,
     ChevronLeft,
     Clock,
+    CheckCircle2,
     DownloadCloud,
     FileText,
     GraduationCap,
@@ -18,10 +19,10 @@ import {
     Mail,
     MapPin,
     Phone,
+    RefreshCcw,
     ShieldCheck,
     Target,
     TrendingUp,
-    Trophy,
     User,
     UserCircle2,
     Wallet,
@@ -35,6 +36,16 @@ import apiClient from '../api/apiConfig';
 const formatCurrency = (value) => `Rs ${Number(value || 0).toLocaleString('en-IN')}`;
 const formatDate = (value) => value ? new Date(value).toLocaleDateString('en-IN') : '- ';
 const formatDateTime = (value) => value ? new Date(value).toLocaleString('en-IN') : '- ';
+const ACTIVITY_STYLE = {
+    online: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+    offline: 'bg-slate-100 text-slate-700 border border-slate-200',
+    inactive: 'bg-amber-50 text-amber-700 border border-amber-200'
+};
+const LIVE_REFRESH_MS = 30000;
+const countValidDeviceTokens = (deviceTokens = []) =>
+    Array.isArray(deviceTokens)
+        ? deviceTokens.filter((token) => typeof token === 'string' && token.trim().length > 10).length
+        : 0;
 
 const StudentProfilePage = () => {
     const { id } = useParams();
@@ -45,8 +56,8 @@ const StudentProfilePage = () => {
     const [performance, setPerformance] = useState(null);
     const [performanceLoading, setPerformanceLoading] = useState(false);
 
-    const loadProfile = useCallback(async () => {
-        setLoading(true);
+    const loadProfile = useCallback(async ({ silent = false } = {}) => {
+        if (!silent) setLoading(true);
         try {
             const response = await apiClient.get(`/students/${id}`);
             setData(response.data);
@@ -54,7 +65,7 @@ const StudentProfilePage = () => {
             console.error('[StudentProfilePage.loadProfile]', error);
             navigate('/students');
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     }, [id, navigate]);
 
@@ -75,6 +86,16 @@ const StudentProfilePage = () => {
         loadPerformance();
     }, [loadProfile, loadPerformance]);
 
+    useEffect(() => {
+        const intervalId = window.setInterval(() => {
+            if (document.visibilityState === 'visible') {
+                loadProfile({ silent: true });
+            }
+        }, LIVE_REFRESH_MS);
+
+        return () => window.clearInterval(intervalId);
+    }, [loadProfile]);
+
     const onDownloadID = (student) => {
         const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [85, 54] });
 
@@ -93,7 +114,7 @@ const StudentProfilePage = () => {
         doc.text(`Roll No: ${student.rollNo}`, 35, 30);
         doc.text(`Course: ${student.className || 'N/A'}`, 35, 34);
         doc.text(`Batch: ${student.batchId?.name || 'N/A'}`, 35, 38);
-        doc.text(`WhatsApp: ${student.contact || 'N/A'}`, 35, 42);
+        doc.text(`Contact: ${student.contact || 'N/A'}`, 35, 42);
 
         doc.setFillColor(248, 250, 252);
         doc.rect(0, 48, 85, 6, 'F');
@@ -118,11 +139,19 @@ const StudentProfilePage = () => {
 
     const { student, fees = [] } = data;
     const portalAccess = student.portalAccess || {};
+    const activity = student.activity || {};
+    const activityStatus = activity.status || 'inactive';
+    const activityBadge = ACTIVITY_STYLE[activityStatus] || ACTIVITY_STYLE.offline;
+    const lastSeen = activity.lastActiveAt || activity.lastAppOpenAt || portalAccess.lastLoginAt || null;
+    const deviceLabel = activity.device?.platform || student.lastDevice?.platform || '- ';
+    const pushDeviceCount = countValidDeviceTokens(student.deviceTokens);
     const signupCompleted = portalAccess.signupStatus === 'yes';
     const totalDues = fees
         .filter((fee) => !fee.isDeleted && fee.status !== 'paid')
         .reduce((sum, fee) => sum + (fee.totalFee - (fee.amountPaid || 0)), 0);
     const performanceStats = performance?.stats || {};
+    const attendanceSummary = student.attendanceSummary || {};
+    const attendanceValue = attendanceSummary.total > 0 ? `${attendanceSummary.percentage}%` : '--';
     const chapterEntries = Object.entries(performance?.chapters || {});
 
     return (
@@ -157,6 +186,17 @@ const StudentProfilePage = () => {
                     <span className={`student-badge ${signupCompleted ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
                         <ShieldCheck size={14} /> Signup: {signupCompleted ? 'Yes' : 'No'}
                     </span>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            loadProfile();
+                            loadPerformance();
+                        }}
+                        className="btn btn-outline"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+                    >
+                        <RefreshCcw size={16} className={loading || performanceLoading ? 'spin' : ''} /> Refresh Activity
+                    </button>
                     <button onClick={() => onDownloadID(student)} className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                         <DownloadCloud size={16} /> Download ID Card
                     </button>
@@ -213,7 +253,25 @@ const StudentProfilePage = () => {
                             <SidebarRow label="Signed Up At" value={formatDateTime(portalAccess.signedUpAt)} />
                             <SidebarRow label="Last Login" value={formatDateTime(portalAccess.lastLoginAt)} />
                             <SidebarRow label="Email" value={student.email || '- '} />
-                            <SidebarRow label="WhatsApp Number" value={student.contact || '- '} />
+                            <SidebarRow label="Contact Number" value={student.contact || '- '} />
+                        </div>
+                    </div>
+
+                    <div className="student-profile-card p-6">
+                        <div className="flex items-center gap-2 mb-5">
+                            <LogIn size={18} className="text-indigo-500" />
+                            <h2 className="text-sm font-black uppercase tracking-[0.18em] text-slate-800">Mobile App Activity</h2>
+                        </div>
+                        <div className="space-y-4">
+                            <SidebarRow label="Last Opened" value={formatDateTime(lastSeen)} />
+                            <SidebarRow label="Device" value={deviceLabel} />
+                            <SidebarRow label="Push Ready" value={pushDeviceCount > 0 ? `Yes (${pushDeviceCount} device${pushDeviceCount > 1 ? 's' : ''})` : 'No'} />
+                            <div>
+                                <div className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Status</div>
+                                <span className={`student-badge ${activityBadge}`}>
+                                    {activityStatus}
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </aside>
@@ -223,7 +281,7 @@ const StudentProfilePage = () => {
                         <StatCard icon={Wallet} label="Monthly Fee" value={formatCurrency(student.fees)} tone="indigo" />
                         <StatCard icon={ShieldCheck} label="Fees Paid" value={formatCurrency(student.feesPaid)} tone="emerald" />
                         <StatCard icon={IndianRupee} label="Current Due" value={formatCurrency(totalDues)} tone="rose" />
-                        <StatCard icon={Trophy} label="Best Score" value={`${performanceStats.bestScore || 0}%`} tone="amber" />
+                        <StatCard icon={CheckCircle2} label="Attendance (MTD)" value={attendanceValue} tone="amber" />
                     </div>
 
                     <div className="student-profile-card p-6">
@@ -245,7 +303,7 @@ const StudentProfilePage = () => {
                                     <InfoTile icon={Calendar} label="Date of Birth" value={formatDate(student.dob)} />
                                     <InfoTile icon={User} label="Gender" value={student.gender || '- '} />
                                     <InfoTile icon={Mail} label="Email Address" value={student.email || '- '} />
-                                    <InfoTile icon={Phone} label="WhatsApp Number" value={student.contact || '- '} />
+                                    <InfoTile icon={Phone} label="Contact Number" value={student.contact || '- '} />
                                     <InfoTile icon={User} label="Father's Name" value={student.fatherName || '- '} />
                                     <InfoTile icon={User} label="Mother's Name" value={student.motherName || '- '} />
                                     <InfoTile icon={IndianRupee} label="Registration Fee" value={formatCurrency(student.registrationFee)} />
@@ -441,4 +499,3 @@ const InfoTile = ({ icon: Icon, label, value, wide = false }) => (
 );
 
 export default StudentProfilePage;
-

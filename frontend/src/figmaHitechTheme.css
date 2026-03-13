@@ -142,7 +142,8 @@ html[data-ui-kit='figma-hitech'] .sb-item-label {
 
 html[data-ui-kit='figma-hitech'] .sb-footer {
     border-top: 1px solid var(--erp-border);
-    padding: 18px 16px 24px;
+    padding: 5px 5px 5px;
+     color: red;
 }
 
 html[data-ui-kit='figma-hitech'] .sidebar-note {

@@ -74,6 +74,8 @@ const initSalaryScheduler = () => {
     console.log('[Scheduler] Salary generation service initialized.');
 };
 
+const { triggerAutomaticNotification } = require('../services/notificationService');
+
 /**
  * Daily check for due fees. Logs reminder events 3 days before and on the due date.
  * Runs every day at 09:00 AM.
@@ -99,11 +101,11 @@ const initReminderScheduler = () => {
                 }
             }).populate('studentId');
 
-            console.log(`[Scheduler] Found ${targetFees.length} potential fee reminders to log.`);
+            console.log(`[Scheduler] Found ${targetFees.length} potential fee reminders.`);
 
             for (const fee of targetFees) {
                 const s = fee.studentId;
-                if (!s || !s.email) continue;
+                if (!s) continue;
 
                 const feeDueDate = new Date(fee.dueDate);
                 feeDueDate.setHours(0, 0, 0, 0);
@@ -113,10 +115,21 @@ const initReminderScheduler = () => {
                 if (feeDueDate.getTime() === threeDaysFromNow.getTime()) shouldNotify = true;
 
                 if (shouldNotify) {
+                    await triggerAutomaticNotification({
+                        studentId: s._id,
+                        eventType: 'feeOverdue',
+                        message: `Reminder: Your fee of ₹${fee.pendingAmount} for ${fee.month} is due. Due date: ${feeDueDate.toLocaleDateString()}.`,
+                        data: {
+                            pendingAmount: fee.pendingAmount,
+                            month: fee.month,
+                            dueDate: feeDueDate.toLocaleDateString()
+                        }
+                    });
+
                     await logNotificationEvent({
-                        recipientEmail: s.email,
+                        recipientEmail: s.email || '',
                         recipientName: s.name,
-                        subject: 'Fee Due Reminder - DeFacto Institute',
+                        subject: 'Fee Due Reminder',
                         type: 'fee_reminder',
                         data: {
                             amount: fee.pendingAmount,
@@ -130,8 +143,66 @@ const initReminderScheduler = () => {
         }
     });
 
-    console.log('[Scheduler] Fee reminder service initialized (Daily at 9:00 AM, internal logs only).');
+    console.log('[Scheduler] Fee reminder service initialized (Daily at 9:00 AM).');
 };
 
-module.exports = { initFeeScheduler, initSalaryScheduler, initReminderScheduler };
+const Notification = require('../models/Notification');
+const { sendNotificationBatch } = require('../services/notificationService');
+
+/**
+ * Initialize background cron jobs
+ */
+const initScheduler = () => {
+    // Check for scheduled notifications every minute
+    cron.schedule('* * * * *', async () => {
+        const now = new Date();
+        
+        try {
+            // Find notifications scheduled for now or in the past that are still in 'scheduled' status
+            const pendingNotifications = await Notification.find({
+                status: 'scheduled',
+                scheduledFor: { $lte: now }
+            });
+
+            if (pendingNotifications.length > 0) {
+                console.log(`[Scheduler] Processing ${pendingNotifications.length} scheduled notifications...`);
+                
+                for (const notif of pendingNotifications) {
+                    try {
+                        // Mark as pending to avoid double processing
+                        notif.status = 'pending';
+                        await notif.save();
+
+                        // Dispatch the notification
+                        await sendNotificationBatch({
+                            title: notif.title,
+                            message: notif.message,
+                            type: notif.type,
+                            studentIds: notif.target === 'individual' ? (notif.targetId ? notif.targetId.split(',') : []) : [],
+                            batchId: notif.target === 'batch' ? notif.targetId : '',
+                            sendToAll: notif.target === 'all',
+                            deliveryMethods: notif.deliveryType === 'both' ? ['push', 'email'] : [notif.deliveryType],
+                            adminId: notif.createdBy,
+                            scheduledFor: null // Pass null to actually send it now
+                        });
+
+                        // Delete the 'scheduled' placeholder record as sendNotificationBatch creates new 'sent' records for individual recipients
+                        await Notification.deleteOne({ _id: notif._id });
+
+                    } catch (error) {
+                        console.error(`[Scheduler] Failed to process notification ${notif._id}:`, error.message);
+                        notif.status = 'failed';
+                        await notif.save();
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('[Scheduler] Critical error in cron job:', error.message);
+        }
+    });
+
+    console.log('[Scheduler] Notification scheduler initialized (1m interval).');
+};
+
+module.exports = { initFeeScheduler, initSalaryScheduler, initReminderScheduler, initScheduler };
 

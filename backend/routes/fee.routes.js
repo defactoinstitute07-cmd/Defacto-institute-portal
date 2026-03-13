@@ -14,6 +14,7 @@ router.post('/generate', verifyPwd, ctrl.generateFees);
 router.post('/:id/pay', verifyPwd, ctrl.capturePayment);
 router.post('/:id/expense', ctrl.addOtherExpense);
 router.post('/bulk-surcharge', verifyPwd, ctrl.addBulkSurcharge);
+router.post('/remind-overdue', verifyPwd, ctrl.sendOverdueReminders);
 router.delete('/:id', verifyPwd, ctrl.deleteFee);
 
 module.exports = router;

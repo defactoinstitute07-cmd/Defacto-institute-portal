@@ -2,15 +2,19 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     LogOut, User, Trophy, Target, TrendingUp,
-    ClipboardList, BrainCircuit, Info, History, Loader2,
+    ClipboardList, BrainCircuit, History, Loader2,
     BookOpen, CheckCircle2, LayoutDashboard
 } from 'lucide-react';
 import apiClient from '../api/apiConfig';
+import { getStudentAttendanceReport } from '../api/attendanceApi';
 
 const StudentDashboard = () => {
     const navigate = useNavigate();
     const [performance, setPerformance] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [attendanceSummary, setAttendanceSummary] = useState({ total: 0, present: 0, absent: 0, late: 0, percentage: 0 });
+    const [attendanceLoading, setAttendanceLoading] = useState(false);
+    const [attendanceRecords, setAttendanceRecords] = useState([]);
 
     // Get student from local storage
     const studentData = localStorage.getItem('student');
@@ -18,7 +22,7 @@ const StudentDashboard = () => {
 
     const handleLogout = () => {
         localStorage.clear();
-        navigate('/login');
+        navigate('/portal');
     };
 
     const fetchPerformance = useCallback(async () => {
@@ -34,9 +38,34 @@ const StudentDashboard = () => {
         }
     }, [student._id]);
 
+    const fetchAttendanceSummary = useCallback(async () => {
+        if (!student._id) return;
+        setAttendanceLoading(true);
+        try {
+            const now = new Date();
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            const params = {
+                dateFrom: startOfMonth.toISOString().slice(0, 10),
+                dateTo: now.toISOString().slice(0, 10),
+                page: 1,
+                limit: 10
+            };
+            const { data } = await getStudentAttendanceReport(params);
+            const summary = data.summary || { total: 0, present: 0, absent: 0, late: 0 };
+            const percentage = summary.total > 0 ? Math.round((summary.present / summary.total) * 100) : 0;
+            setAttendanceSummary({ ...summary, percentage });
+            setAttendanceRecords(data.records || []);
+        } catch (e) {
+            console.error('Failed to load attendance summary', e);
+        } finally {
+            setAttendanceLoading(false);
+        }
+    }, [student._id]);
+
     useEffect(() => {
         fetchPerformance();
-    }, [fetchPerformance]);
+        fetchAttendanceSummary();
+    }, [fetchAttendanceSummary, fetchPerformance]);
 
     return (
         <div className="erp-shell">
@@ -59,7 +88,7 @@ const StudentDashboard = () => {
                         <div className="tb-avatar" style={{ background: '#f1f5f9', color: 'var(--erp-primary)' }}><User size={18} /></div>
                         <span className="tb-name" style={{ fontWeight: 800 }}>{student.name}</span>
                         <div style={{ width: 1, height: 24, background: '#e2e8f0', margin: '0 12px' }} />
-                        <button onClick={handleLogout} className="btn-tb-logout" style={{ background: '#fee2e2', color: '#ef4444', border: 'none', padding: '6px 14px', borderRadius: 6, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <button onClick={handleLogout} className="btn-tb-logout" style={{ background: 'var(--erp-bg-negative-light)', color: 'var(--erp-color-negative)', border: 'none', padding: '6px 14px', borderRadius: 6, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
                             <LogOut size={16} /> Logout
                         </button>
                     </div>
@@ -74,7 +103,7 @@ const StudentDashboard = () => {
                         <div style={{ display: 'flex', gap: 12 }}>
                             <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '8px 16px', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <CheckCircle2 size={16} className="text-green-500" />
-                                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#475569' }}>Status: Active</span>
+                                <span className="text-positive" style={{ fontSize: '0.85rem', fontWeight: 800 }}>Status: Active</span>
                             </div>
                         </div>
                     </div>
@@ -91,7 +120,7 @@ const StudentDashboard = () => {
                                 {[
                                     { label: 'Avg Performance', value: `${performance?.stats.avgScore || 0}%`, icon: Target, bg: '#eff6ff', color: '#2563eb' },
                                     { label: 'Growth Trend', value: `${(performance?.stats.improvement || 0) >= 0 ? '+' : ''}${performance?.stats.improvement || 0}%`, icon: TrendingUp, bg: (performance?.stats.improvement || 0) >= 0 ? '#f0fdf4' : '#fff1f2', color: (performance?.stats.improvement || 0) >= 0 ? '#166534' : '#991b1b' },
-                                    { label: 'Personal Best', value: `${performance?.stats.bestScore || 0}%`, icon: Trophy, bg: '#fffbeb', color: '#92400e' },
+                                    { label: 'Attendance', value: attendanceLoading ? '--' : (attendanceSummary.total > 0 ? `${attendanceSummary.percentage}%` : '--'), icon: CheckCircle2, bg: '#ecfdf5', color: '#047857' },
                                     { label: 'Total Assessments', value: performance?.stats.totalTests || 0, icon: ClipboardList, bg: '#f8fafc', color: '#475569' },
                                 ].map(s => (
                                     <div key={s.label} className="st-stat">
@@ -132,11 +161,7 @@ const StudentDashboard = () => {
                                                             <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#334155' }}>{ch}</div>
                                                             <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: 2 }}>Score: {performance.chapters[ch].score}%</div>
                                                         </div>
-                                                        <span style={{
-                                                            fontSize: '0.7rem', fontWeight: 900, padding: '4px 10px', borderRadius: 6,
-                                                            background: performance.chapters[ch].status === 'Strong' ? '#dcfce7' : performance.chapters[ch].status === 'Average' ? '#fef9c3' : '#fee2e2',
-                                                            color: performance.chapters[ch].status === 'Strong' ? '#166534' : performance.chapters[ch].status === 'Average' ? '#854d0e' : '#991b1b'
-                                                        }}>
+                                                        <span className={performance.chapters[ch].status === 'Strong' ? 'bg-positive-light text-positive' : performance.chapters[ch].status === 'Average' ? 'bg-warning-light text-warning' : 'bg-negative-light text-negative'} style={{ fontSize: '0.7rem', fontWeight: 900, padding: '4px 10px', borderRadius: 6 }}>
                                                             {performance.chapters[ch].status.toUpperCase()}
                                                         </span>
                                                     </div>
@@ -157,7 +182,7 @@ const StudentDashboard = () => {
                                         </div>
 
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px', borderRadius: 6, background: '#fffbeb', marginBottom: 12 }}>
-                                            <div style={{ background: '#f59e0b', color: '#fff', width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                                            <div style={{ background: 'var(--erp-color-warning)', color: '#fff', width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
                                                 {performance?.ranks?.overall ? `#${performance.ranks.overall}` : '-'}
                                             </div>
                                             <div>
@@ -180,6 +205,63 @@ const StudentDashboard = () => {
                                             ) : (
                                                 <div style={{ padding: '10px', textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem' }}>
                                                     Not enough data for subject ranks.
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="st-card" style={{ border: '1px solid #e2e8f0' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                                            <CheckCircle2 size={18} className="text-emerald-500" />
+                                            <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 900, color: '#1e293b' }}>Attendance Snapshot</h3>
+                                        </div>
+
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                                            {[
+                                                { label: 'Present', value: attendanceSummary.present, color: '#16a34a', bg: '#ecfdf5' },
+                                                { label: 'Absent', value: attendanceSummary.absent, color: '#dc2626', bg: '#fef2f2' },
+                                                { label: 'Late', value: attendanceSummary.late, color: '#d97706', bg: '#fffbeb' }
+                                            ].map(item => (
+                                                <div key={item.label} style={{ background: item.bg, borderRadius: 6, padding: 10, textAlign: 'center' }}>
+                                                    <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>{item.label}</div>
+                                                    <div style={{ fontSize: '1.1rem', fontWeight: 900, color: item.color }}>{item.value}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <div style={{ marginTop: 16 }}>
+                                            <div style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '0.05em', marginBottom: 8 }}>Recent Attendance</div>
+                                            {attendanceLoading ? (
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#94a3b8', fontWeight: 700 }}>
+                                                    <Loader2 size={14} className="spin" /> Loading attendance...
+                                                </div>
+                                            ) : attendanceRecords.length === 0 ? (
+                                                <div style={{ fontSize: '0.85rem', color: '#94a3b8' }}>No attendance records yet.</div>
+                                            ) : (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                                    {attendanceRecords.slice(0, 6).map((record) => {
+                                                        const status = record.status || 'Present';
+                                                        const statusTone = status === 'Present'
+                                                            ? { bg: '#ecfdf5', color: '#047857' }
+                                                            : status === 'Absent'
+                                                                ? { bg: '#fef2f2', color: '#b91c1c' }
+                                                                : { bg: '#fffbeb', color: '#b45309' };
+                                                        return (
+                                                            <div key={record._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderRadius: 6, background: '#f8fafc' }}>
+                                                                <div>
+                                                                    <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e293b' }}>
+                                                                        {record.subjectId?.name || 'Subject'}
+                                                                    </div>
+                                                                    <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: 2 }}>
+                                                                        {new Date(record.attendanceDate || record.date).toLocaleDateString()}
+                                                                    </div>
+                                                                </div>
+                                                                <span style={{ padding: '4px 10px', borderRadius: 6, fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', background: statusTone.bg, color: statusTone.color }}>
+                                                                    {status}
+                                                                </span>
+                                                            </div>
+                                                        );
+                                                    })}
                                                 </div>
                                             )}
                                         </div>
@@ -224,11 +306,7 @@ const StudentDashboard = () => {
                                                                 <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8' }}>{h.marks} / {h.maxMarks}</div>
                                                             </td>
                                                             <td style={{ textAlign: 'right' }} data-label="Status">
-                                                                <span style={{
-                                                                    fontSize: '0.7rem', fontWeight: 900, padding: '4px 10px', borderRadius: 4,
-                                                                    background: h.isPresent ? '#e0f2fe' : '#fee2e2',
-                                                                    color: h.isPresent ? '#0369a1' : '#991b1b'
-                                                                }}>
+                                                                <span className={h.isPresent ? 'bg-positive-light text-positive' : 'bg-negative-light text-negative'} style={{ fontSize: '0.7rem', fontWeight: 900, padding: '4px 10px', borderRadius: 4 }}>
                                                                     {h.isPresent ? 'APPEARED' : 'ABSENT'}
                                                                 </span>
                                                             </td>

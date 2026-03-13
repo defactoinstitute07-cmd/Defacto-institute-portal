@@ -6,6 +6,7 @@ const upload = require('../middleware/upload');
 
 router.get('/', ctrl.getAllStudents);
 router.get('/stats', ctrl.getStudentStats);
+router.get('/activity', ctrl.getStudentActivity);
 router.get('/export', ctrl.exportStudents);
 router.get('/batches', ctrl.getBatches);
 router.post('/', upload.single('profileImage'), ctrl.createStudent);

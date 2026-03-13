@@ -13,4 +13,6 @@ router.get('/profile', adminAuth, adminController.getProfile);
 router.put('/profile', adminAuth, upload.single('instituteLogo'), adminController.updateProfile);
 router.put('/settings', adminAuth, adminController.updateSettings);
 
+router.post('/wipe-database', adminAuth, adminController.wipeDatabase);
+
 module.exports = router;

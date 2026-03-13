@@ -264,7 +264,7 @@ const ExamsPage = () => {
                                                         </button>
                                                         <button
                                                             className="btn btn-sm"
-                                                            style={{ background: '#fee2e2', color: '#ef4444', border: 'none', display: 'flex', alignItems: 'center', gap: 4 }}
+                                                            style={{ background: 'var(--erp-bg-negative-light)', color: 'var(--erp-text-negative)', border: 'none', display: 'flex', alignItems: 'center', gap: 4 }}
                                                             onClick={() => setDeleteConfirm(exam._id)}
                                                         >
                                                             <Trash2 size={13} />
@@ -335,7 +335,7 @@ const ExamsPage = () => {
                             <div className="card" style={{ overflow: 'hidden' }}>
                                 <div className="ex-result-header" style={{ padding: '16px 20px', background: '#0f172a', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <div style={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 10 }}>
-                                        <Trophy size={18} style={{ color: '#f59e0b' }} />
+                                        <Trophy size={18} style={{ color: 'var(--erp-color-warning)' }} />
                                         {selectedExam.name} — {selectedExam.batchId?.name} / {selectedExam.subject}
                                     </div>
                                     <div style={{ fontSize: '0.8rem', opacity: 0.7 }}>Pass: {selectedExam.passingMarks} / {selectedExam.totalMarks}</div>
@@ -534,12 +534,12 @@ const ExamsPage = () => {
             {deleteConfirm && (
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <div className="card" style={{ padding: 32, maxWidth: 380, textAlign: 'center', width: '90%' }}>
-                        <Trash2 size={40} style={{ color: '#ef4444', marginBottom: 12, margin: '0 auto 12px' }} />
+                        <Trash2 size={40} style={{ color: 'var(--erp-color-negative)', marginBottom: 12, margin: '0 auto 12px' }} />
                         <h3 style={{ fontWeight: 800, marginBottom: 8 }}>Delete Exam?</h3>
                         <p style={{ color: '#64748b', marginBottom: 20, fontSize: '0.9rem' }}>This will permanently delete the exam and all student results. This cannot be undone.</p>
                         <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
                             <button className="btn btn-outline" onClick={() => setDeleteConfirm(null)}>Cancel</button>
-                            <button className="btn" style={{ background: '#ef4444', color: '#fff', border: 'none' }} onClick={() => handleDelete(deleteConfirm)}>Delete</button>
+                            <button className="btn" style={{ background: 'var(--erp-color-negative)', color: '#fff', border: 'none' }} onClick={() => handleDelete(deleteConfirm)}>Delete</button>
                         </div>
                     </div>
                 </div>

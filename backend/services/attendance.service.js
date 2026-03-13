@@ -5,6 +5,7 @@ const Student = require('../models/Student');
 const Subject = require('../models/Subject');
 const Teacher = require('../models/Teacher');
 const TeacherAssignment = require('../models/TeacherAssignment');
+const { triggerAutomaticNotification } = require('./notificationService');
 
 const VALID_STATUSES = ['Present', 'Absent', 'Late'];
 
@@ -198,6 +199,17 @@ exports.createOrUpdateAssignment = async ({ teacherId, batchId, subjectId, assig
     if (previousAssignment && previousAssignment.teacherId?.toString() !== teacherObjectId.toString()) {
         await syncLegacyTeacherAssignments(previousAssignment.teacherId);
     }
+
+    // Trigger Automatic Notification
+    triggerAutomaticNotification({
+        eventType: 'teacherBatchAssignment',
+        teacherId: teacherObjectId,
+        message: `You have been assigned to batch ${batch.name} for ${subject.name}.`,
+        data: {
+            batchName: batch.name,
+            schedule: 'Check your dashboard for schedule details' // Or extract from batch if available
+        }
+    });
 
     return assignment.toObject();
 };
@@ -488,6 +500,10 @@ exports.getAttendanceReport = async ({
     if (batchId) query.batchId = asObjectId(batchId, 'Batch');
     if (subjectId) query.subjectId = asObjectId(subjectId, 'Subject');
     if (studentId) query.studentId = asObjectId(studentId, 'Student');
+
+    if (actorRole === 'student') {
+        query.studentId = asObjectId(actorId, 'Student');
+    }
 
     if (dateFrom || dateTo) {
         query.attendanceDate = {};

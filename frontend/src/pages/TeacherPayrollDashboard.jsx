@@ -318,10 +318,10 @@ const TeacherPayrollDashboard = () => {
                 <div className="loader-wrap"><div className="spinner" /></div>
             ) : stats && (
                 <div className="payroll-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 20, marginBottom: 32 }}>
-                    <StatCard title="Profiles Set" value={`${stats.teachersWithProfiles}/${stats.totalTeachers}`} icon={Users} color="#059669" bg="#ecfdf5" />
-                    <StatCard title="Liability" value={`₹ ${stats.totalLiability.toLocaleString()}`} icon={DollarSign} color="#2563eb" bg="#eff6ff" />
-                    <StatCard title="Disbursed" value={`₹ ${stats.totalPaid.toLocaleString()}`} icon={CheckCircle2} color="#059669" bg="#ecfdf5" />
-                    <StatCard title="Pending" value={`₹ ${stats.totalPending.toLocaleString()}`} icon={AlertTriangle} color="#dc2626" bg="#fef2f2" />
+                    <StatCard title="Profiles Set" value={`${stats.teachersWithProfiles}/${stats.totalTeachers}`} icon={Users} color="var(--erp-color-positive)" bg="var(--erp-bg-positive-light)" />
+                    <StatCard title="Liability" value={`₹ ${stats.totalLiability.toLocaleString()}`} icon={DollarSign} color="var(--erp-color-info)" bg="var(--erp-bg-info-light)" />
+                    <StatCard title="Disbursed" value={`₹ ${stats.totalPaid.toLocaleString()}`} icon={CheckCircle2} color="var(--erp-color-positive)" bg="var(--erp-bg-positive-light)" />
+                    <StatCard title="Pending" value={`₹ ${stats.totalPending.toLocaleString()}`} icon={AlertTriangle} color="var(--erp-color-negative)" bg="var(--erp-bg-negative-light)" />
                 </div>
             )}
 
@@ -371,19 +371,16 @@ const TeacherPayrollDashboard = () => {
                                         </div>
                                     </td>
                                     <td style={{ padding: '16px 20px', fontWeight: 600 }} data-label="Fixed Base">₹ {salary.baseSalary.toLocaleString()}</td>
-                                    <td style={{ padding: '16px 20px', color: '#059669', fontWeight: 700 }} data-label="Incentives">+₹ {(salary.extraClassesAmount + salary.bonusAmount).toLocaleString()}</td>
+                                    <td className="text-positive" style={{ padding: '16px 20px', fontWeight: 700 }} data-label="Incentives">+₹ {(salary.extraClassesAmount + salary.bonusAmount).toLocaleString()}</td>
                                     <td style={{ padding: '16px 20px' }} data-label="Net Pay">
                                         <div style={{ fontWeight: 900, color: primaryColor, fontSize: '0.95rem' }}>₹ {salary.netSalary.toLocaleString()}</div>
                                         {salary.totalPaid > 0 && (
-                                            <div style={{ fontSize: '0.65rem', color: '#059669', fontWeight: 700 }}>Paid: ₹ {salary.totalPaid.toLocaleString()}</div>
+                                            <div className="text-positive" style={{ fontSize: '0.65rem', fontWeight: 700 }}>Paid: ₹ {salary.totalPaid.toLocaleString()}</div>
                                         )}
                                     </td>
                                     <td style={{ padding: '16px 20px' }} data-label="Status">
-                                        <span style={{
+                                        <span className={salary.status === 'Paid' ? 'bg-positive-light text-positive' : salary.status === 'Processing' ? 'bg-info-light text-info' : 'bg-warning-light text-warning'} style={{
                                             padding: '4px 10px', borderRadius: '2px', fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase',
-                                            background: salary.status === 'Paid' ? '#ecfdf5' : salary.status === 'Processing' ? '#eff6ff' : '#fffbeb',
-                                            color: salary.status === 'Paid' ? '#059669' : salary.status === 'Processing' ? '#2563eb' : '#b45309',
-                                            border: `1px solid ${salary.status === 'Paid' ? '#d1fae5' : salary.status === 'Processing' ? '#dbeafe' : '#fef3c7'}`,
                                             display: 'inline-flex', alignItems: 'center', gap: 4
                                         }}>
                                             {salary.status === 'Paid' ? <CheckCircle2 size={10} /> : <Clock size={10} />}
@@ -468,7 +465,7 @@ const TeacherPayrollDashboard = () => {
                                 <div className="mf" style={{ marginBottom: 16 }}>
                                     <label style={{ fontSize: '0.7rem', fontWeight: 900, color: '#64748b' }}>AMOUNT TO DISBURSE NOW *</label>
                                     <div style={{ position: 'relative' }}>
-                                        <IndianRupee size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#059669' }} />
+                                        <IndianRupee size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--erp-color-positive)' }} />
                                         <input
                                             type="number"
                                             value={payData.paidAmount}
@@ -490,9 +487,9 @@ const TeacherPayrollDashboard = () => {
 
                                 {payData.paymentMethod === 'UPI' && selectedTeacherProfile?.bankDetails?.upiId && (
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px', borderRadius: sharpRadius, background: '#f0fdf4', border: '1px solid #d1fae5', marginBottom: 16 }}>
-                                        <QrCode size={18} color="#059669" />
+                                        <QrCode size={18} color="var(--erp-color-positive)" />
                                         <div>
-                                            <div style={{ fontSize: '0.6rem', fontWeight: 800, color: '#059669', textTransform: 'uppercase' }}>VERIFIED UPI ADDRESS</div>
+                                            <div style={{ fontSize: '0.6rem', fontWeight: 800, color: 'var(--erp-color-positive)', textTransform: 'uppercase' }}>VERIFIED UPI ADDRESS</div>
                                             <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#064e3b' }}>{selectedTeacherProfile.bankDetails.upiId}</div>
                                         </div>
                                     </div>

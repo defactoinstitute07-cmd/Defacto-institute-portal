@@ -15,10 +15,14 @@ export const teacherLogin = (data) => TEACHER_API.post('/api/teacher/login', dat
 // --- Student ---
 export const studentSignup = (data) => API.post('/api/student/signup', data);
 export const studentLogin = (data) => API.post('/api/student/login', data);
+export const studentCompleteSetup = (data) => API.post('/api/student/complete-setup', data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+});
 
 export default {
     adminLogin,
     teacherLogin,
     studentSignup,
-    studentLogin
+    studentLogin,
+    studentCompleteSetup
 };

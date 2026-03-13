@@ -1,7 +1,13 @@
 const Admin = require('../models/Admin');
+const Student = require('../models/Student');
+const Teacher = require('../models/Teacher');
+const Fee = require('../models/Fee');
+const Batch = require('../models/Batch');
+const AuditLog = require('../models/AuditLog');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { JWT_SECRET } = require('../middleware/auth.middleware');
+const emailService = require('../services/emailService');
 
 // Check if admin exists
 exports.checkAdmin = async (req, res) => {
@@ -167,6 +173,22 @@ exports.updateSettings = async (req, res) => {
     try {
         const admin = await Admin.findById(req.admin.id).select('-password');
         if (!admin) return res.status(404).json({ message: 'Admin not found' });
+
+        const { fcmServerKey, gmailEmail, gmailAppPassword, notificationsEnabled, emailEvents, receiptSettings } = req.body;
+
+        if (fcmServerKey !== undefined) admin.fcmServerKey = fcmServerKey;
+        if (gmailEmail !== undefined) admin.gmailEmail = gmailEmail;
+        if (gmailAppPassword !== undefined) admin.gmailAppPassword = gmailAppPassword;
+        if (notificationsEnabled !== undefined) admin.notificationsEnabled = notificationsEnabled;
+        if (emailEvents !== undefined) {
+            admin.emailEvents = { ...admin.emailEvents, ...emailEvents };
+        }
+        if (receiptSettings !== undefined) {
+            admin.receiptSettings = { ...admin.receiptSettings, ...receiptSettings };
+        }
+
+        await admin.save();
+
         res.json({ message: 'Settings updated successfully', admin });
     } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });
@@ -196,5 +218,38 @@ exports.getDatabaseStats = async (req, res) => {
     } catch (error) {
         console.error('[DBStatsError]', error);
         res.status(500).json({ message: 'Failed to fetch database stats', error: error.message });
+    }
+};
+
+// Execute Database Wipe
+exports.wipeDatabase = async (req, res) => {
+    try {
+        const password = String(req.body.password || '').trim();
+
+        const admin = await Admin.findById(req.admin.id);
+        if (!admin) return res.status(404).json({ message: 'Admin not found.' });
+
+        // Verify Password
+        const isMatch = await bcrypt.compare(password, admin.password);
+        if (!isMatch) return res.status(401).json({ message: 'Invalid admin password.' });
+
+        // Delete all data EXCEPT Admin
+        await Promise.all([
+            Student.deleteMany({}),
+            Teacher.deleteMany({}),
+            Fee.deleteMany({}),
+            Batch.deleteMany({}),
+            AuditLog.deleteMany({})
+        ]);
+
+        // Clear OTP fields anyway for clean state
+        admin.wipeOtp = null;
+        admin.wipeOtpExpiry = null;
+        await admin.save();
+
+        res.json({ message: 'Database wiped successfully. All student, teacher, batch, and fee records have been deleted.' });
+    } catch (err) {
+        console.error('[WipeDatabase Error]', err);
+        res.status(500).json({ message: 'Server error', error: err.message });
     }
 };

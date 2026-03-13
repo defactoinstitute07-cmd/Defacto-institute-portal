@@ -96,3 +96,21 @@ exports.getAttendanceReport = async (req, res) => {
         res.status(status).json({ message: error.message || 'Failed to fetch attendance report.' });
     }
 };
+
+exports.getStudentAttendanceReport = async (req, res) => {
+    try {
+        const report = await attendanceService.getAttendanceReport({
+            actorRole: req.role,
+            actorId: req.userId,
+            dateFrom: req.query.dateFrom,
+            dateTo: req.query.dateTo,
+            page: req.query.page,
+            limit: req.query.limit
+        });
+
+        res.json(report);
+    } catch (error) {
+        const status = error.status || 500;
+        res.status(status).json({ message: error.message || 'Failed to fetch attendance report.' });
+    }
+};

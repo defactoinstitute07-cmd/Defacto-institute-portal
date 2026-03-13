@@ -8,6 +8,9 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
 
     if (!token) {
         // Redirect to login but save the current location they were trying to go to
+        if (allowedRoles.includes('student') || allowedRoles.includes('teacher')) {
+            return <Navigate to="/portal" state={{ from: location }} replace />;
+        }
         return <Navigate to="/login" state={{ from: location }} replace />;
     }
 
@@ -16,6 +19,25 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
         if (role === 'teacher') return <Navigate to="/teacher-dashboard" replace />;
         if (role === 'student') return <Navigate to="/student-dashboard" replace />;
         return <Navigate to="/login" replace />;
+    }
+
+    if (role === 'student' && allowedRoles.includes('student')) {
+        let student = {};
+        try {
+            student = JSON.parse(localStorage.getItem('student') || '{}');
+        } catch {
+            student = {};
+        }
+        const needsSetup = student.needsSetup !== undefined
+            ? student.needsSetup
+            : ((student.portalAccess?.signupStatus || 'no') !== 'yes' || !student.profileImage);
+
+        if (needsSetup && location.pathname !== '/student-setup') {
+            return <Navigate to="/student-setup" replace />;
+        }
+        if (!needsSetup && location.pathname === '/student-setup') {
+            return <Navigate to="/student-dashboard" replace />;
+        }
     }
 
     return children;

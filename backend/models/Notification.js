@@ -21,16 +21,35 @@ const channelResultSchema = new mongoose.Schema({
 }, { _id: false });
 
 const notificationSchema = new mongoose.Schema({
+    title: {
+        type: String,
+        default: 'ERP Notification',
+        trim: true
+    },
     message: {
         type: String,
         required: true,
         trim: true
     },
+    type: {
+        type: String,
+        enum: ['general', 'fee', 'attendance', 'homework', 'announcement', 'exam'],
+        default: 'general'
+    },
     studentId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Student',
-        required: true,
+        required: false, // Changed to false for topic/broadcast notifications
         index: true
+    },
+    target: {
+        type: String,
+        enum: ['individual', 'batch', 'all'],
+        default: 'individual'
+    },
+    targetId: {
+        type: String, // Can be studentId, batchId, or 'all'
+        default: null
     },
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
@@ -39,21 +58,30 @@ const notificationSchema = new mongoose.Schema({
     },
     deliveryType: {
         type: String,
-        enum: ['push', 'whatsapp', 'both'],
+        enum: ['push', 'email', 'both'],
         required: true,
         index: true
     },
     status: {
         type: String,
-        enum: ['pending', 'sent', 'partial', 'failed', 'logged'],
+        enum: ['pending', 'scheduled', 'sent', 'partial', 'failed', 'logged'],
         default: 'pending',
         index: true
+    },
+    scheduledFor: {
+        type: Date,
+        default: null,
+        index: true
+    },
+    retryCount: {
+        type: Number,
+        default: 0
     },
     pushResult: {
         type: channelResultSchema,
         default: undefined
     },
-    whatsappResult: {
+    emailResult: {
         type: channelResultSchema,
         default: undefined
     }

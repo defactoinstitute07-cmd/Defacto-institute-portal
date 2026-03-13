@@ -1,4 +1,5 @@
 const Exam = require('../models/Exam');
+const { triggerAutomaticNotification } = require('../services/notificationService');
 const ExamResult = require('../models/ExamResult');
 const Student = require('../models/Student');
 const Batch = require('../models/Batch');
@@ -183,12 +184,26 @@ exports.saveMarks = async (req, res) => {
 
         marks.forEach(m => {
             const student = studentMap[m.studentId?.toString()];
-            if (student && student.email) {
+            if (student) {
                 const mo = parseFloat(m.marksObtained) || 0;
                 const pass = mo >= exam.passingMarks;
                 const grace = exam.passingMarks - 0.05 * exam.totalMarks;
                 const result = pass ? 'PASS' : 'FAIL';
                 const resultColor = pass ? '#15803d' : (mo >= grace ? '#a16207' : '#be123c');
+
+                // Trigger Automatic Email Notification
+                triggerAutomaticNotification({
+                    eventType: 'examResult',
+                    studentId: student._id,
+                    message: `Result announced for ${exam.name}: ${mo}/${exam.totalMarks} (${result})`,
+                    data: {
+                        examName: exam.name,
+                        examDate: exam.date ? new Date(exam.date).toLocaleDateString('en-IN') : 'TBD',
+                        score: mo,
+                        totalMarks: exam.totalMarks,
+                        passStatus: result
+                    }
+                });
 
                 logNotificationEvent({
                     recipientEmail: student.email,

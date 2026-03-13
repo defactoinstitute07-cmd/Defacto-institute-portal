@@ -1,3 +1,4 @@
+// Triggering restart for ERP wipe feature debug
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -23,8 +24,10 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const attendanceRoutes = require('./routes/attendance.routes');
 const subjectRoutes = require('./routes/subject.routes');
 const teacherAssignmentRoutes = require('./routes/teacherAssignment.routes');
+const templateRoutes = require('./routes/templateRoutes');
+const teacherPortalRoutes = require('./routes/teacher.portal.routes');
 
-const { initFeeScheduler, initSalaryScheduler, initReminderScheduler } = require('./utils/scheduler');
+const { initFeeScheduler, initSalaryScheduler, initReminderScheduler, initScheduler } = require('./utils/scheduler');
 // Portal auth routes
 const studentAuthRoutes = require('./routes/student.auth.routes');
 const teacherAuthRoutes = require('./routes/teacher.auth.routes');
@@ -39,6 +42,7 @@ if (process.env.NODE_ENV !== 'production') {
     initFeeScheduler();
     initSalaryScheduler();
     initReminderScheduler();
+    initScheduler();
 }
 
 // Middleware
@@ -125,6 +129,8 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/subjects', subjectRoutes);
 app.use('/api/teacher-assignments', teacherAssignmentRoutes);
+app.use('/api/templates', templateRoutes);
+app.use('/api/teacher-portal', teacherPortalRoutes);
 
 // Portal auth routes
 app.use('/api/student', studentAuthRoutes);
@@ -132,7 +138,10 @@ app.use('/api/teacher', teacherAuthRoutes);
 app.use('/api/demo', demoRoutes);
 
 // Database Connection
-connectDB();
+connectDB().then(() => {
+    // Seed templates if needed
+    require('./controllers/template.controller').seedDefaults();
+});
 
 // 404 Handler for API
 app.use('/api', (req, res) => {

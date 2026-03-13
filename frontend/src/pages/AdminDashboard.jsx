@@ -10,13 +10,18 @@ import {
     UserPlus,
     AlertCircle,
     Loader2,
-    Calendar
+    Calendar,
+    Activity,
+    WifiOff,
+    AlertTriangle,
+    RefreshCcw
 } from 'lucide-react';
 import { SkeletonStat, SkeletonTable } from '../components/common/SkeletonLoaders';
 
 const fmt = (n) => n?.toLocaleString('en-IN') ?? '—';
 const fmtDay = (d) => new Date(d).toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short' });
 const fmtDate = (d) => new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' });
+const LIVE_REFRESH_MS = 30000;
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
@@ -25,22 +30,47 @@ const AdminDashboard = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
-    useEffect(() => {
+    const loadDashboard = async ({ silent = false } = {}) => {
         if (!localStorage.getItem('token')) { navigate('/login'); return; }
-        fetchDashboard()
-            .then(({ data: d }) => setData(d))
-            .catch(err => {
-                if (err.response?.status === 401) navigate('/login');
-                else setError('Failed to load dashboard data.');
-            })
-            .finally(() => setLoading(false));
+        if (!silent) setLoading(true);
+
+        try {
+            const { data: dashboardData } = await fetchDashboard();
+            setData(dashboardData);
+            setError('');
+        } catch (err) {
+            if (err.response?.status === 401) navigate('/login');
+            else if (!silent) setError('Failed to load dashboard data.');
+        } finally {
+            if (!silent) setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        loadDashboard();
     }, [navigate]);
+
+    useEffect(() => {
+        const intervalId = window.setInterval(() => {
+            if (document.visibilityState === 'visible') {
+                loadDashboard({ silent: true });
+            }
+        }, LIVE_REFRESH_MS);
+
+        return () => window.clearInterval(intervalId);
+    }, [navigate]);
+
+    const activitySummary = data?.activitySummary || {};
+    const activityThresholds = data?.activityThresholds || { onlineMinutes: 5, inactiveDays: 7 };
 
     const stats = data ? [
         { label: 'Total Students', value: fmt(data.totalStudents), sub: 'enrolled', icon: GraduationCap, cls: 'ic-indigo' },
         { label: 'Active Batches', value: fmt(data.activeBatches), sub: 'currently running', icon: BookOpen, cls: 'ic-indigo' },
         { label: 'Total Teachers', value: fmt(data.totalTeachers), sub: 'across batches', icon: Users, cls: 'ic-indigo' },
         { label: 'Fees Collected', value: `₹ ${fmt(data.totalFeesPaid)}`, sub: 'collected so far', icon: IndianRupee, cls: 'ic-indigo' },
+        { label: 'Students Online', value: fmt(activitySummary.online), sub: `active in ${activityThresholds.onlineMinutes}m`, icon: Activity, cls: 'ic-green' },
+        { label: 'Students Offline', value: fmt(activitySummary.offline), sub: `seen in ${activityThresholds.inactiveDays}d`, icon: WifiOff, cls: 'ic-blue' },
+        { label: 'Students Inactive', value: fmt(activitySummary.inactive), sub: `no open in ${activityThresholds.inactiveDays}d`, icon: AlertTriangle, cls: 'ic-orange' }
     ] : [];
 
     if (!data && !loading) return null;
@@ -52,6 +82,15 @@ const AdminDashboard = () => {
                     <h1 style={{ fontSize: '1.8rem', fontWeight: 900, color: 'var(--erp-primary)' }}>Institute Insights</h1>
                     <p style={{ fontSize: '0.95rem', color: '#64748b' }}>Welcome back, <b>{admin.adminName || 'Admin'}</b>. Here's your daily institute overview.</p>
                 </div>
+                <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => loadDashboard()}
+                    disabled={loading}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+                >
+                    <RefreshCcw size={16} className={loading ? 'spin' : ''} /> Refresh Activity
+                </button>
             </div>
 
             {error && (

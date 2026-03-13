@@ -5,6 +5,11 @@ const Batch = require('../models/Batch');
 const Attendance = require('../models/Attendance');
 const jwt = require('jsonwebtoken');
 
+const getActivityConfig = () => ({
+    onlineMinutes: Math.max(parseInt(process.env.ACTIVITY_ONLINE_MINUTES || '5', 10) || 5, 1),
+    inactiveDays: Math.max(parseInt(process.env.ACTIVITY_INACTIVE_DAYS || '7', 10) || 7, 1)
+});
+
 // ── Auth Middleware ──────────────────────────────────────────────────────────
 const auth = (req, res, next) => {
     const header = req.headers.authorization;
@@ -21,11 +26,50 @@ const auth = (req, res, next) => {
 // ── GET /admin — Dashboard Data ──────────────────────────────────────────────
 router.get('/', auth, async (req, res) => {
     try {
+        const { onlineMinutes, inactiveDays } = getActivityConfig();
+        const now = new Date();
+        const onlineThreshold = new Date(now.getTime() - onlineMinutes * 60 * 1000);
+        const inactiveThreshold = new Date(now.getTime() - inactiveDays * 24 * 60 * 60 * 1000);
+
         // Core counts
-        const [totalStudents, activeBatches, totalFeesPaid] = await Promise.all([
+        const [totalStudents, activeBatches, totalFeesPaid, activityStats] = await Promise.all([
             Student.countDocuments(),
             Batch.countDocuments({ isActive: true }),
-            Student.aggregate([{ $group: { _id: null, total: { $sum: '$feesPaid' } } }])
+            Student.aggregate([{ $group: { _id: null, total: { $sum: '$feesPaid' } } }]),
+            Student.aggregate([
+                {
+                    $addFields: {
+                        activityAt: {
+                            $ifNull: [
+                                '$lastActiveAt',
+                                { $ifNull: ['$lastAppOpenAt', '$portalAccess.lastLoginAt'] }
+                            ]
+                        }
+                    }
+                },
+                {
+                    $addFields: {
+                        activityStatus: {
+                            $switch: {
+                                branches: [
+                                    {
+                                        case: {
+                                            $or: [
+                                                { $eq: ['$activityAt', null] },
+                                                { $lte: ['$activityAt', inactiveThreshold] }
+                                            ]
+                                        },
+                                        then: 'inactive'
+                                    },
+                                    { case: { $gte: ['$activityAt', onlineThreshold] }, then: 'online' }
+                                ],
+                                default: 'offline'
+                            }
+                        }
+                    }
+                },
+                { $group: { _id: '$activityStatus', count: { $sum: 1 } } }
+            ])
         ]);
 
         // Unique teachers from active batches
@@ -72,13 +116,21 @@ router.get('/', auth, async (req, res) => {
             trend.push({ date: key, present, absent });
         }
 
+        const activitySummary = {
+            online: activityStats.find((item) => item._id === 'online')?.count || 0,
+            offline: activityStats.find((item) => item._id === 'offline')?.count || 0,
+            inactive: activityStats.find((item) => item._id === 'inactive')?.count || 0
+        };
+
         res.json({
             totalStudents,
             activeBatches,
             totalTeachers: teachers.length,
             totalFeesPaid: totalFeesPaid[0]?.total || 0,
             recentAdmissions,
-            attendanceTrend: trend
+            attendanceTrend: trend,
+            activitySummary,
+            activityThresholds: { onlineMinutes, inactiveDays }
         });
     } catch (error) {
         console.error(error);

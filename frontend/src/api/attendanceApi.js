@@ -25,6 +25,7 @@ export const getAdminAttendanceRoster = (params) => apiClient.get('/attendance/r
 export const markAdminAttendance = (payload) => apiClient.post('/attendance/mark', payload);
 export const updateAdminAttendance = (attendanceId, payload) => apiClient.put(`/attendance/${attendanceId}`, payload);
 export const getAdminAttendanceReport = (params) => apiClient.get('/attendance/report', { params });
+export const getStudentAttendanceReport = (params) => apiClient.get('/attendance/student/report', { params });
 
 export const getTeacherAssignedBatches = () => teacherAttendanceClient.get('/attendance/teacher/assigned-batches');
 export const getTeacherAttendanceRoster = (params) => teacherAttendanceClient.get('/attendance/roster', { params });

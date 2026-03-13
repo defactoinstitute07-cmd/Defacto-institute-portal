@@ -15,11 +15,15 @@ const authHeader = () => ({
 
 export const getAdminProfile = () => API.get('/profile', authHeader());
 export const updateAdminProfile = (data) => API.put('/profile', data, authHeader());
+export const updateSettings = (data) => API.put('/settings', data, authHeader());
 
 // Settings page extra metrics
 export const getDatabaseStats = () => axios.get(`${API_BASE_URL}/api/settings/db-stats`, authHeader());
 
 // The dashboard work routes are also under this base
 export const fetchDashboard = () => API.get('/', authHeader());
+
+// Database Wipe APIs
+export const wipeDatabase = (password) => API.post('/wipe-database', { password }, authHeader());
 
 export default API;

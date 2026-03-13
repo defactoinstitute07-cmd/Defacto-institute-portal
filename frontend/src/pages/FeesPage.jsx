@@ -11,12 +11,13 @@ import {
     Calendar, Users, Wallet, AlertCircle,
     ChevronLeft, ChevronRight, Loader2,
     History, Receipt, CreditCard, Landmark, LineChart, IndianRupee, Trash2,
-    Clock, PlusCircle
+    Clock, PlusCircle, Settings
 } from 'lucide-react';
 import RecordPaymentModal from '../components/fees/RecordPaymentModal';
 import PaymentHistoryModal from '../components/fees/PaymentHistoryModal';
 import CreateFeeModal from '../components/fees/CreateFeeModal';
 import AddExpenseModal from '../components/fees/AddExpenseModal';
+import ReceiptSettingsModal from '../components/fees/ReceiptSettingsModal';
 import ActionModal from '../components/common/ActionModal';
 
 import apiClient, { API_BASE_URL } from '../api/apiConfig';
@@ -41,6 +42,7 @@ const FeesPage = () => {
     const [err, setErr] = useState('');
     const [selectedIds, setSelectedIds] = useState([]);
     const [bulkForm, setBulkForm] = useState({ title: '', amount: '', description: '', date: new Date().toISOString().split('T')[0] });
+    const [receiptConfig, setReceiptConfig] = useState(null);
 
     // Action Modal States
     const [actionState, setActionState] = useState({
@@ -98,6 +100,20 @@ const FeesPage = () => {
     useEffect(() => {
         load();
         setSelectedIds([]); // Clear selection when filters change
+        
+        // Load initial receipt settings from localStorage or API
+        const saved = JSON.parse(localStorage.getItem('instituteSettings') || '{}');
+        if (saved.receiptSettings) {
+            setReceiptConfig(saved.receiptSettings);
+        } else {
+            // Fetch if not in localStorage
+            apiClient.get('/settings').then(res => {
+                if (res.data.receiptSettings) {
+                    setReceiptConfig(res.data.receiptSettings);
+                    localStorage.setItem('instituteSettings', JSON.stringify(res.data));
+                }
+            });
+        }
     }, [load]);
 
     // De-bounced search
@@ -143,8 +159,17 @@ const FeesPage = () => {
         const student = feeData.studentId || {};
         const logoUrl = settings.instituteLogo ? (settings.instituteLogo.startsWith('http') ? settings.instituteLogo : `${API_BASE_URL}${settings.instituteLogo}`) : null;
 
+        const rSettings = settings.receiptSettings || {
+            showCoachingName: true,
+            showLogo: true,
+            showWatermark: true,
+            showAddress: true,
+            showPhone: true,
+            showEmail: true
+        };
+
         // --- Watermark ---
-        if (logoUrl) {
+        if (logoUrl && rSettings.showWatermark) {
             try {
                 const imgBase64 = await new Promise((resolve) => {
                     const img = new Image();
@@ -182,7 +207,7 @@ const FeesPage = () => {
 
         // --- Header Section (Centered Logo + Info) ---
         let headerY = 15;
-        if (logoUrl) {
+        if (logoUrl && rSettings.showLogo) {
             try {
                 const logoBase64 = await new Promise((resolve) => {
                     const img = new Image();
@@ -207,15 +232,30 @@ const FeesPage = () => {
             }
         }
 
-        doc.setFontSize(18);
-        doc.setFont('helvetica', 'bold');
-        doc.text(coachingName.toUpperCase(), 105, headerY, { align: 'center' });
+        if (rSettings.showCoachingName) {
+            doc.setFontSize(18);
+            doc.setFont('helvetica', 'bold');
+            doc.text(coachingName.toUpperCase(), 105, headerY, { align: 'center' });
+            headerY += 6;
+        }
 
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-        doc.text(settings.instituteAddress || 'Institute Campus Address...', 105, headerY + 6, { align: 'center' });
-        doc.text(`Phone: ${settings.institutePhone || '+91 0000000000'} | Email: ${settings.instituteEmail || 'info@institute.ac.in'}`, 105, headerY + 12, { align: 'center' });
-        headerY += 15;
+        
+        if (rSettings.showAddress) {
+            doc.text(settings.instituteAddress || 'Institute Campus Address...', 105, headerY, { align: 'center' });
+            headerY += 6;
+        }
+        
+        const contactInfo = [];
+        if (rSettings.showPhone) contactInfo.push(`Phone: ${settings.institutePhone || '+91 0000000000'}`);
+        if (rSettings.showEmail) contactInfo.push(`Email: ${settings.instituteEmail || 'info@institute.ac.in'}`);
+        
+        if (contactInfo.length > 0) {
+            doc.text(contactInfo.join(' | '), 105, headerY, { align: 'center' });
+            headerY += 6;
+        }
+        headerY += 5;
 
         doc.setDrawColor(200);
         doc.line(15, headerY, 195, headerY);
@@ -483,6 +523,30 @@ const FeesPage = () => {
         }
     };
 
+    const handleRemindOverdue = () => {
+        setActionState({
+            isOpen: true,
+            type: 'warning',
+            title: 'Send Overdue Reminders',
+            desc: `This will send an automatic email reminder to ALL students who have "overdue" fee records. Are you sure?`,
+            onConfirm: (pwd) => confirmRemindOverdue(pwd),
+            loading: false,
+            error: ''
+        });
+    };
+
+    const confirmRemindOverdue = async (pwd) => {
+        setActionState(prev => ({ ...prev, loading: true, error: '' }));
+        try {
+            await apiClient.post('/fees/remind-overdue', { adminPassword: pwd });
+            setActionState(prev => ({ ...prev, isOpen: false }));
+            setModal(false);
+            alert('Reminders sent successfully');
+        } catch (e) {
+            setActionState(prev => ({ ...prev, loading: false, error: e.response?.data?.message || 'Reminder operation failed' }));
+        }
+    };
+
     const exportData = () => {
         if (fees.length === 0) {
             alert('No records to export');
@@ -575,6 +639,12 @@ const FeesPage = () => {
     };
 
 
+    useEffect(() => {
+        if (modal === 'remind') {
+            handleRemindOverdue();
+        }
+    }, [modal]);
+
     return (
         <ERPLayout title="Fee Management">
             <style>{`
@@ -597,6 +667,12 @@ const FeesPage = () => {
                 <div className="flex gap-2">
                     <button className="btn btn-outline" onClick={() => setModal('create')}>
                         <PlusCircle size={15} /> Manual Fee
+                    </button>
+                    <button className="btn btn-outline" style={{ color: 'var(--erp-error)', borderColor: 'var(--erp-error)' }} onClick={() => setModal('remind')}>
+                        <AlertCircle size={15} /> Send Reminders
+                    </button>
+                    <button className="btn btn-outline" onClick={() => setModal('receiptSettings')}>
+                        <Settings size={15} /> Receipt Settings
                     </button>
                     <button className="btn btn-primary" onClick={() => { setModal('generate'); setGenForm({ month: '', year: (new Date().getFullYear().toString()), dueDate: '' }); }}>
                         <Plus size={15} /> Bulk Genesis
@@ -752,7 +828,7 @@ const FeesPage = () => {
                                             <span className={`badge ${f.status === 'paid' ? 'badge-active' : f.status === 'overdue' ? 'badge-overdue' : ''}`}
                                                 style={{
                                                     background: f.status === 'partial' ? '#fffbeb' : '',
-                                                    color: f.status === 'partial' ? '#d97706' : '',
+                                                    color: f.status === 'partial' ? 'var(--erp-text-warning)' : '',
                                                     border: f.status === 'partial' ? '1px solid #fde68a' : ''
                                                 }}>
                                                 {f.status}
@@ -990,6 +1066,13 @@ const FeesPage = () => {
                     </div>
                 </div>
             )}
+
+            <ReceiptSettingsModal
+                isOpen={modal === 'receiptSettings'}
+                onClose={() => setModal(false)}
+                initialSettings={receiptConfig}
+                onSave={(newSettings) => setReceiptConfig(newSettings)}
+            />
 
             <ActionModal
                 isOpen={actionState.isOpen}

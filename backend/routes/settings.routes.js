@@ -9,7 +9,7 @@ const { adminAuth } = require('../middleware/auth.middleware');
 // UI themes, logo layout, and global dropdown parameters.
 router.get('/', async (req, res) => {
     try {
-        const admin = await Admin.findOne().select('coachingName instituteLogo classesOffered roomsAvailable instituteAddress instituteEmail institutePhone');
+        const admin = await Admin.findOne().select('coachingName instituteLogo classesOffered roomsAvailable instituteAddress instituteEmail institutePhone receiptSettings');
 
         if (!admin) {
             return res.json({
@@ -19,7 +19,15 @@ router.get('/', async (req, res) => {
                 roomsAvailable: 5,
                 instituteAddress: '',
                 instituteEmail: '',
-                institutePhone: ''
+                institutePhone: '',
+                receiptSettings: {
+                    showCoachingName: true,
+                    showLogo: true,
+                    showWatermark: true,
+                    showAddress: true,
+                    showPhone: true,
+                    showEmail: true
+                }
             });
         }
 
@@ -30,7 +38,15 @@ router.get('/', async (req, res) => {
             roomsAvailable: admin.roomsAvailable || 5,
             instituteAddress: admin.instituteAddress || '',
             instituteEmail: admin.instituteEmail || '',
-            institutePhone: admin.institutePhone || ''
+            institutePhone: admin.institutePhone || '',
+            receiptSettings: admin.receiptSettings || {
+                showCoachingName: true,
+                showLogo: true,
+                showWatermark: true,
+                showAddress: true,
+                showPhone: true,
+                showEmail: true
+            }
         });
 
     } catch (err) {

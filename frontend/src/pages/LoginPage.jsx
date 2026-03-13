@@ -62,8 +62,12 @@ const LoginPage = () => {
                 data = response.data;
                 localStorage.setItem('token', data.token);
                 localStorage.setItem('role', 'student');
-                localStorage.setItem('student', JSON.stringify(data.student));
-                navigate('/student-dashboard');
+                const student = data.student || {};
+                const needsSetup = student.needsSetup !== undefined
+                    ? student.needsSetup
+                    : ((student.portalAccess?.signupStatus || 'no') !== 'yes' || !student.profileImage);
+                localStorage.setItem('student', JSON.stringify({ ...student, needsSetup }));
+                navigate(needsSetup ? '/student-setup' : '/student-dashboard');
             }
         } catch (err) {
             setError(err.response?.data?.message || 'Authentication failed. Please try again.');
@@ -503,4 +507,3 @@ const LoginPage = () => {
 };
 
 export default LoginPage;
-

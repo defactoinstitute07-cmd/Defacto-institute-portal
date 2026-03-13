@@ -7,6 +7,7 @@ const {
     TeacherPayment
 } = require('../models/TeacherPayroll');
 const Teacher = require('../models/Teacher');
+const { triggerAutomaticNotification } = require('../services/notificationService');
 const Admin = require('../models/Admin');
 const Expense = require('../models/Expense');
 const { logNotificationEvent } = require('../services/activityLogService');
@@ -265,6 +266,22 @@ exports.markSalaryPaid = async (req, res) => {
         try {
             const teacherInfo = await Teacher.findById(salary.teacherId).select('name email');
             if (teacherInfo && teacherInfo.email) {
+                // Extract month name from YYYY-MM
+                const dateParts = salary.monthYear.split('-');
+                const monthName = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1).toLocaleString('default', { month: 'long' });
+
+                triggerAutomaticNotification({
+                    eventType: 'salaryPaid',
+                    teacherId: teacherInfo._id,
+                    message: `Your salary for ${monthName} ${dateParts[0]} has been processed. Amount: ₹${paidAmount}`,
+                    data: {
+                        month: monthName,
+                        year: dateParts[0],
+                        amountPaid: paidAmount,
+                        transactionRef: payment.transactionId
+                    }
+                });
+
                 logNotificationEvent({
                     recipientEmail: teacherInfo.email,
                     recipientName: teacherInfo.name,

@@ -3,7 +3,9 @@ const Student = require('../models/Student');
 const Batch = require('../models/Batch');
 const AuditLog = require('../models/AuditLog');
 const crypto = require('crypto');
-const { logNotificationEvent } = require('../services/activityLogService');
+const Admin = require('../models/Admin');
+const { triggerAutomaticNotification } = require('../services/notificationService');
+const emailService = require('../services/emailService');
 
 // GET /api/fees — all fees with optional filters
 exports.getAllFees = async (req, res) => {
@@ -182,21 +184,21 @@ exports.createFee = async (req, res) => {
             });
         }
 
-        // Log fee generation activity instead of sending email.
+        // Trigger fee generation notification
         const studentInfo = await Student.findById(studentId).select('name email');
-        if (studentInfo && studentInfo.email) {
-            logNotificationEvent({
-                recipientEmail: studentInfo.email,
-                recipientName: studentInfo.name,
-                subject: `Fee Invoice Generated: ${month} ${currentYear}`,
-                type: 'fee_generated',
+        if (studentInfo) {
+            await triggerAutomaticNotification({
+                studentId: studentInfo._id,
+                message: `Hello ${studentInfo.name}, a new fee of ₹${numericAmount} has been generated for ${month} ${currentYear}. Due date: ${new Date(dueDate).toLocaleDateString()}. Please check your portal.`,
+                eventType: 'feeGenerated',
+                adminId: req.admin?.id,
                 data: {
-                    month,
-                    year: currentYear,
                     amount: numericAmount,
+                    month: month,
+                    year: currentYear,
                     dueDate: new Date(dueDate).toLocaleDateString()
                 }
-            }).catch(e => console.error('[FeeNotificationLog] Error logging event:', e));
+            });
         }
 
         res.status(201).json({ message: 'Fee record created successfully', fee });
@@ -301,21 +303,19 @@ exports.capturePayment = async (req, res) => {
             ipAddress: req.ip
         });
 
-        // Log fee payment activity instead of sending email.
+        // Trigger fee payment notification
         const studentInfo = await Student.findById(fee.studentId).select('name email');
-        if (studentInfo && studentInfo.email) {
-            logNotificationEvent({
-                recipientEmail: studentInfo.email,
-                recipientName: studentInfo.name,
-                subject: `Payment Received — Receipt ${receiptNo}`,
-                type: 'fee_paid',
+        if (studentInfo) {
+            await triggerAutomaticNotification({
+                studentId: studentInfo._id,
+                message: `Hello ${studentInfo.name}, we have received your payment of ₹${paid} for receipt ${receiptNo}. Thank you!`,
+                eventType: 'feePayment',
+                adminId: req.admin?.id,
                 data: {
                     amountPaid: paid,
-                    receiptNo,
-                    paymentMode: mode || 'Cash',
-                    remainingBalance: fee.pendingAmount
+                    receiptNo: receiptNo
                 }
-            }).catch(e => console.error('[FeeNotificationLog] fee_paid logging error:', e));
+            });
         }
 
         res.json({ message: 'Payment recorded successfully', fee, receiptNo });
@@ -402,21 +402,21 @@ async function _generateFeeRecords(students, month, year, dueDate) {
 
             // Log fee generation activity for all newly generated fees.
             const successfulFees = result;
-            successfulFees.forEach(fee => {
+            successfulFees.forEach(async (fee) => {
                 const student = eligibleStudents.find(s => s._id.toString() === fee.studentId.toString());
-                if (student && student.email) {
-                    logNotificationEvent({
-                        recipientEmail: student.email,
-                        recipientName: student.name,
-                        subject: `Fee Invoice Generated: ${month} ${year}`,
-                        type: 'fee_generated',
+                if (student) {
+                    await triggerAutomaticNotification({
+                        studentId: student._id,
+                        message: `Hello ${student.name}, your monthly fee of ₹${fee.totalFee} has been generated for ${month} ${year}. Due date: ${fee.dueDate.toLocaleDateString()}. Please check your portal.`,
+                        eventType: 'feeGenerated',
+                        adminId: null, // Global trigger
                         data: {
-                            month,
-                            year,
-                            amount: fee.totalFee, // Sending the total including registration if applicable
+                            amount: fee.totalFee,
+                            month: month,
+                            year: year,
                             dueDate: fee.dueDate.toLocaleDateString()
                         }
-                    }).catch(e => console.error('[FeeNotificationLog] Bulk logging error:', e));
+                    });
                 }
             });
         }
@@ -425,21 +425,21 @@ async function _generateFeeRecords(students, month, year, dueDate) {
 
         // Log the ones that succeeded even in a partial bulk failure.
         if (error.insertedDocs && error.insertedDocs.length > 0) {
-            error.insertedDocs.forEach(fee => {
+            error.insertedDocs.forEach(async (fee) => {
                 const student = eligibleStudents.find(s => s._id.toString() === fee.studentId.toString());
                 if (student && student.email) {
-                    logNotificationEvent({
-                        recipientEmail: student.email,
-                        recipientName: student.name,
-                        subject: `Fee Invoice Generated: ${month} ${year}`,
-                        type: 'fee_generated',
+                    await triggerAutomaticNotification({
+                        studentId: student._id,
+                        message: `Hello ${student.name}, your monthly fee of ₹${fee.totalFee} has been generated for ${month} ${year}. Due date: ${fee.dueDate.toLocaleDateString()}. Please check your portal.`,
+                        eventType: 'feeGenerated',
+                        adminId: null, // Global trigger
                         data: {
-                            month,
-                            year,
                             amount: fee.totalFee,
+                            month: month,
+                            year: year,
                             dueDate: fee.dueDate.toLocaleDateString()
                         }
-                    }).catch(e => console.error('[FeeNotificationLog] Bulk partial logging error:', e));
+                    });
                 }
             });
         }
@@ -523,6 +523,49 @@ exports.deleteFee = async (req, res) => {
         res.json({ message: 'Fee record deleted' });
     } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });
+    }
+};
+
+// POST /api/fees/remind-overdue — Send reminders to all overdue fee holders
+exports.sendOverdueReminders = async (req, res) => {
+    try {
+        const overdueFees = await Fee.find({
+            status: 'overdue',
+            isDeleted: { $ne: true }
+        }).populate('studentId', 'name email').lean();
+
+        let sentCount = 0;
+        let failedCount = 0;
+
+        for (const fee of overdueFees) {
+            if (fee.studentId && fee.studentId.email) {
+                try {
+                    await triggerAutomaticNotification({
+                        studentId: fee.studentId._id,
+                        eventType: 'feeOverdue',
+                        message: `Emergency Reminder: Your fee of ₹${fee.pendingAmount} for ${fee.month} is overdue.`,
+                        data: {
+                            studentName: fee.studentId.name,
+                            pendingAmount: fee.pendingAmount,
+                            month: fee.month,
+                            deadline: fee.dueDate ? new Date(fee.dueDate).toLocaleDateString() : 'Immediate'
+                        }
+                    });
+                    sentCount++;
+                } catch (err) {
+                    console.error(`Failed to send overdue reminder to ${fee.studentId.name}:`, err.message);
+                    failedCount++;
+                }
+            }
+        }
+
+        res.json({
+            message: `Overdue reminders processed. Sent: ${sentCount}, Failed: ${failedCount}`,
+            sentCount,
+            failedCount
+        });
+    } catch (err) {
+        res.status(500).json({ message: 'Failed to send reminders', error: err.message });
     }
 };
 

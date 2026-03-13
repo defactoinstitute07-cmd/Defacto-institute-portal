@@ -16,6 +16,7 @@ import { SkeletonTable } from '../components/common/SkeletonLoaders';
 
 // ── API helper ───────────────────────────────────────────────
 import apiClient from '../api/apiConfig';
+import { getSubjects } from '../api/subjectApi';
 
 // Dynamically fallback from user's global config
 const getDynamicClasses = () => {
@@ -298,20 +299,20 @@ const BatchesPage = () => {
     useEffect(() => { const t = setTimeout(() => { setPage(1); loadBatches(); }, 400); return () => clearTimeout(t); }, [search]);
     useEffect(() => { setPage(1); }, [filterCourse]);
 
-    // ── Load subjects by course ──────────────────────────────
+    // ── Load all subjects ────────────────────────────────────
     useEffect(() => {
-        if (!form.course) { setSubjects([]); return; }
         setSubjLoading(true);
-        apiClient.get(`/batches/courses/${encodeURIComponent(form.course)}/subjects`)
+        getSubjects({ activeOnly: true })
             .then(({ data }) => {
-                setSubjects(data.subjects);
-                if (data.subjects.length > 0 && !activeSubject) {
-                    setActiveSubject(data.subjects[0]);
+                const subjectNames = (data.subjects || []).map(s => s.name);
+                setSubjects(subjectNames);
+                if (subjectNames.length > 0 && !activeSubject) {
+                    setActiveSubject(subjectNames[0]);
                 }
             })
             .catch(() => setSubjects([]))
             .finally(() => setSubjLoading(false));
-    }, [form.course, activeSubject]);
+    }, []);
 
     // ── Load occupancy when classroom changes ────────────────
     useEffect(() => {
@@ -802,17 +803,17 @@ const BatchesPage = () => {
                                     </div>
 
                                     <div style={{ marginBottom: 30 }}>
-                                        {!form.course ? (
-                                            <div style={{ fontSize: '0.85rem', color: '#94a3b8', padding: '16px', background: '#f8fafc', borderRadius: 6, textAlign: 'center' }}>
-                                                Select a course above to load available subjects
-                                            </div>
-                                        ) : subjLoading ? (
+                                        {subjLoading ? (
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#64748b', fontSize: '0.85rem' }}>
                                                 <Loader2 size={16} className="spin" /> Loading subjects…
                                             </div>
+                                        ) : subjects.length === 0 ? (
+                                            <div style={{ fontSize: '0.85rem', color: '#94a3b8', padding: '16px', background: '#f8fafc', borderRadius: 6, textAlign: 'center' }}>
+                                                No active subjects defined in the system. Go to the Subjects tab to create some.
+                                            </div>
                                         ) : (
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                                                {/* 1. Subjects available for this Course */}
+                                                {/* 1. Subjects available */}
                                                 <div>
                                                     <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', display: 'block', marginBottom: 8, textTransform: 'uppercase' }}>Select Subjects for Batch</label>
                                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -830,36 +831,6 @@ const BatchesPage = () => {
                                                                 </button>
                                                             );
                                                         })}
-                                                        {/* Custom Subject Input */}
-                                                        <div style={{ display: 'flex', gap: 4 }}>
-                                                            <input
-                                                                id="customSubInput"
-                                                                placeholder="Add custom..."
-                                                                style={{ padding: '6px 12px', borderRadius: '16px', fontSize: '0.75rem', border: '1px solid #cbd5e1', width: 100 }}
-                                                                onKeyDown={e => {
-                                                                    if (e.key === 'Enter') {
-                                                                        e.preventDefault();
-                                                                        const val = e.target.value.trim();
-                                                                        if (val && !form.subjects.includes(val)) {
-                                                                            setForm(f => ({ ...f, subjects: [...f.subjects, val] }));
-                                                                            e.target.value = '';
-                                                                        }
-                                                                    }
-                                                                }}
-                                                            />
-                                                            <button type="button" className="btn btn-outline btn-sm" style={{ borderRadius: '50%', padding: 0, width: 28, height: 28 }}
-                                                                onClick={() => {
-                                                                    const input = document.getElementById('customSubInput');
-                                                                    const val = input.value.trim();
-                                                                    if (val && !form.subjects.includes(val)) {
-                                                                        setForm(f => ({ ...f, subjects: [...f.subjects, val] }));
-                                                                        input.value = '';
-                                                                    }
-                                                                }}
-                                                            >
-                                                                <Plus size={14} />
-                                                            </button>
-                                                        </div>
                                                     </div>
                                                 </div>
 

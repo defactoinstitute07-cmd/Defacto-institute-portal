@@ -4,7 +4,7 @@ import axios from 'axios';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import ERPLayout from '../components/ERPLayout';
-import { Plus, Download, Upload, Check, AlertCircle } from 'lucide-react';
+import { Plus, Download, Upload, Check, AlertCircle, RefreshCcw } from 'lucide-react';
 
 // Sub-Components
 import DashboardStats from '../components/students/DashboardStats';
@@ -23,6 +23,7 @@ const EMPTY_FORM = {
     session: '2026-2027', fees: '', registrationFee: '', status: 'active', notes: '', password: '', profileImage: null,
     fatherName: '', motherName: '', currentYear: '1'
 };
+const LIVE_REFRESH_MS = 30000;
 
 const StudentsPage = () => {
     const navigate = useNavigate();
@@ -67,10 +68,10 @@ const StudentsPage = () => {
         setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000);
     };
 
-    const loadData = useCallback(async () => {
+    const loadData = useCallback(async ({ silent = false } = {}) => {
         if (!localStorage.getItem('token')) { navigate('/login'); return; }
 
-        setLoading(true);
+        if (!silent) setLoading(true);
         try {
             const isAllRecords = filters.status === 'all';
             const apiStatus = isAllRecords ? '' : filters.status;
@@ -105,10 +106,22 @@ const StudentsPage = () => {
             setStats(statsRes.data);
         } catch (e) {
             if (e.response?.status === 401) navigate('/login');
-        } finally { setLoading(false); }
+        } finally {
+            if (!silent) setLoading(false);
+        }
     }, [search, filters, page, navigate]);
 
     useEffect(() => { loadData(); }, [page, loadData]);
+
+    useEffect(() => {
+        const intervalId = window.setInterval(() => {
+            if (document.visibilityState === 'visible') {
+                loadData({ silent: true });
+            }
+        }, LIVE_REFRESH_MS);
+
+        return () => window.clearInterval(intervalId);
+    }, [loadData]);
 
     const handleForm = e => {
         const { name, value } = e.target;
@@ -240,12 +253,12 @@ const StudentsPage = () => {
             doc.setFontSize(10);
             doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 22);
             const tableData = students.map(s => [s.rollNo || '-', s.name || '-', s.className || '-', s.batchId?.name || '-', s.contact || '-', s.status || '-']);
-            autoTable(doc, { head: [['Roll No', 'Name', 'Class', 'Batch', 'WhatsApp', 'Status']], body: tableData, startY: 30 });
+            autoTable(doc, { head: [['Roll No', 'Name', 'Class', 'Batch', 'Contact', 'Status']], body: tableData, startY: 30 });
             doc.save(`Students_Export_${new Date().toISOString().slice(0, 10)}.pdf`);
             addToast('Exported as PDF');
         } else {
             const csvRows = [];
-            const headers = ['Student Name', 'Roll No', 'Class', 'Batch', 'WhatsApp Number', 'Email', 'Admission Date', 'Status', 'Total Fees', 'Fees Paid'];
+            const headers = ['Student Name', 'Roll No', 'Class', 'Batch', 'Contact Number', 'Email', 'Admission Date', 'Status', 'Total Fees', 'Fees Paid'];
             csvRows.push(headers.join(','));
 
             students.forEach(s => {
@@ -402,7 +415,7 @@ const StudentsPage = () => {
         y += 8;
 
         drawField('Course', s.className, 6, y);
-        drawField('WhatsApp', s.contact, 30, y);
+        drawField('Contact', s.contact, 30, y);
 
         // Signature line
         doc.setDrawColor(150);
@@ -443,6 +456,9 @@ const StudentsPage = () => {
                     <p>Manage admissions, enrollments, and student records</p>
                 </div>
                 <div className="flex items-center gap-3 mt-4 sm:mt-0">
+                    <button className="btn btn-outline" onClick={() => loadData()} disabled={loading}>
+                        <RefreshCcw size={16} className={loading ? 'spin' : ''} /> Refresh Activity
+                    </button>
                     <button className="btn btn-outline" onClick={() => { setModal('bulk'); setBulkResults(null); setErr(''); }}>
                         <Upload size={16} /> Bulk View
                     </button>

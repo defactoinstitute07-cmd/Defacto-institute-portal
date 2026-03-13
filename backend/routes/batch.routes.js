@@ -13,6 +13,10 @@ router.get('/:id', ctrl.getBatchById);
 router.post('/', ctrl.createBatch);
 router.patch('/:id/toggle', ctrl.toggleStatus);
 
+// Admin / Teacher accessible route for updating assigned subjects without password
+const { verifyAdminOrTeacher } = require('../middleware/auth.middleware');
+router.patch('/:id/subjects', verifyAdminOrTeacher, ctrl.updateBatchSubjects);
+
 // Batch subjects with teacher assignment info (used by teacher form)
 router.get('/:id/subjects', tCtrl.getBatchSubjectsWithAssignments);
 

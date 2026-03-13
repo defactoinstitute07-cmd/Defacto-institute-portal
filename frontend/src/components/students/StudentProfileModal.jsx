@@ -12,6 +12,8 @@ const StudentProfileModal = ({ isOpen, onClose, student, onDownloadID }) => {
     const primaryColor = 'var(--erp-primary)';
     const borderColor = '#000000'; // Pure black for sharp contrast
     const sharpRadius = '0px'; // Fully Sharp Borders
+    const attendanceSummary = student.attendanceSummary || {};
+    const attendanceValue = attendanceSummary.total > 0 ? `${attendanceSummary.percentage}%` : '--';
 
     return (
         <div className="modal-overlay modal-full-overlay" style={{ background: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'none' }} onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -108,7 +110,7 @@ const StudentProfileModal = ({ isOpen, onClose, student, onDownloadID }) => {
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '32px' }}>
                             <StatCard label="Monthly Fee" value={`₹ ${(student.fees || 0).toLocaleString()}`} radius={sharpRadius} borderColor={borderColor} />
                             <StatCard label="Paid Amount" value={`₹ ${(student.feesPaid || 0).toLocaleString()}`} radius={sharpRadius} color={primaryColor} borderColor={borderColor} />
-                            <StatCard label="Attendance" value="85%" radius={sharpRadius} borderColor={borderColor} />
+                            <StatCard label="Attendance" value={attendanceValue} radius={sharpRadius} borderColor={borderColor} />
                             <StatCard label="Enrollment Year" value={student.session?.split('-')[0] || '2026'} radius={sharpRadius} borderColor={borderColor} />
                         </div>
 

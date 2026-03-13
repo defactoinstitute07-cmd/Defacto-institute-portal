@@ -1,7 +1,19 @@
 import React from 'react';
-import { User, Eye, Pencil, Search, UserCheck, UserX } from 'lucide-react';
+import { User, Eye, Pencil, Search, UserCheck, UserX, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { SkeletonTable } from '../common/SkeletonLoaders';
+
+const formatDateTime = (value) => value ? new Date(value).toLocaleString('en-IN') : '—';
+const countValidDeviceTokens = (deviceTokens = []) =>
+    Array.isArray(deviceTokens)
+        ? deviceTokens.filter((token) => typeof token === 'string' && token.trim().length > 10).length
+        : 0;
+
+const ACTIVITY_BADGES = {
+    online: { bg: '#ecfdf3', color: '#16a34a', border: '#bbf7d0', label: 'Online' },
+    offline: { bg: '#f8fafc', color: '#475569', border: '#e2e8f0', label: 'Offline' },
+    inactive: { bg: '#fff7ed', color: '#ea580c', border: '#fed7aa', label: 'Inactive' }
+};
 
 const StudentTable = ({
     students,
@@ -42,6 +54,7 @@ const StudentTable = ({
                     <tr>
                         <th className="!pl-6">Student Profile</th>
                         <th>Batch Details</th>
+                        <th>App Activity</th>
                         <th>Status</th>
                         <th>Fee Status</th>
                         <th>Attendance</th>
@@ -49,7 +62,20 @@ const StudentTable = ({
                     </tr>
                 </thead>
                 <tbody>
-                    {students.map(s => (
+                    {students.map(s => {
+                        const activity = s.activity || {};
+                        const status = activity.status || 'inactive';
+                        const badge = ACTIVITY_BADGES[status] || ACTIVITY_BADGES.offline;
+                        const lastSeen = activity.lastActiveAt || activity.lastAppOpenAt || s.portalAccess?.lastLoginAt || null;
+                        const deviceLabel = activity.device?.platform || s.lastDevice?.platform || 'Unknown';
+                        const pushDeviceCount = s.pushStatus?.deviceTokenCount ?? countValidDeviceTokens(s.deviceTokens);
+                        const attendance = s.attendanceSummary || {};
+                        const attendanceTotal = attendance.total || 0;
+                        const attendancePercent = Number.isFinite(attendance.percentage) ? attendance.percentage : 0;
+                        const attendanceLabel = attendanceTotal > 0 ? `${attendancePercent}%` : '--';
+                        const attendanceMeta = attendanceTotal > 0 ? `${attendance.present || 0}/${attendanceTotal}` : 'No data';
+
+                        return (
                         <tr key={s._id} className="hover:bg-slate-50 transition-colors">
                             <td data-label="Student Profile" className="!pl-6">
                                 <div className="flex items-center gap-3 cursor-pointer group" onClick={() => navigate(`/students/${s._id}`)}>
@@ -64,6 +90,24 @@ const StudentTable = ({
                             </td>
                             <td data-label="Batch Details">
                                 <div className="text-sm font-semibold text-slate-700">{s.batchId?.name || 'Unassigned'}</div>
+                            </td>
+                            <td data-label="App Activity">
+                                <div className="text-xs font-semibold text-slate-700">{formatDateTime(lastSeen)}</div>
+                                <div className="text-[10px] text-slate-500 mt-1">Device: {deviceLabel}</div>
+                                <div className="text-[10px] text-slate-500 mt-1">
+                                    Push: {pushDeviceCount > 0 ? `Ready (${pushDeviceCount})` : 'Not Linked'}
+                                </div>
+                                <div style={{ marginTop: 6 }}>
+                                    <span style={{
+                                        padding: '2px 8px', borderRadius: '2px', fontSize: '10px', fontWeight: 800,
+                                        background: badge.bg,
+                                        color: badge.color,
+                                        textTransform: 'uppercase',
+                                        border: `1px solid ${badge.border}`
+                                    }}>
+                                        {badge.label}
+                                    </span>
+                                </div>
                             </td>
                             <td data-label="Status">
                                 <div style={{ marginTop: 4 }}>
@@ -86,9 +130,9 @@ const StudentTable = ({
                                 <div className="text-[10px] text-slate-400 mt-0.5">Total: ₹ {(s.fees || 0).toLocaleString()}</div>
                             </td>
                             <td data-label="Attendance">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-sm font-medium">85%</span>
-                                    <div className="badge badge-primary badge-xs"></div>
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-semibold text-slate-700">{attendanceLabel}</span>
+                                    <span className="text-[10px] text-slate-400 font-semibold">{attendanceMeta}</span>
                                 </div>
                             </td>
                             <td data-label="Actions" className="text-right !pr-6">
@@ -108,7 +152,8 @@ const StudentTable = ({
                                 </div>
                             </td>
                         </tr>
-                    ))}
+                    );
+                    })}
                 </tbody>
             </table>
 

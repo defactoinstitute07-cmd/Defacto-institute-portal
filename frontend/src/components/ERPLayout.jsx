@@ -12,6 +12,7 @@ import {
     LayoutDashboard,
     LineChart,
     LogOut,
+    Mail,
     Menu,
     Receipt,
     Search,
@@ -35,6 +36,7 @@ const NAV_ITEMS = [
         items: [
             { to: '/students', icon: GraduationCap, label: 'Students' },
             { to: '/batches', icon: BookOpen, label: 'Batches' },
+            { to: '/subjects', icon: BookOpen, label: 'Subjects' },
             { to: '/teachers', icon: Users2, label: 'Teachers' },
             { to: '/attendance', icon: ClipboardCheck, label: 'Attendance' },
             { to: '/exams', icon: Trophy, label: 'Exams & Results' }
@@ -53,6 +55,7 @@ const NAV_ITEMS = [
         section: 'Admin',
         items: [
             { to: '/profile', icon: UserCircle, label: 'Institute Profile' },
+            { to: '/templates', icon: Mail, label: 'Email Templates' },
             { to: '/notifications', icon: Bell, label: 'Notifications' },
             { to: '/settings', icon: Settings, label: 'Settings' }
         ]
@@ -108,7 +111,7 @@ const ERPLayout = ({ children, title }) => {
                     {!mini && (
                         <div className="sb-brand-copy">
                             <div className="sb-name">{instituteName}</div>
-                            <div className="sb-subtitle">Modern Admin Dashboard</div>
+                            
                         </div>
                     )}
                 </div>
@@ -134,14 +137,14 @@ const ERPLayout = ({ children, title }) => {
                 </div>
 
                 <div className="sb-footer">
-                    
+
 
                     <div className="sb-item" onClick={logout} style={{ cursor: 'pointer' }} title={mini ? 'Sign out' : undefined}>
                         <span className="sb-item-icon"><LogOut size={18} /></span>
-                        {!mini && <span className="sb-item-label">Sign out</span>}
+                        {!mini && <span className="sb-item-label sing-out">Sign out</span>}
                     </div>
 
-                  
+
                 </div>
             </nav>
 
@@ -167,26 +170,12 @@ const ERPLayout = ({ children, title }) => {
                         </div>
                     </div>
 
-                    <label className="shell-search-wrap hide-mobile" aria-label="Search dashboard">
-                        <Search size={16} />
-                        <input className="shell-search-input" type="text" placeholder="Search here..." />
-                    </label>
+                    
 
                     <div className="tb-right">
-                        <button type="button" className="tb-icon-btn hide-mobile">
-                            <Languages size={16} />
-                            <span>Eng (US)</span>
-                            <ChevronDown size={14} />
-                        </button>
+                        
 
-                        <button
-                            type="button"
-                            className="tb-icon-btn"
-                            aria-label="Notifications"
-                            onClick={() => navigate('/notifications')}
-                        >
-                            <Bell size={16} />
-                        </button>
+                       
 
                         <div className="shell-profile" title={adminName}>
                             <div className="tb-avatar">{profileInitial}</div>
@@ -194,7 +183,7 @@ const ERPLayout = ({ children, title }) => {
                                 <span className="shell-profile-name">{adminName}</span>
                                 <span className="shell-profile-role">Admin</span>
                             </div>
-                            <ChevronDown size={14} className="hide-mobile" />
+                            
                         </div>
                     </div>
                 </header>

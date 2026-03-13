@@ -2,10 +2,111 @@ const Student = require('../models/Student');
 const Batch = require('../models/Batch');
 const Admin = require('../models/Admin');
 const Fee = require('../models/Fee');
+const Attendance = require('../models/Attendance');
 const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
 const feeController = require('./fee.controller');
-const { logNotificationEvent } = require('../services/activityLogService');
+const { triggerAutomaticNotification } = require('../services/notificationService');
+
+const getActivityConfig = () => ({
+    onlineMinutes: Math.max(parseInt(process.env.ACTIVITY_ONLINE_MINUTES || '5', 10) || 5, 1),
+    inactiveDays: Math.max(parseInt(process.env.ACTIVITY_INACTIVE_DAYS || '7', 10) || 7, 1)
+});
+
+const deriveActivityStatus = (student) => {
+    const { onlineMinutes, inactiveDays } = getActivityConfig();
+    const lastActiveAt = student.lastActiveAt || student.lastAppOpenAt || student.portalAccess?.lastLoginAt || null;
+
+    if (!lastActiveAt) {
+        return {
+            status: 'inactive',
+            lastActiveAt: null,
+            lastAppOpenAt: student.lastAppOpenAt || null,
+            device: student.lastDevice || {}
+        };
+    }
+
+    const now = Date.now();
+    const diffMs = now - new Date(lastActiveAt).getTime();
+    const minutesSince = diffMs / (60 * 1000);
+    const daysSince = diffMs / (24 * 60 * 60 * 1000);
+
+    let status = 'offline';
+    if (minutesSince <= onlineMinutes) status = 'online';
+    if (daysSince >= inactiveDays) status = 'inactive';
+
+    return {
+        status,
+        lastActiveAt,
+        lastAppOpenAt: student.lastAppOpenAt || null,
+        device: student.lastDevice || {}
+    };
+};
+
+const getAttendanceDateRange = () => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(now);
+    end.setHours(23, 59, 59, 999);
+    return { start, end };
+};
+
+const buildAttendanceSummaryMap = async (studentIds, { dateFrom, dateTo } = {}) => {
+    if (!studentIds || studentIds.length === 0) return new Map();
+
+    const match = { studentId: { $in: studentIds } };
+    if (dateFrom || dateTo) {
+        match.attendanceDate = {};
+        if (dateFrom) match.attendanceDate.$gte = dateFrom;
+        if (dateTo) match.attendanceDate.$lte = dateTo;
+    }
+
+    const rows = await Attendance.aggregate([
+        { $match: match },
+        {
+            $group: {
+                _id: { studentId: '$studentId', status: '$status' },
+                count: { $sum: 1 }
+            }
+        }
+    ]);
+
+    const summaryMap = new Map();
+
+    rows.forEach((row) => {
+        const studentId = row._id.studentId.toString();
+        if (!summaryMap.has(studentId)) {
+            summaryMap.set(studentId, { total: 0, present: 0, absent: 0, late: 0, percentage: 0 });
+        }
+        const summary = summaryMap.get(studentId);
+        if (row._id.status === 'Present') summary.present = row.count;
+        if (row._id.status === 'Absent') summary.absent = row.count;
+        if (row._id.status === 'Late') summary.late = row.count;
+    });
+
+    summaryMap.forEach((summary) => {
+        summary.total = summary.present + summary.absent + summary.late;
+        summary.percentage = summary.total > 0 ? Math.round((summary.present / summary.total) * 100) : 0;
+    });
+
+    return summaryMap;
+};
+
+const toActivityFilters = (query = {}) => {
+    const rawActivity = String(query.activityStatus || query.activity || '').toLowerCase();
+    const statusParam = String(query.status || '').toLowerCase();
+    let activityStatus = rawActivity;
+    let studentStatus = query.studentStatus || '';
+
+    if (!activityStatus && ['online', 'offline', 'inactive'].includes(statusParam)) {
+        activityStatus = statusParam;
+    } else if (!studentStatus && statusParam && !['online', 'offline', 'inactive'].includes(statusParam)) {
+        studentStatus = statusParam;
+    }
+
+    return { activityStatus, studentStatus };
+};
 
 // GET /api/students/stats
 exports.getStudentStats = async (req, res) => {
@@ -30,16 +131,153 @@ exports.getStudentStats = async (req, res) => {
         startOfMonth.setHours(0, 0, 0, 0);
         const newAdmissions = await Student.countDocuments({ admissionDate: { $gte: startOfMonth } });
 
+        const { start, end } = getAttendanceDateRange();
+        const attendanceRows = await Attendance.aggregate([
+            { $match: { attendanceDate: { $gte: start, $lte: end } } },
+            { $group: { _id: '$status', count: { $sum: 1 } } }
+        ]);
+
+        const presentCount = attendanceRows.find((row) => row._id === 'Present')?.count || 0;
+        const totalCount = attendanceRows.reduce((sum, row) => sum + row.count, 0);
+        const attendanceAvg = totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0;
+
         res.json({
             total,
             active,
             completed,
             feePending,
             newAdmissions,
-            attendanceAvg: 85 // Mock value as attendance system is separate
+            attendanceAvg
         });
     } catch (err) {
         res.status(500).json({ message: 'Error fetching stats', error: err.message });
+    }
+};
+
+// GET /api/students/activity
+exports.getStudentActivity = async (req, res) => {
+    try {
+        const { search = '', batch = '', page = 1, limit = 20 } = req.query;
+        const { activityStatus, studentStatus } = toActivityFilters(req.query);
+
+        const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
+        const safePage = Math.max(parseInt(page, 10) || 1, 1);
+        const skip = (safePage - 1) * safeLimit;
+
+        const match = {};
+        if (search) {
+            match.$or = [
+                { name: { $regex: search, $options: 'i' } },
+                { email: { $regex: search, $options: 'i' } },
+                { rollNo: { $regex: search, $options: 'i' } }
+            ];
+        }
+
+        if (batch && mongoose.Types.ObjectId.isValid(batch)) {
+            match.batchId = new mongoose.Types.ObjectId(batch);
+        }
+
+        if (studentStatus) {
+            match.status = studentStatus;
+        }
+
+        const { onlineMinutes, inactiveDays } = getActivityConfig();
+        const now = new Date();
+        const onlineThreshold = new Date(now.getTime() - onlineMinutes * 60 * 1000);
+        const inactiveThreshold = new Date(now.getTime() - inactiveDays * 24 * 60 * 60 * 1000);
+
+        const pipeline = [
+            { $match: match },
+            {
+                $addFields: {
+                    activityAt: {
+                        $ifNull: [
+                            '$lastActiveAt',
+                            { $ifNull: ['$lastAppOpenAt', '$portalAccess.lastLoginAt'] }
+                        ]
+                    }
+                }
+            },
+            {
+                $addFields: {
+                    activityStatus: {
+                        $switch: {
+                            branches: [
+                                {
+                                    case: {
+                                        $or: [
+                                            { $eq: ['$activityAt', null] },
+                                            { $lte: ['$activityAt', inactiveThreshold] }
+                                        ]
+                                    },
+                                    then: 'inactive'
+                                },
+                                {
+                                    case: { $gte: ['$activityAt', onlineThreshold] },
+                                    then: 'online'
+                                }
+                            ],
+                            default: 'offline'
+                        }
+                    }
+                }
+            }
+        ];
+
+        if (activityStatus) {
+            pipeline.push({ $match: { activityStatus } });
+        }
+
+        pipeline.push({
+            $facet: {
+                data: [
+                    { $sort: { activityAt: -1, name: 1 } },
+                    { $skip: skip },
+                    { $limit: safeLimit },
+                    {
+                        $project: {
+                            name: 1,
+                            rollNo: 1,
+                            className: 1,
+                            batchId: 1,
+                            status: 1,
+                            contact: 1,
+                            email: 1,
+                            portalAccess: 1,
+                            lastActiveAt: 1,
+                            lastAppOpenAt: 1,
+                            lastDevice: 1,
+                            activityStatus: 1,
+                            activityAt: 1
+                        }
+                    }
+                ],
+                total: [{ $count: 'count' }]
+            }
+        });
+
+        const [result] = await Student.aggregate(pipeline);
+        const total = result?.total?.[0]?.count || 0;
+        const students = (result?.data || []).map((student) => ({
+            ...student,
+            activity: {
+                status: student.activityStatus,
+                lastActiveAt: student.lastActiveAt || null,
+                lastAppOpenAt: student.lastAppOpenAt || null,
+                device: student.lastDevice || {}
+            }
+        }));
+
+        res.json({
+            students,
+            total,
+            page: safePage,
+            pages: Math.ceil(total / safeLimit),
+            thresholds: { onlineMinutes, inactiveDays }
+        });
+    } catch (err) {
+        console.error('[getStudentActivity]', err);
+        res.status(500).json({ message: 'Server error', error: err.message });
     }
 };
 
@@ -67,7 +305,25 @@ exports.getAllStudents = async (req, res) => {
             .limit(parseInt(limit))
             .lean();
 
-        res.json({ students, total, page: parseInt(page), pages: Math.ceil(total / limit) });
+        const { start, end } = getAttendanceDateRange();
+        const attendanceMap = await buildAttendanceSummaryMap(
+            students.map((student) => student._id),
+            { dateFrom: start, dateTo: end }
+        );
+
+        const enriched = students.map((student) => ({
+            ...student,
+            activity: deriveActivityStatus(student),
+            attendanceSummary: attendanceMap.get(student._id.toString()) || {
+                total: 0,
+                present: 0,
+                absent: 0,
+                late: 0,
+                percentage: 0
+            }
+        }));
+
+        res.json({ students: enriched, total, page: parseInt(page), pages: Math.ceil(total / limit) });
     } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });
     }
@@ -132,15 +388,14 @@ exports.createStudent = async (req, res) => {
         const student = new Student(studentData);
         await student.save();
 
-        // Log onboarding activity instead of sending email.
-        if (student.email) {
-            await logNotificationEvent({
-                recipientEmail: student.email,
-                recipientName: student.name,
-                subject: 'Welcome to DeFacto Institute',
-                type: 'student_registration',
+        // Send onboarding notification
+        if (student) {
+            await triggerAutomaticNotification({
+                studentId: student._id,
+                message: `Welcome ${student.name}! Your registration is successful. Roll No: ${student.rollNo}, Password: ${req.body.password || 'student@123'}. Please login to your portal to complete your profile.`,
+                eventType: 'studentRegistration',
+                adminId: req.admin?.id,
                 data: {
-                    rollNo: student.rollNo,
                     password: req.body.password || 'student@123'
                 }
             });
@@ -199,17 +454,16 @@ exports.updateStudent = async (req, res) => {
         if (isActivatingBatch) {
             await feeController.ensureMonthlyFeeForStudents([student._id]);
 
-            // Log batch assignment activity instead of sending email.
-            if (student.email && data.batchId) {
+            // Send batch assignment notification
+            if (student && data.batchId) {
                 const batch = await require('../models/Batch').findById(data.batchId);
-                await logNotificationEvent({
-                    recipientEmail: student.email,
-                    recipientName: student.name,
-                    subject: 'New Batch Assigned - DeFacto Institute',
-                    type: 'batch_assignment',
+                await triggerAutomaticNotification({
+                    studentId: student._id,
+                    message: `Hello ${student.name}, you have been assigned to the batch: ${batch?.name || 'Assigned Batch'}. Timing: ${batch?.timeSlots?.[0] || 'TBA'}.`,
+                    eventType: 'batchAssignment',
+                    adminId: req.admin?.id,
                     data: {
                         batchName: batch?.name || 'Assigned Batch',
-                        course: student.className || 'General',
                         timing: batch?.timeSlots?.[0] || 'TBA'
                     }
                 });
@@ -326,15 +580,14 @@ exports.bulkUpload = async (req, res) => {
                 });
                 await student.save();
 
-                // Log onboarding activity instead of sending email.
-                if (student.email) {
-                    await logNotificationEvent({
-                        recipientEmail: student.email,
-                        recipientName: student.name,
-                        subject: 'Welcome to DeFacto Institute',
-                        type: 'student_registration',
+                // Send onboarding notification
+                if (student) {
+                    await triggerAutomaticNotification({
+                        studentId: student._id,
+                        message: `Welcome ${student.name}! Your registration is successful. Roll No: ${student.rollNo}, Password: student@123. Please login to your portal.`,
+                        eventType: 'studentRegistration',
+                        adminId: req.admin?.id,
                         data: {
-                            rollNo: student.rollNo,
                             password: 'student@123'
                         }
                     });
@@ -412,10 +665,21 @@ exports.getStudentById = async (req, res) => {
             .sort({ createdAt: -1 })
             .lean();
 
-        res.json({ student, fees });
+        const { start, end } = getAttendanceDateRange();
+        const attendanceMap = await buildAttendanceSummaryMap([student._id], { dateFrom: start, dateTo: end });
+        const attendanceSummary = attendanceMap.get(student._id.toString()) || {
+            total: 0,
+            present: 0,
+            absent: 0,
+            late: 0,
+            percentage: 0
+        };
+
+        res.json({
+            student: { ...student, activity: deriveActivityStatus(student), attendanceSummary },
+            fees
+        });
     } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });
     }
 };
-
-

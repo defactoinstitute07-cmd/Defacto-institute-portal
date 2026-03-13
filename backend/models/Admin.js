@@ -63,6 +63,49 @@ const adminSchema = new mongoose.Schema({
         type: Number,
         required: [true, 'Number of rooms is required']
     },
+    wipeOtp: {
+        type: String,
+        default: null
+    },
+    wipeOtpExpiry: {
+        type: Date,
+        default: null
+    },
+    fcmServerKey: {
+        type: String,
+        default: ''
+    },
+    gmailEmail: {
+        type: String,
+        default: ''
+    },
+    gmailAppPassword: {
+        type: String,
+        default: ''
+    },
+    notificationsEnabled: {
+        type: Boolean,
+        default: true
+    },
+    emailEvents: {
+        studentRegistration: { type: Boolean, default: false },
+        feeGenerated: { type: Boolean, default: false },
+        feePayment: { type: Boolean, default: false },
+        batchAssignment: { type: Boolean, default: false },
+        feeOverdue: { type: Boolean, default: false },
+        examResult: { type: Boolean, default: false },
+        teacherRegistration: { type: Boolean, default: false },
+        salaryPaid: { type: Boolean, default: false },
+        teacherBatchAssignment: { type: Boolean, default: false }
+    },
+    receiptSettings: {
+        showCoachingName: { type: Boolean, default: true },
+        showLogo: { type: Boolean, default: true },
+        showWatermark: { type: Boolean, default: true },
+        showAddress: { type: Boolean, default: true },
+        showPhone: { type: Boolean, default: true },
+        showEmail: { type: Boolean, default: true }
+    },
     createdAt: {
         type: Date,
         default: Date.now

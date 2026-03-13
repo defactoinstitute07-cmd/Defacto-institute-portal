@@ -213,3 +213,27 @@ exports.getBatchById = async (req, res) => {
         res.status(500).json({ message: 'Server error', error: err.message });
     }
 };
+
+// PATCH /api/batches/:id/subjects
+exports.updateBatchSubjects = async (req, res) => {
+    try {
+        const { subjectIds, subjects } = req.body;
+
+        // Ensure both arrays exist (even if empty) to prevent accidental null assignments
+        if (!Array.isArray(subjectIds) || !Array.isArray(subjects)) {
+            return res.status(400).json({ message: 'Invalid data format. subjectIds and subjects must be arrays.' });
+        }
+
+        const batch = await Batch.findByIdAndUpdate(
+            req.params.id,
+            { $set: { subjectIds, subjects } },
+            { new: true }
+        );
+
+        if (!batch) return res.status(404).json({ message: 'Batch not found' });
+
+        res.json({ message: 'Batch subjects updated successfully', batch });
+    } catch (err) {
+        res.status(500).json({ message: 'Server error', error: err.message });
+    }
+};

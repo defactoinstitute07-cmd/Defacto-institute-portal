@@ -2,7 +2,10 @@ const notificationService = require('../services/notificationService');
 
 exports.getRecipients = async (req, res, next) => {
     try {
-        const result = await notificationService.getRecipients(req.query);
+        const { search, page, limit, status, batchId, hasPendingFees, hasPushToken, recipientType } = req.query;
+        const result = await notificationService.getRecipients({
+            search, page, limit, status, batchId, hasPendingFees, hasPushToken, recipientType
+        });
         res.json({ success: true, ...result });
     } catch (error) {
         next(error);
@@ -20,7 +23,8 @@ exports.getHistory = async (req, res, next) => {
 
 exports.sendNotifications = async (req, res, next) => {
     try {
-        const { message = '', studentIds = [], sendToAll = false, deliveryMethods = [] } = req.body;
+        console.log('[NotificationController] Incoming send request:', JSON.stringify(req.body, null, 2));
+        const { message = '', studentIds = [], sendToAll = false, deliveryMethods = [], batchId = '' } = req.body;
 
         if (!String(message).trim()) {
             return res.status(400).json({ success: false, message: 'Message is required.' });
@@ -30,21 +34,28 @@ exports.sendNotifications = async (req, res, next) => {
             return res.status(400).json({ success: false, message: 'Select at least one delivery method.' });
         }
 
-        if (!sendToAll && (!Array.isArray(studentIds) || studentIds.length === 0)) {
-            return res.status(400).json({ success: false, message: 'Select at least one student or choose all students.' });
+        const hasBatchTarget = Boolean(batchId);
+        const hasStudentTargets = Array.isArray(studentIds) && studentIds.length > 0;
+
+        if (!sendToAll && !hasStudentTargets && !hasBatchTarget) {
+            return res.status(400).json({ success: false, message: 'Select at least one student, choose a batch, or select all students.' });
         }
 
         const result = await notificationService.sendNotificationBatch({
+            title: req.body.title || 'ERP Notification',
             message: String(message).trim(),
+            type: req.body.type || 'general',
             studentIds,
             sendToAll: sendToAll === true,
             deliveryMethods,
-            adminId: req.admin?.id || null
+            batchId,
+            adminId: req.admin?.id || null,
+            scheduledFor: req.body.scheduledFor ? new Date(req.body.scheduledFor) : null
         });
 
         res.status(201).json({
             success: true,
-            message: `Notifications processed for ${result.summary.total} student(s).`,
+            message: result.status === 'scheduled' ? 'Notification scheduled successfully.' : `Notifications processed for ${result.summary?.total || 1} student(s).`,
             ...result
         });
     } catch (error) {

@@ -10,6 +10,7 @@ exports.adminAuth = (req, res, next) => {
     try {
         const token = auth.split(' ')[1];
         req.admin = jwt.verify(token, SECRET);
+        console.log(`[AdminAuth] Request for Admin ID: ${req.admin.id} to Path: ${req.path}`);
         req.userId = req.admin.id;
         req.role = 'admin';
         next();

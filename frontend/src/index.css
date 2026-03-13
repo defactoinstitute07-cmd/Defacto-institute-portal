@@ -3,6 +3,7 @@
 @import "tailwindcss";
 
 @layer components {
+
     .card,
     .stat-card,
     .toolbar,
@@ -27,6 +28,7 @@
 }
 
 @layer utilities {
+
     .rounded,
     .rounded-sm,
     .rounded-lg,
@@ -73,10 +75,53 @@
 
     /* Accent & Status */
     --erp-accent: #2563eb;
-    --erp-error: #ef4444;
-    --erp-success: #10b981;
-    --erp-warning: #f59e0b;
-    --erp-danger: #ef4444;
+
+    /* Semantic Colors - Color Psychology Design */
+    /* Positive / Success / Good performance */
+    --erp-color-positive: #10b981;
+    /* Emerald 500 */
+    --erp-bg-positive-light: #ecfdf5;
+    /* Emerald 50 */
+    --erp-border-positive: #a7f3d0;
+    /* Emerald 200 */
+    --erp-text-positive: #047857;
+    /* Emerald 700 */
+
+    /* Negative / Error / Poor performance */
+    --erp-color-negative: #ef4444;
+    /* Red 500 */
+    --erp-bg-negative-light: #fef2f2;
+    /* Red 50 */
+    --erp-border-negative: #fecaca;
+    /* Red 200 */
+    --erp-text-negative: #b91c1c;
+    /* Red 700 */
+
+    /* Warning / Neutral / Pending */
+    --erp-color-warning: #f59e0b;
+    /* Amber 500 */
+    --erp-bg-warning-light: #fffbeb;
+    /* Amber 50 */
+    --erp-border-warning: #fde68a;
+    /* Amber 200 */
+    --erp-text-warning: #b45309;
+    /* Amber 700 */
+
+    /* Generic highlight / Info */
+    --erp-color-info: #3b82f6;
+    /* Blue 500 */
+    --erp-bg-info-light: #eff6ff;
+    /* Blue 50 */
+    --erp-border-info: #bfdbfe;
+    /* Blue 200 */
+    --erp-text-info: #1d4ed8;
+    /* Blue 700 */
+
+    /* Backward compatibility */
+    --erp-error: var(--erp-color-negative);
+    --erp-success: var(--erp-color-positive);
+    --erp-warning: var(--erp-color-warning);
+    --erp-danger: var(--erp-color-negative);
 
     /* ── Breakpoints ────────────────── */
     --mobile: 480px;
@@ -549,7 +594,7 @@ a {
 .sb-logo {
     width: 34px;
     height: 34px;
-    border-radius: 0.375rem;
+    border-radius: 5px;
     background: rgba(255, 255, 255, 0.18);
     display: flex;
     align-items: center;
@@ -633,13 +678,17 @@ a {
 .sb-item-label {
     font-size: 0.875rem;
     font-weight: 500;
+    
 }
-
+.sing-out{
+    color: red;
+}
 
 /* Sidebar footer */
 .sb-footer {
     border-top: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 12px 8px;
+    padding: 0px 8px;
+    
 }
 
 
@@ -1197,23 +1246,23 @@ a {
 
 .badge-paid,
 .badge-active {
-    background: #f0fff4;
-    color: #16a34a;
-    border: 1px solid #bbf7d0;
+    background: var(--erp-bg-positive-light);
+    color: var(--erp-text-positive);
+    border: 1px solid var(--erp-border-positive);
 }
 
 .badge-unpaid,
 .badge-overdue,
 .badge-inactive {
-    background: #fef2f2;
-    color: #dc2626;
-    border: 1px solid #fecaca;
+    background: var(--erp-bg-negative-light);
+    color: var(--erp-text-negative);
+    border: 1px solid var(--erp-border-negative);
 }
 
 .badge-partial {
-    background: #fffbeb;
-    color: #d97706;
-    border: 1px solid #fde68a;
+    background: var(--erp-bg-warning-light);
+    color: var(--erp-text-warning);
+    border: 1px solid var(--erp-border-warning);
 }
 
 
@@ -1587,14 +1636,82 @@ a {
 }
 
 
-/* Utility */
+/* Utility
 .flex {
     display: flex;
     align-items: center;
-}
+} */
 
 .flex-1 {
     flex: 1;
+}
+
+/* ══════════════════════════════════════════════════════
+   SEMANTIC UTILITIES (Color Psychology)
+   ══════════════════════════════════════════════════════ */
+
+/* Positive / Success (Green) */
+.text-positive {
+    color: var(--erp-text-positive);
+}
+
+.bg-positive {
+    background: var(--erp-color-positive);
+    color: #fff;
+}
+
+.bg-positive-light {
+    background: var(--erp-bg-positive-light);
+    color: var(--erp-text-positive);
+    border: 1px solid var(--erp-border-positive);
+}
+
+/* Negative / Error / Warning (Red) */
+.text-negative {
+    color: var(--erp-text-negative);
+}
+
+.bg-negative {
+    background: var(--erp-color-negative);
+    color: #fff;
+}
+
+.bg-negative-light {
+    background: var(--erp-bg-negative-light);
+    color: var(--erp-text-negative);
+    border: 1px solid var(--erp-border-negative);
+}
+
+/* Warning / Neutral / Pending (Orange/Amber) */
+.text-warning {
+    color: var(--erp-text-warning);
+}
+
+.bg-warning {
+    background: var(--erp-color-warning);
+    color: #fff;
+}
+
+.bg-warning-light {
+    background: var(--erp-bg-warning-light);
+    color: var(--erp-text-warning);
+    border: 1px solid var(--erp-border-warning);
+}
+
+/* Info / Generic (Blue) */
+.text-info {
+    color: var(--erp-text-info);
+}
+
+.bg-info {
+    background: var(--erp-color-info);
+    color: #fff;
+}
+
+.bg-info-light {
+    background: var(--erp-bg-info-light);
+    color: var(--erp-text-info);
+    border: 1px solid var(--erp-border-info);
 }
 
 .gap-2 {
@@ -1718,6 +1835,3 @@ img {
     max-width: 100%;
     height: auto;
 }
-
-
-

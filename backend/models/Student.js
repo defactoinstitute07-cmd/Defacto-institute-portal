@@ -18,6 +18,14 @@ const portalAccessSchema = new mongoose.Schema({
     }
 }, { _id: false });
 
+const deviceInfoSchema = new mongoose.Schema({
+    platform: { type: String, default: '' },
+    model: { type: String, default: '' },
+    manufacturer: { type: String, default: '' },
+    appVersion: { type: String, default: '' },
+    deviceId: { type: String, default: '' }
+}, { _id: false });
+
 const studentSchema = new mongoose.Schema({
     name: { type: String, required: true, trim: true, index: true },
     rollNo: { type: String, unique: true },
@@ -45,6 +53,20 @@ const studentSchema = new mongoose.Schema({
     deviceTokens: {
         type: [String],
         default: []
+    },
+    lastAppOpenAt: {
+        type: Date,
+        default: null,
+        index: true
+    },
+    lastActiveAt: {
+        type: Date,
+        default: null,
+        index: true
+    },
+    lastDevice: {
+        type: deviceInfoSchema,
+        default: () => ({})
     },
     portalAccess: {
         type: portalAccessSchema,
