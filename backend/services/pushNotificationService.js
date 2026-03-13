@@ -1,94 +1,144 @@
-const PUSH_TITLE = process.env.PUSH_NOTIFICATION_TITLE || 'ERP Notification';
+const { messaging } = require('../config/firebase-config');
+const Student = require('../models/Student');
 
-const sendPushNotification = async ({ student, message }) => {
-    const deviceTokens = Array.from(new Set((student.deviceTokens || []).filter(Boolean)));
+const INVALID_TOKEN_ERRORS = [
+    'messaging/registration-token-not-registered',
+    'messaging/invalid-registration-token',
+];
 
-    if (deviceTokens.length === 0) {
-        return {
-            status: 'failed',
-            error: 'No registered device tokens for this student.',
-            meta: {}
-        };
-    }
+/**
+ * Send push notification using Firebase Admin SDK
+ * Supports individual tokens, multicast, and topics.
+ */
+const sendPushNotification = async (payload) => {
+    console.log('[PushService] Attempting to send notification:', JSON.stringify(payload, null, 2));
 
-    if (!process.env.FCM_SERVER_KEY) {
-        console.log('[PushNotificationService] FCM_SERVER_KEY missing. Logging push payload instead.', {
-            studentId: String(student._id),
-            tokens: deviceTokens.length,
-            message
-        });
+    const { student, message, title, type, data = {}, topic = null } = payload;
 
-        return {
-            status: 'logged',
-            error: '',
-            meta: { simulated: true, tokens: deviceTokens.length }
-        };
-    }
+    const notificationPayload = {
+        title: title || 'ERP Notification',
+        body: message,
+    };
+
+    const commonData = {
+        type: type || 'general',
+        ...data,
+        click_action: 'FLUTTER_NOTIFICATION_CLICK', // Standard for many RN libs
+    };
 
     try {
-        const response = await fetch('https://fcm.googleapis.com/fcm/send', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `key=${process.env.FCM_SERVER_KEY}`
-            },
-            body: JSON.stringify({
-                registration_ids: deviceTokens,
-                notification: {
-                    title: PUSH_TITLE,
-                    body: message
-                },
-                data: {
-                    type: 'admin_notification',
-                    studentId: String(student._id)
-                }
-            })
-        });
-
-        const payload = await response.json().catch(() => ({}));
-
-        if (!response.ok) {
-            return {
-                status: 'failed',
-                error: payload.error || `FCM request failed with HTTP ${response.status}`,
-                meta: payload
+        // Option 1: Send to a Topic
+        if (topic) {
+            const topicPayload = {
+                topic: topic,
+                notification: notificationPayload,
+                data: commonData,
             };
-        }
-
-        const successCount = Number(payload.success || 0);
-        const failureCount = Number(payload.failure || 0);
-
-        if (successCount > 0 && failureCount === 0) {
+            console.log('[PushService] Sending to topic payload:', JSON.stringify(topicPayload, null, 2));
+            const response = await messaging.send(topicPayload);
+            console.log('[PushService] Topic send response:', JSON.stringify(response, null, 2));
             return {
                 status: 'sent',
-                providerMessageId: payload.multicast_id ? String(payload.multicast_id) : '',
+                providerMessageId: response,
                 error: '',
-                meta: { successCount, failureCount }
+                meta: { topic }
             };
         }
 
-        if (successCount > 0) {
+        // Option 2: Send to specific Student tokens
+        const tokens = Array.from(new Set((student?.deviceTokens || []).filter(token => typeof token === 'string' && token.length > 10)));
+
+        if (tokens.length === 0) {
+            console.warn('[PushService] No valid device tokens found for student:', student?._id);
             return {
-                status: 'partial',
-                providerMessageId: payload.multicast_id ? String(payload.multicast_id) : '',
-                error: `${failureCount} device token(s) failed.`,
-                meta: { successCount, failureCount, results: payload.results || [] }
+                status: 'failed',
+                error: 'No valid device tokens.',
+                meta: {}
+            };
+        }
+
+        if (tokens.length === 1) {
+            const singleTokenPayload = {
+                token: tokens[0],
+                notification: notificationPayload,
+                data: commonData,
+            };
+            console.log('[PushService] Sending to single token payload:', JSON.stringify(singleTokenPayload, null, 2));
+            const response = await messaging.send(singleTokenPayload);
+            console.log('[PushService] Single token send response:', JSON.stringify(response, null, 2));
+            return {
+                status: 'sent',
+                providerMessageId: response,
+                error: '',
+                meta: { token: tokens[0] }
+            };
+        }
+
+        // Multicast for multiple tokens
+        const multicastPayload = {
+            tokens: tokens,
+            notification: notificationPayload,
+            data: commonData,
+        };
+
+        const response = await messaging.sendEachForMulticast(multicastPayload);
+        
+        // Handle token cleanup if some failed
+        if (response.failureCount > 0) {
+            const failedTokens = [];
+            response.responses.forEach((res, idx) => {
+                if (!res.success && INVALID_TOKEN_ERRORS.includes(res.error?.code)) {
+                    failedTokens.push(tokens[idx]);
+                }
+            });
+
+            if (failedTokens.length > 0 && student?._id) {
+                await Student.updateOne(
+                    { _id: student._id },
+                    { $pull: { deviceTokens: { $in: failedTokens } } }
+                );
+            }
+        }
+
+        if (response.successCount > 0) {
+            return {
+                status: response.failureCount === 0 ? 'sent' : 'partial',
+                error: response.failureCount > 0 ? `${response.failureCount} tokens failed` : '',
+                meta: { 
+                    successCount: response.successCount, 
+                    failureCount: response.failureCount,
+                    responses: response.responses.map(r => ({ success: r.success, error: r.error?.code }))
+                }
             };
         }
 
         return {
             status: 'failed',
-            providerMessageId: payload.multicast_id ? String(payload.multicast_id) : '',
-            error: payload.results?.[0]?.error || 'FCM did not accept any delivery targets.',
-            meta: payload
+            error: response.responses[0]?.error?.message || 'All tokens failed.',
+            meta: response
         };
+
     } catch (error) {
+        console.error('[PushNotificationService] FCM Error:', error);
         return {
             status: 'failed',
             error: error.message,
-            meta: {}
+            meta: { code: error.code }
         };
     }
 };
 
-module.exports = { sendPushNotification };
+/**
+ * Subscribe students to a topic (useful for batch/all notifications)
+ */
+const subscribeToTopic = async (tokens, topic) => {
+    try {
+        const response = await messaging.subscribeToTopic(tokens, topic);
+        return response;
+    } catch (error) {
+        console.error(`[PushNotificationService] Topic Subscription Error (${topic}):`, error);
+        throw error;
+    }
+};
+
+module.exports = { sendPushNotification, subscribeToTopic };
