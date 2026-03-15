@@ -138,7 +138,7 @@ const sendNotificationBatch = async ({
         .lean();
 
     if (recipients.length === 0) {
-        throw createHttpError(`No active students matched the selected recipients.`);
+        throw createHttpError(`No active ${recipientType === 'teacher' ? 'teachers' : 'students'} matched the selected recipients.`);
     }
 
     const summary = { total: recipients.length, sent: 0, partial: 0, failed: 0, logged: 0 };
@@ -160,13 +160,21 @@ const sendNotificationBatch = async ({
         }
 
         if (methods.includes('email')) {
-            emailResult = await sendEmail({ 
+            const rawEmailResult = await sendEmail({ 
                 student: recipientType === 'student' ? recipient : null,
                 teacher: recipientType === 'teacher' ? recipient : null,
                 message, 
                 admin, 
                 subjectOverride: title 
             });
+            
+            // Transform for Notification model schema (requires 'status' field)
+            emailResult = {
+                status: rawEmailResult.success ? 'sent' : 'failed',
+                providerMessageId: rawEmailResult.messageId || '',
+                error: rawEmailResult.error || '',
+                meta: rawEmailResult
+            };
             channelResults.push(emailResult);
         }
 
