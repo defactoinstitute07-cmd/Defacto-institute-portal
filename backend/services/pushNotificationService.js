@@ -13,7 +13,7 @@ const INVALID_TOKEN_ERRORS = [
 const sendPushNotification = async (payload) => {
     console.log('[PushService] Attempting to send notification:', JSON.stringify(payload, null, 2));
 
-    const { student, message, title, type, data = {}, topic = null } = payload;
+    const { student, message, title, type, data = {}, topic = null, recipientType = 'student' } = payload;
 
     const notificationPayload = {
         title: title || 'ERP Notification',
@@ -31,7 +31,30 @@ const sendPushNotification = async (payload) => {
     const commonData = {
         type: String(type || 'general'),
         ...stringifiedData,
-        click_action: 'FLUTTER_NOTIFICATION_CLICK', // Standard for many RN libs
+        click_action: 'FLUTTER_NOTIFICATION_CLICK', 
+    };
+
+    const androidConfig = {
+        priority: 'high',
+        notification: {
+            sound: 'default',
+            clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+            channelId: 'erp_notifications_high'
+        }
+    };
+
+    const apnsConfig = {
+        headers: {
+            'apns-priority': '10'
+        },
+        payload: {
+            aps: {
+                alert: notificationPayload,
+                sound: 'default',
+                badge: 1,
+                contentAvailable: true
+            }
+        }
     };
 
     try {
@@ -41,6 +64,8 @@ const sendPushNotification = async (payload) => {
                 topic: topic,
                 notification: notificationPayload,
                 data: commonData,
+                android: androidConfig,
+                apns: apnsConfig
             };
             console.log('[PushService] Sending to topic payload:', JSON.stringify(topicPayload, null, 2));
             const response = await messaging.send(topicPayload);
@@ -70,6 +95,8 @@ const sendPushNotification = async (payload) => {
                 token: tokens[0],
                 notification: notificationPayload,
                 data: commonData,
+                android: androidConfig,
+                apns: apnsConfig
             };
             console.log('[PushService] Sending to single token payload:', JSON.stringify(singleTokenPayload, null, 2));
             const response = await messaging.send(singleTokenPayload);
@@ -87,6 +114,8 @@ const sendPushNotification = async (payload) => {
             tokens: tokens,
             notification: notificationPayload,
             data: commonData,
+            android: androidConfig,
+            apns: apnsConfig
         };
 
         const response = await messaging.sendEachForMulticast(multicastPayload);
@@ -101,7 +130,8 @@ const sendPushNotification = async (payload) => {
             });
 
             if (failedTokens.length > 0 && student?._id) {
-                await Student.updateOne(
+                const Model = recipientType === 'teacher' ? require('../models/Teacher') : Student;
+                await Model.updateOne(
                     { _id: student._id },
                     { $pull: { deviceTokens: { $in: failedTokens } } }
                 );

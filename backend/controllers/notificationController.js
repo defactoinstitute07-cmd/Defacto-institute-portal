@@ -24,7 +24,7 @@ exports.getHistory = async (req, res, next) => {
 exports.sendNotifications = async (req, res, next) => {
     try {
         console.log('[NotificationController] Incoming send request:', JSON.stringify(req.body, null, 2));
-        const { message = '', studentIds = [], sendToAll = false, deliveryMethods = [], batchId = '' } = req.body;
+        const { message = '', studentIds = [], sendToAll = false, deliveryMethods = [], batchId = '', recipientType = 'student' } = req.body;
 
         if (!String(message).trim()) {
             return res.status(400).json({ success: false, message: 'Message is required.' });
@@ -49,6 +49,7 @@ exports.sendNotifications = async (req, res, next) => {
             sendToAll: sendToAll === true,
             deliveryMethods,
             batchId,
+            recipientType,
             adminId: req.admin?.id || null,
             scheduledFor: req.body.scheduledFor ? new Date(req.body.scheduledFor) : null
         });

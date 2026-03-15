@@ -44,7 +44,19 @@ const notificationSchema = new mongoose.Schema({
     studentId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Student',
-        required: false, // Changed to false for topic/broadcast notifications
+        required: false,
+        index: true
+    },
+    teacherId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Teacher',
+        required: false,
+        index: true
+    },
+    recipientType: {
+        type: String,
+        enum: ['student', 'teacher'],
+        default: 'student',
         index: true
     },
     target: {

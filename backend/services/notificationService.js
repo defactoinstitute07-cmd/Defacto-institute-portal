@@ -1,5 +1,6 @@
 const Notification = require('../models/Notification');
 const Student = require('../models/Student');
+const Teacher = require('../models/Teacher');
 const Admin = require('../models/Admin');
 const NotificationTemplate = require('../models/NotificationTemplate');
 const { sendPushNotification } = require('./pushNotificationService');
@@ -92,6 +93,7 @@ const sendNotificationBatch = async ({
     sendToAll = false, 
     deliveryMethods = [], 
     batchId = '', 
+    recipientType = 'student',
     adminId = null, 
     scheduledFor = null
 }) => {
@@ -110,6 +112,7 @@ const sendNotificationBatch = async ({
             scheduledFor,
             target: sendToAll ? 'all' : (batchId ? 'batch' : 'individual'),
             targetId: sendToAll ? 'all' : (batchId || studentIds.join(',')),
+            recipientType
         });
         return { status: 'scheduled', notification: notificationRecord };
     }
@@ -124,13 +127,14 @@ const sendNotificationBatch = async ({
         if (Array.isArray(studentIds) && studentIds.length > 0) {
             query._id = { $in: studentIds };
         }
-        if (batchId) {
+        if (batchId && recipientType === 'student') {
             query.batchId = batchId;
         }
     }
 
-    const recipients = await Student.find(query)
-        .select('name rollNo className contact deviceTokens email')
+    const Model = recipientType === 'teacher' ? require('../models/Teacher') : Student;
+    const recipients = await Model.find(query)
+        .select('name rollNo regNo className contact deviceTokens email')
         .lean();
 
     if (recipients.length === 0) {
@@ -145,12 +149,24 @@ const sendNotificationBatch = async ({
         let emailResult;
 
         if (methods.includes('push')) {
-            pushResult = await sendPushNotification({ student: recipient, message, title, type });
+            pushResult = await sendPushNotification({ 
+                student: recipient, 
+                message, 
+                title, 
+                type,
+                recipientType
+            });
             channelResults.push(pushResult);
         }
 
         if (methods.includes('email')) {
-            emailResult = await sendEmail({ student: recipient, message, admin, subjectOverride: title });
+            emailResult = await sendEmail({ 
+                student: recipientType === 'student' ? recipient : null,
+                teacher: recipientType === 'teacher' ? recipient : null,
+                message, 
+                admin, 
+                subjectOverride: title 
+            });
             channelResults.push(emailResult);
         }
 
@@ -161,14 +177,16 @@ const sendNotificationBatch = async ({
             title,
             message,
             type,
-            studentId: recipient._id,
+            studentId: recipientType === 'student' ? recipient._id : null,
+            teacherId: recipientType === 'teacher' ? recipient._id : null,
             createdBy: adminId,
             deliveryType,
             status,
             pushResult,
             emailResult,
             target: 'individual',
-            targetId: String(recipient._id)
+            targetId: String(recipient._id),
+            recipientType
         });
     }
 
@@ -436,6 +454,7 @@ const triggerAutomaticNotification = async ({ eventType, studentId, teacherId, m
             teacherId: recipientType === 'teacher' ? recipient._id : null,
             createdBy: admin._id,
             deliveryType: deriveDeliveryType(methods),
+            recipientType,
             status: overallStatus,
             emailResult: emailResult ? {
                 status: emailResult.success ? 'sent' : 'failed',

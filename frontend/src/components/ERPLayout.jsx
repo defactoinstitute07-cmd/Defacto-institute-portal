@@ -98,7 +98,7 @@ const ERPLayout = ({ children, title }) => {
                             <img
                                 src={admin.instituteLogo}
                                 alt="Logo"
-                                style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 0 }}
+                                style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 5 }}
                                 onError={(event) => {
                                     event.target.style.display = 'none';
                                     event.target.parentElement.innerHTML = '<div class="sb-logo-fallback"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4c0-.6.4-1 1-1h10c.6 0 1 .4 1 1v18"/><path d="M6 18h12"/><path d="M10 8h4"/><path d="M10 12h4"/><path d="M10 16h4"/><path d="M3 22h18"/></svg></div>';
