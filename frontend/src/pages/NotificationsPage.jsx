@@ -12,6 +12,7 @@ import { getAdminProfile } from "../api/adminApi";
 import { getAllBatches } from "../api/batchApi";
 import { Filter, Trash2, CheckSquare, RefreshCcw } from "lucide-react";
 import ActionModal from "../components/common/ActionModal";
+import ToastContainer, { useToast } from "../components/Toast";
 
 const STATUS_STYLES = {
   sent: "bg-green-50 text-green-700 border border-green-200",
@@ -34,6 +35,7 @@ const countValidDeviceTokens = (deviceTokens = []) =>
     : 0;
 
 const NotificationsPage = () => {
+  const { toasts, toast, removeToast } = useToast();
   const [alert, setAlert] = useState(null);
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
@@ -136,7 +138,7 @@ const NotificationsPage = () => {
       });
       setRecipients(data.students || []);
     } catch (err) {
-      setAlert({ type: "error", text: "Failed to load recipients." });
+      toast.error("Failed to load recipients.");
     } finally {
       setLoadingRecipients(false);
     }
@@ -166,7 +168,7 @@ const NotificationsPage = () => {
       setHasMoreHistory(newNotifications.length === 5);
       setHistoryPage(page);
     } catch {
-      setAlert({ type: "error", text: "Failed to load notification history." });
+      toast.error("Failed to load notification history.");
     } finally {
       if (!append) setLoadingHistory(false);
     }
@@ -231,13 +233,13 @@ const NotificationsPage = () => {
     e.preventDefault();
 
     if (!message.trim())
-      return setAlert({ type: "error", text: "Write a message first." });
+      return toast.warning("Write a message first.");
 
     if (activeDeliveryMethods.length === 0)
-      return setAlert({ type: "error", text: "Select delivery method." });
+      return toast.warning("Select delivery method.");
 
     if (sendToBatch && !filterBatch) {
-      return setAlert({ type: "error", text: "Select a batch to send to." });
+      return toast.warning("Select a batch to send to.");
     }
 
     setSending(true);
@@ -255,19 +257,13 @@ const NotificationsPage = () => {
         recipientType
       });
 
-      setAlert({
-        type: "success",
-        text: "Notification sent successfully."
-      });
+      toast.success("Notification sent successfully.");
 
       setMessage("");
       setSelectedRecipients([]);
       loadHistory();
-    } catch {
-      setAlert({
-        type: "error",
-        text: "Failed to send notification."
-      });
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to send notification.");
     } finally {
       setSending(false);
     }
@@ -306,6 +302,7 @@ const NotificationsPage = () => {
 
   return (
     <ERPLayout title="Notifications">
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
       <div className="space-y-6">
 
         {alert && <AlertMessage type={alert.type} message={alert.text} />}

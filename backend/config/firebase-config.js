@@ -6,11 +6,16 @@ let firebaseApp;
 try {
     // Try to load service account from environment variable first
     if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-        firebaseApp = admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount)
-        });
-        console.log('[Firebase] Initialized using environment variable.');
+        if (admin.apps.length > 0) {
+            firebaseApp = admin.app();
+            console.log('[Firebase] Already initialized, reusing existing app.');
+        } else {
+            const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+            firebaseApp = admin.initializeApp({
+                credential: admin.credential.cert(serviceAccount)
+            });
+            console.log('[Firebase] Initialized using environment variable.');
+        }
     } else {
         // Fallback to local file
         const serviceAccountPath = path.resolve(__dirname, '../serviceAccountKey.json');
@@ -18,10 +23,15 @@ try {
         // Check if file exists to avoid crash on startup if not provided yet
         const fs = require('fs');
         if (fs.existsSync(serviceAccountPath)) {
-            firebaseApp = admin.initializeApp({
-                credential: admin.credential.cert(serviceAccountPath)
-            });
-            console.log('[Firebase] Initialized using serviceAccountKey.json');
+            if (admin.apps.length > 0) {
+                firebaseApp = admin.app();
+                console.log('[Firebase] Already initialized (local), reusing existing app.');
+            } else {
+                firebaseApp = admin.initializeApp({
+                    credential: admin.credential.cert(serviceAccountPath)
+                });
+                console.log('[Firebase] Initialized using serviceAccountKey.json');
+            }
         } else {
             console.warn('[Firebase] Warning: serviceAccountKey.json not found and FIREBASE_SERVICE_ACCOUNT env var is missing. Push notifications will be in simulation mode.');
             // Initialize with dummy if necessary or handle gracefully in services
