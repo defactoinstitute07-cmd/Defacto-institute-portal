@@ -146,6 +146,15 @@ app.use('/api/demo', demoRoutes);
 
 app.use('/api/track-visit', pageVisitRoutes); // Scoped CORS handled inside the router
 
+// Health check route
+app.get('/api/health', (req, res) => {
+    res.status(200).json({ 
+        status: 'ok', 
+        timestamp: new Date().toISOString(),
+        env: process.env.NODE_ENV
+    });
+});
+
 // Database Connection
 connectDB().then(() => {
     // Seed templates if needed

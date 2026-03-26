@@ -19,7 +19,7 @@ const connectDB = async (retries = 5, delay = 5000) => {
 
     if (!MONGODB_URI) {
         console.error('❌ MONGODB_URI is not defined in environment variables');
-        process.exit(1);
+        throw new Error('MONGODB_URI is not defined');
     }
 
     const options = {

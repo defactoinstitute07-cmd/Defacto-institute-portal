@@ -11,7 +11,8 @@
     "prisma:migrate:expenses": "prisma migrate dev --name add_expense_tracking",
     "fees:sync-structures": "node scripts/syncFeeStructuresFromBatches.js",
     "expenses:seed": "node scripts/seedExpenseTracking.js",
-    "expenses:sync-payroll": "node scripts/syncPayrollExpenses.js"
+    "expenses:sync-payroll": "node scripts/syncPayrollExpenses.js",
+    "postinstall": "prisma generate"
   },
   "keywords": [],
   "author": "",
