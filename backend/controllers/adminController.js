@@ -28,6 +28,7 @@ exports.signup = async (req, res) => {
             registrationNumber, classesOffered, phone, bio,
             instituteAddress, instituteEmail, institutePhone
         } = req.body;
+        console.log('[Signup] New attempt:', { adminName, email, coachingName });
 
         const adminExists = await Admin.countDocuments() > 0;
         if (adminExists) {
