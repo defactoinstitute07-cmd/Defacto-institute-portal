@@ -8,7 +8,7 @@ let cachedConnection = null;
  * @param {number} retries - Number of retry attempts.
  * @param {number} delay - Delay between retries in milliseconds.
  */
-const connectDB = async (retries = 5, delay = 5000) => {
+const connectDB = async (retries = 3, delay = 2000) => {
     // If connection is already established, reuse it
     if (cachedConnection && mongoose.connection.readyState === 1) {
         console.log('Using existing MongoDB connection');
@@ -22,19 +22,14 @@ const connectDB = async (retries = 5, delay = 5000) => {
         throw new Error('MONGODB_URI is not defined');
     }
 
-    const isProc = process.env.NODE_ENV === 'production';
-    const finalRetries = isProc ? 1 : retries;
-    const finalDelay = isProc ? 1000 : delay;
-
     const options = {
-        serverSelectionTimeoutMS: isProc ? 2000 : 5000, 
-        socketTimeoutMS: 45000, 
+        serverSelectionTimeoutMS: 5000, // 5s to select a server
+        socketTimeoutMS: 45000,         // 45s socket timeout
     };
 
-    let currentRetry = finalRetries;
-    while (currentRetry > 0) {
+    while (retries > 0) {
         try {
-            console.log(`Connecting to MongoDB... (Attempts remaining: ${currentRetry})`);
+            console.log(`Connecting to MongoDB... (Attempts remaining: ${retries})`);
 
             cachedConnection = await mongoose.connect(MONGODB_URI, options);
 
@@ -51,23 +46,16 @@ const connectDB = async (retries = 5, delay = 5000) => {
 
             return cachedConnection;
         } catch (error) {
-            currentRetry -= 1;
+            retries -= 1;
             console.error(`❌ MongoDB connection failed: ${error.message}`);
 
-            if (currentRetry === 0) {
+            if (retries === 0) {
                 console.error('Max retries reached. Database connection could not be established.');
-                // In production, you might not want to exit if it's a serverless function
-                // but for a standalone server, exit is often better than running in a broken state.
-                if (process.env.NODE_ENV !== 'production') {
-                    // process.exit(1);
-                }
                 throw error;
             }
 
-            console.log(`Retrying in ${finalDelay / 1000}s...`);
-            await new Promise(resolve => setTimeout(resolve, finalDelay));
-            // Exponential backoff
-            // finalDelay *= 1.5; // Avoid exponential backoff in Vercel to stay within limit
+            console.log(`Retrying in ${delay / 1000}s...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
         }
     }
 };
