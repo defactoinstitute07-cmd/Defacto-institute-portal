@@ -7,6 +7,7 @@ const { loadBackendEnv } = require('./config/env');
 loadBackendEnv();
 const connectDB = require('./config/db');
 const errorHandler = require('./middleware/errorHandler');
+const { adminAuth } = require('./middleware/auth.middleware');
 
 const rateLimit = require('express-rate-limit');
 
@@ -17,6 +18,9 @@ const batchRoutes = require('./routes/batch.routes');
 const schedulerRoutes = require('./routes/scheduler.routes');
 const settingsRoutes = require('./routes/settings.routes');
 const teacherRoutes = require('./routes/teacher.routes');
+const teacherPayrollRoutes = require('./routes/teacher.payroll.routes');
+const expenseRoutes = require('./routes/expense.routes');
+const feesRoutes = require('./routes/fees.routes');
 const eventRoutes = require('./routes/event.routes');
 const examRoutes = require('./routes/exam.routes');
 const notificationRoutes = require('./routes/notificationRoutes');
@@ -137,6 +141,9 @@ app.use('/api/subjects', subjectRoutes);
 app.use('/api/teacher-assignments', teacherAssignmentRoutes);
 app.use('/api/templates', templateRoutes);
 app.use('/api/teacher-portal', teacherPortalRoutes);
+app.use('/api/payroll', adminAuth, teacherPayrollRoutes);
+app.use('/api/fees', adminAuth, feesRoutes);
+app.use('/api/expenses', adminAuth, expenseRoutes);
 
 // Portal auth routes
 app.use('/api/student', studentAuthRoutes);

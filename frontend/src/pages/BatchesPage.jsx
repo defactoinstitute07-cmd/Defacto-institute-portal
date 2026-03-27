@@ -144,7 +144,18 @@ const TimetableGrid = ({ days, timeSlots, classroom, occupancy, selected, onTogg
 // ══════════════════════════════════════════════════════════════
 const BatchRow = ({ batch, onEdit, onDelete }) => {
     const navigate = useNavigate();
-    const schedDays = [...new Set((batch.schedule || []).map(s => s.day.slice(0, 3)))].join(', ');
+    const scheduleArray = Array.isArray(batch.schedule) ? batch.schedule : [];
+    const legacySlots = Array.isArray(batch.timeSlots) ? batch.timeSlots : [];
+
+    const schedDays = scheduleArray.length
+        ? [...new Set(scheduleArray
+            .map(s => (s && s.day ? String(s.day).slice(0, 3) : ''))
+            .filter(Boolean))].join(', ')
+        : legacySlots.length
+            ? [...new Set(legacySlots
+                .map(slot => String(slot).split(' ')[0].slice(0, 3))
+                .filter(Boolean))].join(', ')
+            : '';
 
     return (
         <tr>
@@ -163,10 +174,16 @@ const BatchRow = ({ batch, onEdit, onDelete }) => {
                 </div>
             </td>
             <td data-label="Schedule">
-                {batch.schedule?.length
-                    ? <div>{schedDays || '—'}<div className="td-sm">{batch.schedule.length} slot{batch.schedule.length !== 1 ? 's' : ''}/week</div></div>
-                    : <span className="td-sm">—</span>
-                }
+                {scheduleArray.length || legacySlots.length
+                    ? (
+                        <div>
+                            {schedDays || '—'}
+                            <div className="td-sm">
+                                {(scheduleArray.length || legacySlots.length)} slot{(scheduleArray.length || legacySlots.length) !== 1 ? 's' : ''}/week
+                            </div>
+                        </div>
+                    )
+                    : <span className="td-sm">—</span>}
             </td>
             <td data-label="Enrollment">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -341,7 +358,7 @@ const BatchesPage = () => {
             capacity: batch.capacity || 30,
             subjects: batch.subjects || [],
             classroom: batch.classroom || '',
-            schedule: batch.schedule || [],
+            schedule: Array.isArray(batch.schedule) ? batch.schedule : [],
             fees: batch.fees || '',
             teacher: batch.teacher || '',
             startDate: batch.startDate ? new Date(batch.startDate).toISOString().split('T')[0] : '',
