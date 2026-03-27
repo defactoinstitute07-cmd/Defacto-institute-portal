@@ -29,7 +29,7 @@ const AdminLoginPage = () => {
         try {
             const response = await authApi.adminLogin({ identifier: form.identifier, password: form.password });
             const data = response.data;
-            setClientSession({ role: 'admin', admin: data.admin });
+            setClientSession({ role: 'admin', admin: data.admin, token: data.token });
             navigate('/dashboard');
         } catch (err) {
             setError(err.response?.data?.message || 'Authentication failed. Please try again.');

@@ -33,6 +33,11 @@ const errorHandler = (err, req, res, next) => {
         return res.status(400).json({ success: false, message });
     }
 
+    // Multer upload errors
+    if (err.name === 'MulterError') {
+        return res.status(400).json({ success: false, message: err.message || 'File upload failed.' });
+    }
+
     // Mongo Network/Timeout Errors
     if (err.name === 'MongoNetworkError' || err.name === 'MongoTimeoutError') {
         const message = 'Database connection issue. Please try again later.';

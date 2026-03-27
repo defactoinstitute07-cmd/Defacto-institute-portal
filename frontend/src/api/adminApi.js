@@ -7,6 +7,17 @@ const API = axios.create({
     withCredentials: true
 });
 
+API.interceptors.request.use((config) => {
+    if (typeof window !== 'undefined') {
+        const token = localStorage.getItem('authToken');
+        if (token) {
+            config.headers = config.headers || {};
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+    }
+    return config;
+});
+
 export const checkAdminExists = () => API.get('/check-admin');
 export const adminSignup = (data) => API.post('/signup', data);
 export const adminLogin = (data) => API.post('/login', data);

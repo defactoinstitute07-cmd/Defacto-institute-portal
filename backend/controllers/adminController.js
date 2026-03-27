@@ -7,6 +7,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { JWT_SECRET } = require('../middleware/auth.middleware');
 const emailService = require('../services/emailService');
+const connectDB = require('../config/db');
 
 // Check if admin exists
 exports.checkAdmin = async (req, res) => {
@@ -28,11 +29,24 @@ exports.signup = async (req, res) => {
             instituteAddress, instituteEmail, institutePhone
         } = req.body;
         console.log('[Signup] New attempt:', { adminName, email, coachingName });
+
+        if (!adminName || !coachingName || !password) {
+            return res.status(400).json({ message: 'adminName, coachingName and password are required.' });
+        }
         
-        // Explicitly check DB connection
+        // Ensure DB is ready. On serverless cold starts the first request can arrive before connectDB() finishes.
         const mongoose = require('mongoose');
         if (mongoose.connection.readyState !== 1) {
-            console.error('[SignupError] MongoDB not connected. Status:', mongoose.connection.readyState);
+            try {
+                await connectDB(5, 1500);
+            } catch (dbErr) {
+                console.error('[SignupError] MongoDB reconnect attempt failed:', dbErr.message);
+                return res.status(503).json({ message: 'Database unavailable. Please try again in a few seconds.' });
+            }
+        }
+
+        if (mongoose.connection.readyState !== 1) {
+            console.error('[SignupError] MongoDB not connected after retry. Status:', mongoose.connection.readyState);
             return res.status(503).json({ message: 'Database connecting, please try again in a few seconds.', status: mongoose.connection.readyState });
         }
 
@@ -46,11 +60,18 @@ exports.signup = async (req, res) => {
 
         let instituteLogo = '';
         if (req.file) {
-            instituteLogo = req.file.path;
+            instituteLogo = req.file.path || '';
         }
 
         let parsedClasses = [];
-        try { if (classesOffered) parsedClasses = JSON.parse(classesOffered); } catch (e) { }
+        if (classesOffered) {
+            try {
+                const parsed = JSON.parse(classesOffered);
+                parsedClasses = Array.isArray(parsed) ? parsed : [];
+            } catch (parseErr) {
+                return res.status(400).json({ message: 'classesOffered must be a valid JSON array.' });
+            }
+        }
 
         const admin = new Admin({
             adminName,
@@ -72,6 +93,21 @@ exports.signup = async (req, res) => {
         res.status(201).json({ message: 'Admin account created successfully' });
     } catch (error) {
         console.error('[SignupError]', error);
+
+        if (error.code === 11000) {
+            const duplicateField = Object.keys(error.keyValue || {})[0] || 'field';
+            return res.status(400).json({ message: `Duplicate value for ${duplicateField}.` });
+        }
+
+        if (error.name === 'ValidationError') {
+            const details = Object.values(error.errors || {}).map((e) => e.message).join(', ');
+            return res.status(400).json({ message: details || 'Validation failed.' });
+        }
+
+        if (error.name === 'MongoNetworkError' || error.name === 'MongoServerSelectionError') {
+            return res.status(503).json({ message: 'Database unavailable. Please try again shortly.' });
+        }
+
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 };

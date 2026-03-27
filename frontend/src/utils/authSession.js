@@ -1,8 +1,13 @@
 const SESSION_ACTIVE_KEY = 'sessionActive';
+const TOKEN_KEY = 'authToken';
 
-export const setClientSession = ({ role, admin, teacher, student }) => {
+export const setClientSession = ({ role, admin, teacher, student, token }) => {
     localStorage.setItem(SESSION_ACTIVE_KEY, 'true');
     localStorage.setItem('role', role);
+
+    if (token) {
+        localStorage.setItem(TOKEN_KEY, token);
+    }
 
     if (admin) {
         localStorage.setItem('admin', JSON.stringify(admin));
@@ -31,6 +36,7 @@ export const clearClientSession = () => {
 
     localStorage.removeItem(SESSION_ACTIVE_KEY);
     localStorage.removeItem('role');
+    localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem('admin');
     localStorage.removeItem('teacher');
     localStorage.removeItem('student');

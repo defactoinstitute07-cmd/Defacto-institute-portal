@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 // Cache connection state for serverless environments (like Vercel)
 let cachedConnection = null;
+let connectPromise = null;
 
 /**
  * Connects to MongoDB Atlas with retry logic and caching.
@@ -13,6 +14,14 @@ const connectDB = async (retries = 3, delay = 2000) => {
     if (cachedConnection && mongoose.connection.readyState === 1) {
         console.log('Using existing MongoDB connection');
         return cachedConnection;
+    }
+
+    // If another request already started connecting, wait for it.
+    if (connectPromise) {
+        await connectPromise;
+        if (cachedConnection && mongoose.connection.readyState === 1) {
+            return cachedConnection;
+        }
     }
 
     const MONGODB_URI = process.env.MONGODB_URI;
@@ -31,7 +40,9 @@ const connectDB = async (retries = 3, delay = 2000) => {
         try {
             console.log(`Connecting to MongoDB... (Attempts remaining: ${retries})`);
 
-            cachedConnection = await mongoose.connect(MONGODB_URI, options);
+            connectPromise = mongoose.connect(MONGODB_URI, options);
+            cachedConnection = await connectPromise;
+            connectPromise = null;
 
             console.log('✅ MongoDB Connected Successfully');
 
@@ -46,6 +57,7 @@ const connectDB = async (retries = 3, delay = 2000) => {
 
             return cachedConnection;
         } catch (error) {
+            connectPromise = null;
             retries -= 1;
             console.error(`❌ MongoDB connection failed: ${error.message}`);
 
