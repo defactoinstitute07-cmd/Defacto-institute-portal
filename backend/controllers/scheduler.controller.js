@@ -277,7 +277,7 @@ exports.expertAISchedule = async (req, res) => {
         return res.json({ schedule: generatedSchedule });
 
     } catch (err) {
-        console.error('Error in expertAISchedule:', err);
+        console.error('Error in expertAISchedule');
         res.status(500).json({ message: 'Server error during expert auto-schedule', error: err.message });
     }
 };
@@ -450,7 +450,7 @@ exports.autoScheduleBatch = async (req, res) => {
         });
 
     } catch (err) {
-        console.error('Error in autoScheduleBatch:', err);
+        console.error('Error in autoScheduleBatch');
         res.status(500).json({ message: 'Server error during batch auto-schedule', error: err.message });
     }
 };
@@ -638,7 +638,7 @@ exports.smartAutoSchedule = async (req, res) => {
         });
 
     } catch (err) {
-        console.error('Smart Schedule Error:', err);
+        console.error('Smart Schedule Error');
         res.status(500).json({ message: 'Server error during smart scheduling' });
     }
 };
@@ -680,6 +680,6 @@ exports.syncBatchSchedule = async (batchId, course, scheduleArray) => {
 
         await Schedule.insertMany(docs);
     } catch (err) {
-        console.error('Error syncing batch schedule:', err);
+        console.error('Error syncing batch schedule');
     }
 };

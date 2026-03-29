@@ -64,7 +64,7 @@ exports.createExam = async (req, res) => {
                         totalMarks,
                         passingMarks
                     }
-                }).catch(e => console.error('[ExamNotificationLog] test_scheduled error:', e));
+                }).catch(() => console.error('[ExamNotificationLog] test_scheduled logging failed'));
             }
         });
 
@@ -233,7 +233,7 @@ exports.saveMarks = async (req, res) => {
                         result,
                         resultColor
                     }
-                }).catch(e => console.error('[ExamNotificationLog] result_announced error:', e));
+                }).catch(() => console.error('[ExamNotificationLog] result_announced logging failed'));
             }
         });
 

@@ -9,7 +9,7 @@ const logNotificationEvent = async ({ recipientEmail, recipientName, subject, ty
         loggedAt: new Date().toISOString()
     };
 
-    console.log('[NotificationEvent] Email delivery removed; logged event instead:', entry);
+    console.log('[NotificationEvent] Event logged');
     return entry;
 };
 

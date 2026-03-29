@@ -52,7 +52,7 @@ exports.getFees = async (req, res) => {
             fees
         });
     } catch (err) {
-        console.error('Error fetching fees:', err);
+        console.error('Error fetching fees');
         return res.status(500).json({ message: 'Server error', error: err.message });
     }
 };
@@ -96,7 +96,7 @@ exports.getMetrics = async (req, res) => {
             monthlyCollection: aggMonthly ? aggMonthly.monthlyCollection : 0
         });
     } catch (err) {
-        console.error('Error fetching fee metrics:', err);
+        console.error('Error fetching fee metrics');
         return res.status(500).json({ message: 'Server error', error: err.message });
     }
 };
@@ -155,11 +155,11 @@ exports.createFee = async (req, res) => {
                 year,
                 dueDate: new Date(dueDate).toLocaleDateString('en-IN')
             }
-        }).catch((error) => console.error('[fees.createFee.notification]', error));
+        }).catch(() => console.error('[fees.createFee.notification] Notification dispatch failed'));
 
         return res.status(201).json({ success: true, fee });
     } catch (err) {
-        console.error('Error creating fee:', err);
+        console.error('Error creating fee');
         return res.status(500).json({ message: 'Server error', error: err.message });
     }
 };
@@ -217,12 +217,12 @@ exports.recordPayment = async (req, res) => {
                     year: fee.year,
                     dueDate: fee.dueDate ? new Date(fee.dueDate).toLocaleDateString('en-IN') : ''
                 }
-            }).catch((error) => console.error('[fees.recordPayment.notification]', error));
+            }).catch(() => console.error('[fees.recordPayment.notification] Notification dispatch failed'));
         }
 
         return res.json({ success: true, receiptNo, fee });
     } catch (err) {
-        console.error('Error recording payment:', err);
+        console.error('Error recording payment');
         return res.status(500).json({ message: 'Server error', error: err.message });
     }
 };
@@ -256,7 +256,7 @@ exports.addExpenseToFee = async (req, res) => {
         await fee.save();
         return res.json({ success: true, fee });
     } catch (err) {
-        console.error('Error adding extra expense to fee:', err);
+        console.error('Error adding extra expense to fee');
         return res.status(500).json({ message: 'Server error', error: err.message });
     }
 };
@@ -323,13 +323,13 @@ exports.generateFeesBulk = async (req, res) => {
                         year: target.year,
                         dueDate: target.dueDate
                     }
-                }).catch((error) => console.error('[fees.generateFeesBulk.notification]', error));
+                }).catch(() => console.error('[fees.generateFeesBulk.notification] Notification dispatch failed'));
             });
         }
 
         return res.json({ success: true, created: feesToCreate.length });
     } catch (err) {
-        console.error('Error generating bulk fees:', err);
+        console.error('Error generating bulk fees');
         return res.status(500).json({ message: 'Server error', error: err.message });
     }
 };
@@ -368,7 +368,7 @@ exports.remindOverdue = async (req, res) => {
                     dueDate: fee.dueDate ? new Date(fee.dueDate).toLocaleDateString('en-IN') : '',
                     deadline: now.toLocaleDateString('en-IN')
                 }
-            }).catch((error) => console.error('[fees.remindOverdue.notification]', error));
+            }).catch(() => console.error('[fees.remindOverdue.notification] Notification dispatch failed'));
         });
 
         return res.json({
@@ -378,7 +378,7 @@ exports.remindOverdue = async (req, res) => {
             message: `Overdue reminders triggered for ${overdueFees.length} fee records.`
         });
     } catch (err) {
-        console.error('Error sending overdue reminders:', err);
+        console.error('Error sending overdue reminders');
         return res.status(500).json({ message: 'Server error', error: err.message });
     }
 };
@@ -408,7 +408,7 @@ exports.bulkSurcharge = async (req, res) => {
 
         return res.json({ success: true, updated: fees.length });
     } catch (err) {
-        console.error('Error applying bulk surcharge:', err);
+        console.error('Error applying bulk surcharge');
         return res.status(500).json({ message: 'Server error', error: err.message });
     }
 };

@@ -118,7 +118,8 @@ exports.createTeacher = async (req, res) => {
                 message: `Your faculty account has been created. Reg No: ${teacher.regNo}`,
                 data: {
                     password: password || 'teacher@123',
-                    portalUrl: process.env.FRONTEND_URL || 'http://localhost:5173'
+                           portalUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+                           teacherPortalUrl: process.env.TEACHER_PORTAL_URL || `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login`
                 }
             });
 
@@ -131,12 +132,12 @@ exports.createTeacher = async (req, res) => {
                     regNo: teacher.regNo,
                     designation: teacher.designation || 'Faculty'
                 }
-            }).catch(e => console.error('[TeacherNotificationLog] Admission logging error:', e));
+            }).catch(() => console.error('[TeacherNotificationLog] Admission logging failed'));
         }
 
         res.status(201).json({ message: 'Teacher created', teacher });
     } catch (err) {
-        console.error('[createTeacher]', err);
+        console.error('[createTeacher] Failed to create teacher');
         if (err.code === 11000) {
             const field = Object.keys(err.keyValue || {})[0] || 'field';
             return res.status(400).json({ message: `Duplicate value: ${field} already exists` });
@@ -320,7 +321,8 @@ exports.bulkUpload = async (req, res) => {
                         message: `Welcome to Institute. Your faculty account has been created.`,
                         data: {
                             password: defaultPassword,
-                            portalUrl: process.env.FRONTEND_URL || 'http://localhost:5173'
+                            portalUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+                            teacherPortalUrl: process.env.TEACHER_PORTAL_URL || `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login`
                         }
                     });
                 }

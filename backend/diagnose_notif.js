@@ -28,8 +28,8 @@ async function diagnose() {
         logs.forEach(l => {
             console.log(`[${l.createdAt.toISOString()}] ${l.type} - ${l.status}`);
             console.log(`  Title: ${l.title}`);
-            if (l.pushResult) console.log(`  Push Result: ${JSON.stringify(l.pushResult)}`);
-            if (l.emailResult) console.log(`  Email Result: ${JSON.stringify(l.emailResult)}`);
+            if (l.pushResult) console.log('  Push Result: [redacted details]');
+            if (l.emailResult) console.log('  Email Result: [redacted details]');
             console.log('-------------------');
         });
 
@@ -42,7 +42,7 @@ async function diagnose() {
 
         process.exit(0);
     } catch (err) {
-        console.error('Diagnosis failed:', err);
+        console.error('Diagnosis failed');
         process.exit(1);
     }
 }

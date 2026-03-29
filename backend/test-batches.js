@@ -16,14 +16,14 @@ const req = http.request({
     res.on('data', chunk => raw += chunk);
     res.on('end', () => {
         const token = JSON.parse(raw).token;
-        if (!token) return console.log("No token:", raw);
+        if (!token) return console.log('No token returned from login response');
 
         http.get('http://localhost:5000/api/batches', {
             headers: { Authorization: `Bearer ${token}` }
         }, (res2) => {
             let bRaw = '';
             res2.on('data', chunk => bRaw += chunk);
-            res2.on('end', () => console.log("Batches response:", bRaw.substring(0, 500)));
+            res2.on('end', () => console.log(`Batches response received (length: ${bRaw.length})`));
         });
     });
 });

@@ -140,6 +140,8 @@ const StudentProfileModal = ({ isOpen, onClose, student, onDownloadID }) => {
                                         <DetailItem label="MOTHER'S NAME" value={student.motherName || '—'} icon={Info} />
                                         <DetailItem label="WHATSAPP NUMBER" value={student.contact || '—'} icon={Phone} />
                                         <DetailItem label="EMAIL ADDRESS" value={student.email || '—'} icon={Mail} />
+                                        <DetailItem label="PARENT PHONE" value={student.parentPhone || '—'} icon={Phone} />
+                                        <DetailItem label="PARENT EMAIL" value={student.parentEmail || '—'} icon={Mail} />
                                         <DetailItem label="ADMISSION DATE" value={new Date(student.admissionDate || student.joinedAt).toLocaleDateString()} icon={Calendar} />
                                         <DetailItem label="ACADEMIC SESSION" value={student.session || '—'} icon={Calendar} />
                                         <DetailItem label="REGISTRATION FEE" value={`₹ ${student.registrationFee || 0}`} icon={IndianRupee} />

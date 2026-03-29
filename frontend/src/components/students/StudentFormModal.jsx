@@ -202,6 +202,17 @@ const StudentFormModal = ({
                   </div>
                 </div>
 
+                <div style={{ display: 'flex', gap: 16 }} className="flex-mob-stack">
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontWeight: 800, fontSize: '0.7rem', color: '#475569' }}>PARENT PHONE NUMBER</label>
+                    <input type="text" name="parentPhone" value={form.parentPhone || ''} onChange={handleForm} placeholder="+91 0000000000" style={inputStyle} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontWeight: 800, fontSize: '0.7rem', color: '#475569' }}>PARENT EMAIL ADDRESS</label>
+                    <input type="email" name="parentEmail" value={form.parentEmail || ''} onChange={handleForm} placeholder="parent@example.com" style={inputStyle} />
+                  </div>
+                </div>
+
                 {/* Address */}
                 <div>
                   <label style={{ fontWeight: 800, fontSize: '0.7rem', color: '#475569' }}>FULL ADDRESS</label>

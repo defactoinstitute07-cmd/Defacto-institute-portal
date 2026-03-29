@@ -14,6 +14,7 @@ const batchSchema = new mongoose.Schema({
     teacher: { type: String },
     fees: { type: Number, default: 0 },
     enrolledCount: { type: Number, default: 0 },
+    hasChapterPlanning: { type: Boolean, default: false },
     startDate: { type: Date },
     endDate: { type: Date },
     isActive: { type: Boolean, default: true },

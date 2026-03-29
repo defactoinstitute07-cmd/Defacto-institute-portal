@@ -18,14 +18,47 @@ const asObjectId = (value, label) => {
     return new mongoose.Types.ObjectId(value);
 };
 
+const parseAttendanceDate = (value) => {
+    if (value instanceof Date) {
+        return new Date(value.getTime());
+    }
+
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+
+        // Parse date-only inputs as local calendar dates to avoid UTC timezone shifts.
+        if (dateOnlyMatch) {
+            const year = Number(dateOnlyMatch[1]);
+            const monthIndex = Number(dateOnlyMatch[2]) - 1;
+            const day = Number(dateOnlyMatch[3]);
+            const parsed = new Date(Date.UTC(year, monthIndex, day));
+
+            if (
+                parsed.getUTCFullYear() === year &&
+                parsed.getUTCMonth() === monthIndex &&
+                parsed.getUTCDate() === day
+            ) {
+                return parsed;
+            }
+
+            return new Date(NaN);
+        }
+
+        return new Date(trimmed);
+    }
+
+    return new Date(value);
+};
+
 const normalizeAttendanceDate = (value) => {
-    const date = new Date(value);
+    const date = parseAttendanceDate(value);
     if (Number.isNaN(date.getTime())) {
         const error = new Error('A valid attendance date is required.');
         error.status = 400;
         throw error;
     }
-    date.setHours(0, 0, 0, 0);
+    date.setUTCHours(0, 0, 0, 0);
     return date;
 };
 
@@ -120,7 +153,7 @@ const buildAssignmentQuery = ({ teacherId, batchId, subjectId, activeOnly = true
     return query;
 };
 
-exports.createSubject = async ({ name, code, batchId }) => {
+exports.createSubject = async ({ name, code, batchId, totalChapters }) => {
     if (!name || !String(name).trim()) {
         const error = new Error('Subject name is required.');
         error.status = 400;
@@ -143,7 +176,8 @@ exports.createSubject = async ({ name, code, batchId }) => {
     const subject = new Subject({
         name: String(name).trim(),
         code: code ? String(code).trim().toUpperCase() : undefined,
-        batchId: new mongoose.Types.ObjectId(batchId)
+        batchId: new mongoose.Types.ObjectId(batchId),
+        totalChapters: Number.isFinite(Number(totalChapters)) ? Math.max(0, Number(totalChapters)) : null
     });
 
     await subject.save();

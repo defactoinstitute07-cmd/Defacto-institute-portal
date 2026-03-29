@@ -23,7 +23,6 @@ exports.getHistory = async (req, res, next) => {
 
 exports.sendNotifications = async (req, res, next) => {
     try {
-        console.log('[NotificationController] Incoming send request:', JSON.stringify(req.body, null, 2));
         const { message = '', studentIds = [], sendToAll = false, deliveryMethods = [], batchId = '', recipientType = 'student' } = req.body;
 
         if (!String(message).trim()) {

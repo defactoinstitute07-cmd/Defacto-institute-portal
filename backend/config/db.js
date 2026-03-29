@@ -48,7 +48,7 @@ const connectDB = async (retries = 3, delay = 2000) => {
 
             // Setup connection event listeners
             mongoose.connection.on('error', (err) => {
-                console.error(`❌ MongoDB connection error: ${err}`);
+                console.error('MongoDB connection error');
             });
 
             mongoose.connection.on('disconnected', () => {
@@ -59,7 +59,7 @@ const connectDB = async (retries = 3, delay = 2000) => {
         } catch (error) {
             connectPromise = null;
             retries -= 1;
-            console.error(`❌ MongoDB connection failed: ${error.message}`);
+            console.error('MongoDB connection failed');
 
             if (retries === 0) {
                 console.error('Max retries reached. Database connection could not be established.');

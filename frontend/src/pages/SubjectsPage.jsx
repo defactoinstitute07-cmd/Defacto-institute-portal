@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { BookOpen, Loader2, Save, Plus, X } from 'lucide-react';
+import { BookOpen, Loader2, Save, Plus, X, AlertTriangle } from 'lucide-react';
 import ERPLayout from '../components/ERPLayout';
 import { getAllBatches, updateBatchSubjects } from '../api/batchApi';
 import { getSubjects, createSubject } from '../api/subjectApi';
+import apiClient from '../api/apiConfig';
 
 const fieldClass = 'w-full rounded-md border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 outline-none transition focus:border-indigo-400';
 
@@ -10,6 +11,7 @@ const SubjectsPage = () => {
     const [batches, setBatches] = useState([]);
     const [allSubjects, setAllSubjects] = useState([]);
     const [selectedBatchId, setSelectedBatchId] = useState('');
+    const [classSuggestions, setClassSuggestions] = useState([]);
 
     // Assigned subjects for the currently selected batch
     const [assignedSubjectIds, setAssignedSubjectIds] = useState(new Set());
@@ -17,8 +19,9 @@ const SubjectsPage = () => {
     // New Subject Form
     const [newSubject, setNewSubject] = useState({ name: '', code: '', description: '' });
 
-    const [loading, setLoading] = useState({ page: true, save: false, create: false });
+    const [loading, setLoading] = useState({ page: true, save: false, create: false, remove: false });
     const [flash, setFlash] = useState(null);
+    const [removePrompt, setRemovePrompt] = useState({ open: false, subjectId: '', subjectName: '' });
 
     const pushFlash = (type, text) => {
         setFlash({ type, text });
@@ -48,13 +51,39 @@ const SubjectsPage = () => {
 
     const selectedBatch = useMemo(() => batches.find(b => b._id === selectedBatchId) || null, [batches, selectedBatchId]);
 
+    const mappingSubjects = useMemo(() => {
+        const suggestionSet = new Set((classSuggestions || []).map(s => String(s).toLowerCase()));
+        const selectedIds = new Set(Array.from(assignedSubjectIds));
+
+        const suggestedSubjects = allSubjects.filter(subject => suggestionSet.has(String(subject.name || '').toLowerCase()));
+        const selectedSubjects = allSubjects.filter(subject => selectedIds.has(String(subject._id)));
+
+        const merged = [...suggestedSubjects];
+        selectedSubjects.forEach((subject) => {
+            if (!merged.some((item) => String(item._id) === String(subject._id))) {
+                merged.push(subject);
+            }
+        });
+
+        return merged;
+    }, [allSubjects, classSuggestions, assignedSubjectIds]);
+
     // When a batch is selected, prepopulate its assigned subjects
     useEffect(() => {
         if (selectedBatch) {
             const initialIds = new Set(selectedBatch.subjectIds?.map(id => String(id)) || []);
             setAssignedSubjectIds(initialIds);
+
+            if (selectedBatch.course) {
+                apiClient.get(`/batches/courses/${encodeURIComponent(selectedBatch.course)}/subjects`)
+                    .then(({ data }) => setClassSuggestions([...(data.subjects || [])]))
+                    .catch(() => setClassSuggestions([]));
+            } else {
+                setClassSuggestions([]);
+            }
         } else {
             setAssignedSubjectIds(new Set());
+            setClassSuggestions([]);
         }
     }, [selectedBatch]);
 
@@ -68,6 +97,66 @@ const SubjectsPage = () => {
             }
             return newSet;
         });
+    };
+
+    const computeSubjectNamesFromIds = (subjectIdsSet) => {
+        const ids = Array.from(subjectIdsSet);
+        return allSubjects
+            .filter(s => ids.includes(String(s._id)))
+            .map(s => s.name);
+    };
+
+    const syncBatchMappingInState = (batchId, nextIdsSet) => {
+        const nextIds = Array.from(nextIdsSet);
+        const nextNames = computeSubjectNamesFromIds(nextIdsSet);
+
+        setBatches(prev => prev.map(batch => (
+            batch._id === batchId
+                ? { ...batch, subjectIds: nextIds, subjects: nextNames }
+                : batch
+        )));
+    };
+
+    const requestRemoveSubject = (subjectId, subjectName) => {
+        setRemovePrompt({ open: true, subjectId, subjectName });
+    };
+
+    const closeRemovePrompt = () => {
+        if (loading.remove) return;
+        setRemovePrompt({ open: false, subjectId: '', subjectName: '' });
+    };
+
+    const handleRemoveSubject = async () => {
+        if (!selectedBatchId || !removePrompt.subjectId) return;
+
+        const subjectId = removePrompt.subjectId;
+        const subjectName = removePrompt.subjectName;
+
+        const previousSet = new Set(assignedSubjectIds);
+        if (!previousSet.has(subjectId)) return;
+
+        const nextSet = new Set(previousSet);
+        nextSet.delete(subjectId);
+
+        // Optimistic UI update for instant feedback.
+        setLoading(prev => ({ ...prev, remove: true }));
+        setAssignedSubjectIds(nextSet);
+        syncBatchMappingInState(selectedBatchId, nextSet);
+
+        try {
+            const subjectIdsArray = Array.from(nextSet);
+            const subjectsArray = computeSubjectNamesFromIds(nextSet);
+            await updateBatchSubjects(selectedBatchId, subjectIdsArray, subjectsArray);
+            pushFlash('success', `Removed ${subjectName} from batch mapping.`);
+            closeRemovePrompt();
+        } catch (error) {
+            // Roll back optimistic update if persistence fails.
+            setAssignedSubjectIds(previousSet);
+            syncBatchMappingInState(selectedBatchId, previousSet);
+            pushFlash('error', error.response?.data?.message || 'Failed to remove subject mapping.');
+        } finally {
+            setLoading(prev => ({ ...prev, remove: false }));
+        }
     };
 
     const handleSaveAssignments = async () => {
@@ -98,9 +187,18 @@ const SubjectsPage = () => {
 
     const handleCreateSubject = async (e) => {
         e.preventDefault();
+
+        if (!selectedBatchId) {
+            pushFlash('error', 'Please select a batch before creating a subject.');
+            return;
+        }
+
         try {
             setLoading(prev => ({ ...prev, create: true }));
-            const res = await createSubject(newSubject);
+            const res = await createSubject({
+                ...newSubject,
+                batchId: selectedBatchId
+            });
 
             pushFlash('success', 'Subject created successfully.');
 
@@ -168,19 +266,27 @@ const SubjectsPage = () => {
                                 {selectedBatchId ? (
                                     <div className="animate-in fade-in duration-300">
                                         <div className="flex justify-between items-center mb-4">
-                                            <h3 className="text-sm font-bold text-slate-800">Available Subjects</h3>
+                                            <h3 className="text-sm font-bold text-slate-800">Class-Based Subject Suggestions</h3>
                                             <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
                                                 {assignedSubjectIds.size} Selected
                                             </span>
                                         </div>
 
+                                        <p className="mb-4 text-xs font-medium text-slate-500">
+                                            Showing suggestions relevant to <span className="font-bold">{selectedBatch?.course || 'selected class'}</span>. Subjects are not auto-added; click to choose.
+                                        </p>
+
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-6 max-h-[400px] overflow-y-auto p-1">
-                                            {allSubjects.map(subject => {
+                                            {mappingSubjects.map(subject => {
                                                 const isSelected = assignedSubjectIds.has(String(subject._id));
                                                 return (
                                                     <div
                                                         key={subject._id}
-                                                        onClick={() => handleToggleSubject(String(subject._id))}
+                                                        onClick={() => {
+                                                            if (!isSelected) {
+                                                                handleToggleSubject(String(subject._id));
+                                                            }
+                                                        }}
                                                         className={`cursor-pointer border rounded-lg p-3 transition-all duration-200 ${isSelected
                                                                 ? 'border-indigo-500 bg-indigo-50 shadow-sm'
                                                                 : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
@@ -198,12 +304,41 @@ const SubjectsPage = () => {
                                                     </div>
                                                 );
                                             })}
-                                            {allSubjects.length === 0 && (
+                                            {mappingSubjects.length === 0 && (
                                                 <div className="col-span-full py-8 text-center text-sm font-medium text-slate-500 border-2 border-dashed border-slate-200 rounded-lg">
-                                                    No subjects available in the system yet.
+                                                    No class-based suggestions available for this batch course.
                                                 </div>
                                             )}
                                         </div>
+
+                                        {assignedSubjectIds.size > 0 && (
+                                            <div className="mb-6 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                                <div className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-slate-500">Selected Subjects</div>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {allSubjects
+                                                        .filter(subject => assignedSubjectIds.has(String(subject._id)))
+                                                        .map(subject => (
+                                                            <div
+                                                                key={`selected-${subject._id}`}
+                                                                className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700"
+                                                            >
+                                                                <span>{subject.name}</span>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        requestRemoveSubject(String(subject._id), subject.name);
+                                                                    }}
+                                                                    className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100"
+                                                                    title={`Remove ${subject.name} from this batch`}
+                                                                >
+                                                                    <X size={12} />
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                </div>
+                                            </div>
+                                        )}
 
                                         <div className="pt-5 border-t border-slate-100 flex justify-end">
                                             <button
@@ -282,6 +417,63 @@ const SubjectsPage = () => {
                     </div>
                 )}
             </div>
+
+            {removePrompt.open && (
+                <div
+                    className="fixed inset-0 z-[1100] bg-slate-900/50 backdrop-blur-[2px] flex items-center justify-center p-4"
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) closeRemovePrompt();
+                    }}
+                >
+                    <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+                        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-lg bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center">
+                                    <AlertTriangle size={18} />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-black text-slate-900">Remove Subject Mapping</h3>
+                                    <p className="text-xs text-slate-500">This action updates only the selected batch mapping.</p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                className="w-7 h-7 rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 flex items-center justify-center"
+                                onClick={closeRemovePrompt}
+                                disabled={loading.remove}
+                            >
+                                <X size={14} />
+                            </button>
+                        </div>
+
+                        <div className="px-5 py-4 text-sm text-slate-700">
+                            Are you sure you want to remove
+                            <span className="font-black text-slate-900"> {removePrompt.subjectName} </span>
+                            from this batch?
+                        </div>
+
+                        <div className="px-5 py-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-2">
+                            <button
+                                type="button"
+                                className="px-3 py-2 text-xs font-bold rounded-md border border-slate-200 text-slate-600 hover:bg-white"
+                                onClick={closeRemovePrompt}
+                                disabled={loading.remove}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                className="px-3 py-2 text-xs font-black rounded-md border border-rose-600 bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-60 inline-flex items-center gap-2"
+                                onClick={handleRemoveSubject}
+                                disabled={loading.remove}
+                            >
+                                {loading.remove ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />}
+                                Remove
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </ERPLayout>
     );
 };

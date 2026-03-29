@@ -33,7 +33,19 @@ const EMPTY_FORM = {
     name: '', course: '', capacity: 30, subjects: [],
     classroom: '', schedule: [], fees: '',
     startDate: '', endDate: '',
+    hasChapterPlanning: false,
+    subjectPlans: {},
     schedulerConfig: { daysCount: 6, timings: ['09:00', '10:00', '11:00'] }
+};
+
+const toDateInputValue = (value) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 };
 
 // ══════════════════════════════════════════════════════════════
@@ -257,6 +269,8 @@ const BatchesPage = () => {
     // ── Form state ───────────────────────────────────────────
     const [form, setForm] = useState(EMPTY_FORM);
 
+    const availableSubjects = [...new Set([...(subjects || []), ...(form.subjects || [])])];
+
     // ── Password modal (for updates) ─────────────────────────
     const [showPwdModal, setShowPwdModal] = useState(false);
     const [pwdLoading, setPwdLoading] = useState(false);
@@ -315,20 +329,23 @@ const BatchesPage = () => {
     useEffect(() => { const t = setTimeout(() => { setPage(1); loadBatches(); }, 400); return () => clearTimeout(t); }, [search]);
     useEffect(() => { setPage(1); }, [filterCourse]);
 
-    // ── Load all subjects ────────────────────────────────────
+    // ── Load only subjects mapped for the selected batch ────
     useEffect(() => {
+        if (!editingBatch?._id) {
+            setSubjects([]);
+            return;
+        }
+
         setSubjLoading(true);
-        getSubjects({ activeOnly: true })
+        getSubjects({ activeOnly: true, batchId: editingBatch._id })
             .then(({ data }) => {
-                const subjectNames = (data.subjects || []).map(s => s.name);
-                setSubjects(subjectNames);
-                if (subjectNames.length > 0 && !activeSubject) {
-                    setActiveSubject(subjectNames[0]);
-                }
+                const suggestionNames = [...new Set((data.subjects || []).map((s) => s.name).filter(Boolean))];
+                setSubjects(suggestionNames);
+                setActiveSubject(prev => (prev && suggestionNames.includes(prev) ? prev : (suggestionNames[0] || null)));
             })
             .catch(() => setSubjects([]))
             .finally(() => setSubjLoading(false));
-    }, []);
+    }, [editingBatch?._id]);
 
     // ── Load occupancy when classroom changes ────────────────
     useEffect(() => {
@@ -345,7 +362,6 @@ const BatchesPage = () => {
     const openCreate = () => {
         setForm(EMPTY_FORM);
         setEditingBatch(null);
-        setSubjects([]);
         setOccupancy({});
         setModalMode('create');
         setShowModal(true);
@@ -361,10 +377,26 @@ const BatchesPage = () => {
             schedule: Array.isArray(batch.schedule) ? batch.schedule : [],
             fees: batch.fees || '',
             teacher: batch.teacher || '',
-            startDate: batch.startDate ? new Date(batch.startDate).toISOString().split('T')[0] : '',
-            endDate: batch.endDate ? new Date(batch.endDate).toISOString().split('T')[0] : '',
+            startDate: toDateInputValue(batch.startDate),
+            endDate: toDateInputValue(batch.endDate),
+            hasChapterPlanning: Boolean(batch.hasChapterPlanning),
+            subjectPlans: {},
             schedulerConfig: batch.schedulerConfig || { daysCount: 6, timings: ['09:00', '10:00', '11:00'] }
         });
+
+        getSubjects({ activeOnly: false, batchId: batch._id })
+            .then(({ data }) => {
+                const planMap = (data.subjects || []).reduce((acc, item) => {
+                    if (item?.name) {
+                        acc[item.name] = Number.isFinite(Number(item.totalChapters)) ? Number(item.totalChapters) : '';
+                    }
+                    return acc;
+                }, {});
+
+                setForm((prev) => ({ ...prev, subjectPlans: planMap }));
+            })
+            .catch(() => { });
+
         setEditingBatch(batch);
         setModalMode('edit');
         setShowModal(true);
@@ -378,7 +410,13 @@ const BatchesPage = () => {
             ...f,
             subjects: f.subjects.includes(sub)
                 ? f.subjects.filter(s => s !== sub)
-                : [...f.subjects, sub]
+                : [...f.subjects, sub],
+            subjectPlans: f.subjects.includes(sub)
+                ? Object.fromEntries(Object.entries(f.subjectPlans || {}).filter(([key]) => key !== sub))
+                : {
+                    ...(f.subjectPlans || {}),
+                    [sub]: Object.prototype.hasOwnProperty.call(f.subjectPlans || {}, sub) ? f.subjectPlans[sub] : ''
+                }
         }));
     };
 
@@ -400,7 +438,19 @@ const BatchesPage = () => {
     const handleCreate = async () => {
         setFormSaving(true);
         try {
-            const { schedulerConfig, ...payload } = form;
+            const { schedulerConfig, ...rawPayload } = form;
+            const subjectPlans = rawPayload.hasChapterPlanning
+                ? (rawPayload.subjects || []).map((name) => ({
+                    name,
+                    totalChapters: Number(rawPayload.subjectPlans?.[name]) || 0
+                }))
+                : [];
+            const payload = {
+                ...rawPayload,
+                subjectPlans,
+                startDate: rawPayload.startDate || null,
+                endDate: rawPayload.endDate || null
+            };
             await apiClient.post('/batches', payload);
             toast.success(`Batch "${form.name}" created successfully!`);
             closeModal();
@@ -412,7 +462,19 @@ const BatchesPage = () => {
 
     // ── Save (UPDATE) — open password modal first ─────────────
     const handleUpdateIntent = () => {
-        const { schedulerConfig, ...payload } = form;
+        const { schedulerConfig, ...rawPayload } = form;
+        const subjectPlans = rawPayload.hasChapterPlanning
+            ? (rawPayload.subjects || []).map((name) => ({
+                name,
+                totalChapters: Number(rawPayload.subjectPlans?.[name]) || 0
+            }))
+            : [];
+        const payload = {
+            ...rawPayload,
+            subjectPlans,
+            startDate: rawPayload.startDate || null,
+            endDate: rawPayload.endDate || null
+        };
         pendingFormRef.current = payload;
         setPwdError('');
         setShowPwdModal(true);
@@ -812,6 +874,20 @@ const BatchesPage = () => {
                                         </div>
                                     </div>
 
+                                    <div style={{ marginBottom: 24, padding: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8 }}>
+                                        <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
+                                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Has Chapter Planning</span>
+                                            <input
+                                                type="checkbox"
+                                                checked={Boolean(form.hasChapterPlanning)}
+                                                onChange={(e) => setForm((f) => ({ ...f, hasChapterPlanning: e.target.checked }))}
+                                            />
+                                        </label>
+                                        <p style={{ margin: '8px 0 0 0', fontSize: '0.75rem', color: '#64748b' }}>
+                                            Enable this to set total chapters per subject and unlock chapter analytics.
+                                        </p>
+                                    </div>
+
                                     {/* ── Subject Selection ── */}
                                     <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
                                         Subject Assignment
@@ -823,17 +899,20 @@ const BatchesPage = () => {
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#64748b', fontSize: '0.85rem' }}>
                                                 <Loader2 size={16} className="spin" /> Loading subjects…
                                             </div>
-                                        ) : subjects.length === 0 ? (
+                                        ) : availableSubjects.length === 0 ? (
                                             <div style={{ fontSize: '0.85rem', color: '#94a3b8', padding: '16px', background: '#f8fafc', borderRadius: 6, textAlign: 'center' }}>
-                                                No active subjects defined in the system. Go to the Subjects tab to create some.
+                                                No class-based subject suggestions available for this course.
                                             </div>
                                         ) : (
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                                                 {/* 1. Subjects available */}
                                                 <div>
-                                                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', display: 'block', marginBottom: 8, textTransform: 'uppercase' }}>Select Subjects for Batch</label>
+                                                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', display: 'block', marginBottom: 8, textTransform: 'uppercase' }}>Mapped Batch Subjects</label>
+                                                    <p style={{ margin: '0 0 10px 0', fontSize: '0.72rem', color: '#64748b' }}>
+                                                        Suggestions only. Showing only subjects mapped for this batch.
+                                                    </p>
                                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                                                        {subjects.map(sub => {
+                                                        {availableSubjects.map(sub => {
                                                             const isAdded = form.subjects.includes(sub);
                                                             return (
                                                                 <button key={sub} type="button" onClick={() => toggleSubject(sub)}
@@ -878,6 +957,36 @@ const BatchesPage = () => {
                                         )}
                                     </div>
 
+                                    {form.hasChapterPlanning && form.subjects.length > 0 && (
+                                        <div style={{ marginBottom: 30 }}>
+                                            <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>
+                                                Subject Chapter Planning
+                                            </div>
+                                            <div style={{ display: 'grid', gap: 10 }}>
+                                                {form.subjects.map((subjectName) => (
+                                                    <div key={subjectName} style={{ display: 'grid', gridTemplateColumns: '1fr 180px', gap: 12, alignItems: 'center' }}>
+                                                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>{subjectName}</div>
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            className="erp-input"
+                                                            style={{ width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: 8, fontSize: '0.85rem' }}
+                                                            placeholder="Total chapters"
+                                                            value={form.subjectPlans?.[subjectName] ?? ''}
+                                                            onChange={(e) => setForm((f) => ({
+                                                                ...f,
+                                                                subjectPlans: {
+                                                                    ...(f.subjectPlans || {}),
+                                                                    [subjectName]: e.target.value
+                                                                }
+                                                            }))}
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {/* ── Classroom & Timetable Section ── */}
                                     <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
                                         Classroom & Timetable
@@ -921,7 +1030,7 @@ const BatchesPage = () => {
                                                 </p>
                                             </div>
 
-                                            {subjects.length > 0 && (
+                                            {availableSubjects.length > 0 && (
                                                 <div style={{ marginTop: 12, padding: '8px 12px', background: '#eef2ff', borderRadius: 6, border: '1px solid #e0e7ff', display: 'flex', alignItems: 'center', gap: 8 }}>
                                                     <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#4f46e5' }} />
                                                     <p style={{ margin: 0, fontSize: '0.7rem', color: '#4338ca', fontWeight: 600 }}>

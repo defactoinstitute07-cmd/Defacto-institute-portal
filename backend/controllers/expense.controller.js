@@ -30,7 +30,7 @@ exports.createExpense = async (req, res) => {
             expense
         });
     } catch (error) {
-        console.error('Error creating expense:', error);
+        console.error('Error creating expense');
         res.status(500).json({ success: false, message: 'Server Error', error: error.message });
     }
 };
@@ -85,7 +85,7 @@ exports.getExpenses = async (req, res) => {
             expenses
         });
     } catch (error) {
-        console.error('Error fetching expenses:', error);
+        console.error('Error fetching expenses');
         res.status(500).json({ success: false, message: 'Server Error' });
     }
 };
@@ -113,7 +113,7 @@ exports.updateExpense = async (req, res) => {
             expense
         });
     } catch (error) {
-        console.error('Error updating expense:', error);
+        console.error('Error updating expense');
         res.status(500).json({ success: false, message: 'Server Error', error: error.message });
     }
 };
@@ -136,7 +136,7 @@ exports.deleteExpense = async (req, res) => {
             message: 'Expense deleted successfully'
         });
     } catch (error) {
-        console.error('Error deleting expense:', error);
+        console.error('Error deleting expense');
         res.status(500).json({ success: false, message: 'Server Error' });
     }
 };
@@ -159,7 +159,7 @@ exports.markExpensePaid = async (req, res) => {
             expense
         });
     } catch (error) {
-        console.error('Error marking expense as paid:', error);
+        console.error('Error marking expense as paid');
         res.status(500).json({ success: false, message: 'Server Error', error: error.message });
     }
 };
@@ -210,7 +210,7 @@ exports.getExpenseMetrics = async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('Error fetching expense metrics:', error);
+        console.error('Error fetching expense metrics');
         res.status(500).json({ success: false, message: 'Server Error' });
     }
 };

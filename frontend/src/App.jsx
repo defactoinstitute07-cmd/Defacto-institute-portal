@@ -13,6 +13,7 @@ import TeacherPayrollDashboard from './pages/TeacherPayrollDashboard';
 import { API_BASE_URL } from './api/apiConfig';
 import AnalyticsPage from './pages/AnalyticsPage';
 import BatchDetailsPage from './pages/BatchDetailsPage';
+import BatchSubjectDetailsPage from './pages/BatchSubjectDetailsPage';
 import StudentProfilePage from './pages/StudentProfilePage';
 import SettingsPage from './pages/SettingsPage';
 import ExamsPage from './pages/ExamsPage';
@@ -104,6 +105,7 @@ function App() {
                 <Route path="/fees" element={<ProtectedRoute allowedRoles={['admin']}><FeesPage /></ProtectedRoute>} />
                 <Route path="/batches" element={<ProtectedRoute allowedRoles={['admin']}><BatchesPage /></ProtectedRoute>} />
                 <Route path="/batches/:id" element={<ProtectedRoute allowedRoles={['admin']}><BatchDetailsPage /></ProtectedRoute>} />
+                <Route path="/batches/:id/subjects/:subjectName" element={<ProtectedRoute allowedRoles={['admin']}><BatchSubjectDetailsPage /></ProtectedRoute>} />
                 <Route path="/teachers" element={<ProtectedRoute allowedRoles={['admin']}><TeachersPage /></ProtectedRoute>} />
                 <Route path="/payroll" element={<ProtectedRoute allowedRoles={['admin']}><TeacherPayrollDashboard /></ProtectedRoute>} />
                 <Route path="/expenses" element={<ProtectedRoute allowedRoles={['admin']}><ExpensesPage /></ProtectedRoute>} />

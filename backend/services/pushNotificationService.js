@@ -31,7 +31,7 @@ const cleanupFailedTokens = async ({ failedTokens = [], studentId, recipientType
  * Supports individual tokens, multicast, and topics.
  */
 const sendPushNotification = async (payload) => {
-    console.log('[PushService] Attempting to send notification:', JSON.stringify(payload, null, 2));
+    console.log('[PushService] Attempting to send notification');
 
     const { student, message, title, type, data = {}, topic = null, recipientType = 'student' } = payload;
 
@@ -87,9 +87,8 @@ const sendPushNotification = async (payload) => {
                 android: androidConfig,
                 apns: apnsConfig
             };
-            console.log('[PushService] Sending to topic payload:', JSON.stringify(topicPayload, null, 2));
             const response = await messaging.send(topicPayload);
-            console.log('[PushService] Topic send response:', JSON.stringify(response, null, 2));
+            console.log('[PushService] Topic notification sent');
             return {
                 status: 'sent',
                 providerMessageId: response,
@@ -102,7 +101,7 @@ const sendPushNotification = async (payload) => {
         const tokens = Array.from(new Set((student?.deviceTokens || []).filter(token => typeof token === 'string' && token.length > 10)));
 
         if (tokens.length === 0) {
-            console.warn('[PushService] No valid device tokens found for student:', student?._id);
+            console.warn('[PushService] No valid device tokens found for recipient');
             return {
                 status: 'failed',
                 error: 'No valid device tokens.',
@@ -162,7 +161,7 @@ const sendPushNotification = async (payload) => {
         };
 
     } catch (error) {
-        console.error('[PushNotificationService] FCM Error:', error);
+        console.error('[PushNotificationService] FCM Error');
 
         if (looksLikeInvalidTokenError(error)) {
             const tokens = Array.from(new Set((student?.deviceTokens || []).filter(token => typeof token === 'string' && token.length > 10)));
@@ -195,7 +194,7 @@ const subscribeToTopic = async (tokens, topic) => {
         const response = await messaging.subscribeToTopic(tokens, topic);
         return response;
     } catch (error) {
-        console.error(`[PushNotificationService] Topic Subscription Error (${topic}):`, error);
+        console.error('[PushNotificationService] Topic Subscription Error');
         throw error;
     }
 };

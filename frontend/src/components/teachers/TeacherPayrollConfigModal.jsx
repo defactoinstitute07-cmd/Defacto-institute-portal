@@ -123,6 +123,9 @@ const TeacherPayrollConfigModal = ({ teacher, onClose, onSave, toast }) => {
     const [formData, setFormData] = useState({
         salaryType: 'Monthly',
         baseSalary: 0,
+        includeBonus: false,
+        bonusType: 'Optional',
+        bonusAmount: 0,
         status: 'Active',
         bankDetails: {
             accountName: '',
@@ -135,6 +138,8 @@ const TeacherPayrollConfigModal = ({ teacher, onClose, onSave, toast }) => {
 
     const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
     const [currentMonthSalary, setCurrentMonthSalary] = useState(null);
+    const [showGenerateAuth, setShowGenerateAuth] = useState(false);
+    const [generateAdminPassword, setGenerateAdminPassword] = useState('');
 
     useEffect(() => {
         if (!teacher) return;
@@ -164,16 +169,26 @@ const TeacherPayrollConfigModal = ({ teacher, onClose, onSave, toast }) => {
     const [generating, setGenerating] = useState(false);
 
     const handleGenerate = async () => {
+        if (!generateAdminPassword.trim()) {
+            toast.error('Admin password is required to generate salary');
+            return;
+        }
         const monthYear = selectedMonth;
         setGenerating(true);
         try {
-            await apiClient.post('/payroll/bulk-generate', { ids: [teacher._id], monthYear });
+            await apiClient.post('/payroll/bulk-generate', {
+                ids: [teacher._id],
+                monthYear,
+                adminPassword: generateAdminPassword
+            });
             toast.success('Salary record generated successfully!');
             // Refresh salary status
             const salariesRes = await apiClient.get(`/payroll/salaries?monthYear=${monthYear}`);
             const salaries = salariesRes?.data || [];
             const found = salaries.find(s => s.teacherId?._id === teacher._id || s.teacherId === teacher._id);
             setCurrentMonthSalary(found || false);
+            setShowGenerateAuth(false);
+            setGenerateAdminPassword('');
             if (onSave) onSave();
         } catch (e) {
             toast.error(e.response?.data?.message || 'Failed to generate salary');
@@ -184,9 +199,21 @@ const TeacherPayrollConfigModal = ({ teacher, onClose, onSave, toast }) => {
 
     const handleProfileSubmit = async (e) => {
         e.preventDefault();
+        if (Number(formData.baseSalary) < 0) {
+            toast.error('Base salary cannot be negative');
+            return;
+        }
+        if (formData.includeBonus && Number(formData.bonusAmount) < 0) {
+            toast.error('Bonus amount cannot be negative');
+            return;
+        }
         setSaving(true);
         try {
-            await apiClient.post(`/payroll/profile/${teacher._id}`, formData);
+            await apiClient.post(`/payroll/profile/${teacher._id}`, {
+                ...formData,
+                baseSalary: Number(formData.baseSalary || 0),
+                bonusAmount: formData.includeBonus ? Number(formData.bonusAmount || 0) : 0
+            });
             toast.success('Payroll profile saved successfully!');
             onSave(); // Optional callback to refresh parent list
             onClose();
@@ -295,7 +322,10 @@ const TeacherPayrollConfigModal = ({ teacher, onClose, onSave, toast }) => {
 
                             <CurrentMonthBanner
                                 salary={currentMonthSalary}
-                                onGenerate={handleGenerate}
+                                onGenerate={() => {
+                                    setGenerateAdminPassword('');
+                                    setShowGenerateAuth(true);
+                                }}
                                 generating={generating}
                                 selectedMonth={selectedMonth}
                             />
@@ -348,6 +378,68 @@ const TeacherPayrollConfigModal = ({ teacher, onClose, onSave, toast }) => {
                                         onChange={e => setFormData({ ...formData, baseSalary: Number(e.target.value) })}
                                     />
                                 </div>
+                            </div>
+
+                            <SectionDivider label="Bonus Configuration" color="#0f766e" icon={IndianRupee} />
+
+                            <div style={{
+                                border: `1.5px solid ${borderColor}`,
+                                borderRadius: sharpRadius,
+                                padding: '16px',
+                                background: '#f8fafc',
+                                marginBottom: 40
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.78rem', fontWeight: 900, color: labelColor, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                        <Banknote size={14} /> Include Bonus In Payroll
+                                    </label>
+                                    <input
+                                        type="checkbox"
+                                        checked={Boolean(formData.includeBonus)}
+                                        onChange={e => setFormData({ ...formData, includeBonus: e.target.checked })}
+                                        style={{ width: 18, height: 18, accentColor: 'var(--erp-primary)', cursor: 'pointer' }}
+                                    />
+                                </div>
+
+                                {formData.includeBonus && (
+                                    <div className="mf-row" style={{ marginBottom: 0 }}>
+                                        <div className="mf" style={{ flex: 1 }}>
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', fontWeight: 900, color: labelColor }}>
+                                                BONUS TYPE
+                                            </label>
+                                            <select
+                                                style={{ borderRadius: sharpRadius, padding: '10px 12px', border: `1.5px solid ${borderColor}`, fontWeight: 700, background: '#fff' }}
+                                                value={formData.bonusType}
+                                                onChange={e => setFormData({ ...formData, bonusType: e.target.value })}
+                                            >
+                                                <option value="Fixed">Fixed Monthly Bonus</option>
+                                                <option value="Optional">Optional Bonus</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="mf" style={{ flex: 1 }}>
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.7rem', fontWeight: 900, color: labelColor }}>
+                                                BONUS AMOUNT (₹)
+                                            </label>
+                                            <div style={{ position: 'relative' }}>
+                                                <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontWeight: 900, color: '#94a3b8' }}>₹</span>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    step="1"
+                                                    style={{ borderRadius: sharpRadius, padding: '10px 12px 10px 28px', border: `1.5px solid ${borderColor}`, fontWeight: 800, background: '#fff' }}
+                                                    placeholder="e.g. 2500"
+                                                    value={formData.bonusAmount}
+                                                    onChange={e => setFormData({ ...formData, bonusAmount: Number(e.target.value) })}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <p style={{ margin: '10px 0 0 0', fontSize: '0.73rem', color: '#64748b', fontWeight: 600 }}>
+                                    Bonus value is added to monthly salary generation and reflected in payout calculations.
+                                </p>
                             </div>
 
                             {/* --- BANK DETAILS --- */}
@@ -425,6 +517,112 @@ const TeacherPayrollConfigModal = ({ teacher, onClose, onSave, toast }) => {
                         </form>
                     </div>
                 </div>
+
+                {showGenerateAuth && (
+                    <div style={{
+                        position: 'absolute',
+                        inset: 0,
+                        background: 'rgba(15, 23, 42, 0.65)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 5,
+                        padding: '20px'
+                    }} onClick={(e) => {
+                        if (e.target === e.currentTarget && !generating) {
+                            setShowGenerateAuth(false);
+                            setGenerateAdminPassword('');
+                        }
+                    }}>
+                        <div style={{
+                            width: '100%',
+                            maxWidth: 420,
+                            background: '#fff',
+                            borderRadius: '10px',
+                            border: `1px solid ${borderColor}`,
+                            boxShadow: '0 20px 40px rgba(2, 6, 23, 0.25)',
+                            overflow: 'hidden'
+                        }}>
+                            <div style={{ padding: '16px 18px', borderBottom: `1px solid ${borderColor}` }}>
+                                <div style={{ fontSize: '0.95rem', fontWeight: 900, color: headingColor }}>Confirm Salary Generation</div>
+                                <div style={{ marginTop: 4, fontSize: '0.76rem', fontWeight: 600, color: '#64748b' }}>
+                                    Enter admin password to generate salary for {new Date(selectedMonth + '-01').toLocaleString('default', { month: 'long', year: 'numeric' })}.
+                                </div>
+                            </div>
+
+                            <div style={{ padding: '16px 18px' }}>
+                                <label style={{ display: 'block', marginBottom: 8, fontSize: '0.7rem', fontWeight: 900, color: labelColor, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    Admin Password
+                                </label>
+                                <input
+                                    type="password"
+                                    value={generateAdminPassword}
+                                    onChange={(e) => setGenerateAdminPassword(e.target.value)}
+                                    placeholder="Required for this action"
+                                    style={{
+                                        width: '100%',
+                                        borderRadius: sharpRadius,
+                                        padding: '12px',
+                                        border: `1.5px solid ${borderColor}`,
+                                        fontWeight: 700,
+                                        fontSize: '0.9rem'
+                                    }}
+                                />
+                            </div>
+
+                            <div style={{
+                                padding: '14px 18px',
+                                borderTop: `1px solid ${borderColor}`,
+                                background: '#f8fafc',
+                                display: 'flex',
+                                gap: 10,
+                                justifyContent: 'flex-end'
+                            }}>
+                                <button
+                                    type="button"
+                                    disabled={generating}
+                                    onClick={() => {
+                                        setShowGenerateAuth(false);
+                                        setGenerateAdminPassword('');
+                                    }}
+                                    style={{
+                                        borderRadius: sharpRadius,
+                                        border: `1px solid ${borderColor}`,
+                                        background: '#fff',
+                                        color: '#475569',
+                                        fontWeight: 800,
+                                        fontSize: '0.75rem',
+                                        padding: '9px 14px',
+                                        cursor: generating ? 'not-allowed' : 'pointer'
+                                    }}
+                                >
+                                    CANCEL
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={generating}
+                                    onClick={handleGenerate}
+                                    style={{
+                                        borderRadius: sharpRadius,
+                                        border: 'none',
+                                        background: primaryColor,
+                                        color: '#fff',
+                                        fontWeight: 900,
+                                        fontSize: '0.75rem',
+                                        padding: '9px 14px',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 8,
+                                        cursor: generating ? 'not-allowed' : 'pointer'
+                                    }}
+                                >
+                                    {generating ? <Loader2 size={14} className="spin" /> : <ShieldCheck size={14} />}
+                                    CONFIRM GENERATE
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

@@ -7,7 +7,7 @@ const decodePrivateKeyFromBase64 = (value) => {
     try {
         return Buffer.from(String(value || ''), 'base64').toString('utf8');
     } catch (error) {
-        console.error('[Firebase] Failed to decode FIREBASE_PRIVATE_KEY_BASE64:', error.message);
+        console.error('[Firebase] Failed to decode FIREBASE_PRIVATE_KEY_BASE64');
         return '';
     }
 };
@@ -81,30 +81,51 @@ try {
         }
     }
 } catch (error) {
-    console.error('[Firebase] Initialization error:', error.message);
+    console.error('[Firebase] Initialization error');
 }
 
-const messaging = firebaseApp ? firebaseApp.messaging() : {
-    send: (payload) => {
-        console.log('[FCM-Simulator] Send Payload:', JSON.stringify(payload, null, 2));
-        return Promise.resolve('simulated-message-id');
-    },
-    sendEach: (payloads) => {
-        console.log('[FCM-Simulator] SendBatch Payload count:', payloads.length);
-        return Promise.resolve({ successCount: payloads.length, failureCount: 0, responses: [] });
-    },
-    sendEachForMulticast: (payload) => {
-        console.log('[FCM-Simulator] SendMulticast Tokens count:', payload.tokens.length);
-        return Promise.resolve({ successCount: payload.tokens.length, failureCount: 0, responses: payload.tokens.map(() => ({ success: true })) });
-    },
-    subscribeToTopic: (tokens, topic) => {
-        console.log(`[FCM-Simulator] Subscribing ${tokens.length} tokens to topic: ${topic}`);
-        return Promise.resolve({ successCount: tokens.length, failureCount: 0, errors: [] });
-    },
-    unsubscribeFromTopic: (tokens, topic) => {
-        console.log(`[FCM-Simulator] Unsubscribing ${tokens.length} tokens from topic: ${topic}`);
-        return Promise.resolve({ successCount: tokens.length, failureCount: 0, errors: [] });
+const createMessagingFallback = () => {
+    const isProduction = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
+    const baseError = new Error('Firebase messaging is not configured. Set FIREBASE_* env vars or FIREBASE_SERVICE_ACCOUNT.');
+    baseError.code = 'messaging/configuration-error';
+
+    const rejectInProduction = () => Promise.reject(baseError);
+
+    if (isProduction) {
+        return {
+            send: rejectInProduction,
+            sendEach: rejectInProduction,
+            sendEachForMulticast: rejectInProduction,
+            subscribeToTopic: rejectInProduction,
+            unsubscribeFromTopic: rejectInProduction
+        };
     }
+
+    // Keep simulator behavior only for non-production development environments.
+    return {
+        send: (payload) => {
+            console.log('[FCM-Simulator] Send invoked');
+            return Promise.resolve('simulated-message-id');
+        },
+        sendEach: (payloads) => {
+            console.log('[FCM-Simulator] SendBatch Payload count:', payloads.length);
+            return Promise.resolve({ successCount: payloads.length, failureCount: 0, responses: [] });
+        },
+        sendEachForMulticast: (payload) => {
+            console.log('[FCM-Simulator] SendMulticast Tokens count:', payload.tokens.length);
+            return Promise.resolve({ successCount: payload.tokens.length, failureCount: 0, responses: payload.tokens.map(() => ({ success: true })) });
+        },
+        subscribeToTopic: (tokens, topic) => {
+            console.log(`[FCM-Simulator] Subscribing ${tokens.length} tokens to topic: ${topic}`);
+            return Promise.resolve({ successCount: tokens.length, failureCount: 0, errors: [] });
+        },
+        unsubscribeFromTopic: (tokens, topic) => {
+            console.log(`[FCM-Simulator] Unsubscribing ${tokens.length} tokens from topic: ${topic}`);
+            return Promise.resolve({ successCount: tokens.length, failureCount: 0, errors: [] });
+        }
+    };
 };
+
+const messaging = firebaseApp ? firebaseApp.messaging() : createMessagingFallback();
 
 module.exports = { admin, messaging };

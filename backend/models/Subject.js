@@ -18,6 +18,11 @@ const subjectSchema = new mongoose.Schema({
         required: true,
         index: true
     },
+    totalChapters: {
+        type: Number,
+        default: null,
+        min: 0
+    },
     isActive: {
         type: Boolean,
         default: true,

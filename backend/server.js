@@ -59,10 +59,7 @@ const allowedOrigins = [
 ].filter(Boolean);
 
 // Log start-up diagnostics
-console.log('--- Server Startup Internal Diagnostics ---');
-console.log('ALLOWED_ORIGINS:', allowedOrigins);
-console.log('MONGODB_URI configured:', !!process.env.MONGODB_URI);
-console.log('-------------------------------------------');
+console.log('Server startup checks completed');
 
 app.use(cors({
     origin: function (origin, callback) {
@@ -104,7 +101,7 @@ app.use((req, res, next) => {
         if (req.query) cleanObj(req.query);
         if (req.params) cleanObj(req.params);
     } catch (err) {
-        console.error("CleanObj Error", err);
+        console.error('CleanObj Error');
     }
     next();
 });
@@ -170,7 +167,7 @@ connectDB()
         require('./controllers/template.controller').seedDefaults();
     })
     .catch((error) => {
-        console.error('❌ CRITICAL: MongoDB initialization failed:', error.message);
+        console.error('CRITICAL: MongoDB initialization failed');
     });
 
 // 404 Handler for API

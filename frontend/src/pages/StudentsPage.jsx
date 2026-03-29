@@ -22,7 +22,7 @@ const EMPTY_FORM = {
     name: '', dob: '', gender: 'Male', phone: '', email: '', address: '',
     className: '', batchId: '', admissionDate: new Date().toISOString().slice(0, 10),
     session: '2026-2027', fees: '', registrationFee: '', status: 'active', notes: '', password: '', profileImage: null,
-    fatherName: '', motherName: '', currentYear: '1'
+    fatherName: '', motherName: '', parentPhone: '', parentEmail: '', currentYear: '1'
 };
 const LIVE_REFRESH_MS = 30000;
 
@@ -506,6 +506,7 @@ const StudentsPage = () => {
                             registrationFee: s.registrationFee || '',
                             status: s.status || 'active', notes: s.notes || '', profileImage: null,
                             fatherName: s.fatherName || '', motherName: s.motherName || '',
+                            parentPhone: s.parentPhone || '', parentEmail: s.parentEmail || '',
                             currentYear: s.currentYear || '1'
                         });
                         setStep(1); setModal('admission');

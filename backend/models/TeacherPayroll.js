@@ -5,6 +5,9 @@ const salaryProfileSchema = new mongoose.Schema({
     teacherId: { type: mongoose.Schema.Types.ObjectId, ref: 'Teacher', required: true, unique: true },
     salaryType: { type: String, enum: ['Monthly', 'Per Class', 'Per Hour'], default: 'Monthly' },
     baseSalary: { type: Number, required: true },
+    includeBonus: { type: Boolean, default: false },
+    bonusType: { type: String, enum: ['Fixed', 'Optional'], default: 'Optional' },
+    bonusAmount: { type: Number, default: 0 },
     bankDetails: {
         accountName: { type: String },
         accountNumber: { type: String },
@@ -84,6 +87,8 @@ const teacherPaymentSchema = new mongoose.Schema({
     salaryRecordId: { type: mongoose.Schema.Types.ObjectId, ref: 'TeacherSalary', required: true },
     teacherId: { type: mongoose.Schema.Types.ObjectId, ref: 'Teacher', required: true },
     paidAmount: { type: Number, required: true },
+    bonusApplied: { type: Number, default: 0 },
+    totalPayable: { type: Number, default: 0 },
     paymentMethod: { type: String, enum: ['Cash', 'Bank Transfer', 'UPI'], required: true },
     transactionId: { type: String },
     paymentDate: { type: Date, default: Date.now },

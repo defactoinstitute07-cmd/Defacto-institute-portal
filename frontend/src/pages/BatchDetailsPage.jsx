@@ -3,15 +3,15 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import {
     Users, IndianRupee, Clock, BookOpen, ChevronLeft,
-    User, ArrowUpRight, Calendar, MapPin,
-    ShieldCheck, Loader2, Search, FileDown, PlusCircle,
+    User, ArrowUpRight, Calendar,
+    Search, FileDown,
     Eye, X, Download
 } from 'lucide-react';
 import ERPLayout from '../components/ERPLayout';
 import { API_BASE_URL } from '../api/apiConfig';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { SkeletonStat, SkeletonTable, SkeletonLine, SkeletonSidebarItem } from '../components/common/SkeletonLoaders';
+import { SkeletonStat, SkeletonTable, SkeletonSidebarItem } from '../components/common/SkeletonLoaders';
 import apiClient from '../api/apiConfig';
 
 const BatchDetailsPage = () => {
@@ -24,6 +24,8 @@ const BatchDetailsPage = () => {
     const [showPreview, setShowPreview] = useState(false);
     const [pdfUrl, setPdfUrl] = useState(null);
     const [assignmentsMap, setAssignmentsMap] = useState({});
+    const batch = data?.batch || {};
+    const students = data?.students || [];
 
     const loadBatch = useCallback(async () => {
         setLoading(true);
@@ -53,10 +55,13 @@ const BatchDetailsPage = () => {
             .catch(() => console.error('Failed to load scheduler config'));
     }, []);
 
+    const goToSubjectDetails = useCallback((subjectName) => {
+        if (!subjectName) return;
+        navigate(`/batches/${id}/subjects/${encodeURIComponent(subjectName)}`);
+    }, [id, navigate]);
+
     if (!data && !loading) return null;
 
-    const batch = data?.batch || {};
-    const students = data?.students || [];
     const filteredStudents = students.filter(s =>
         s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         s.rollNo.toLowerCase().includes(searchTerm.toLowerCase())
@@ -241,9 +246,14 @@ const BatchDetailsPage = () => {
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Subjects covered</label>
                                         <div className="flex flex-wrap gap-2 mt-2">
                                             {batch.subjects?.map(sub => (
-                                                <span key={sub} className="px-3 py-1 bg-slate-50 border border-slate-100 rounded-lg text-xs font-bold text-slate-600">
+                                                <button
+                                                    key={sub}
+                                                    type="button"
+                                                    onClick={() => goToSubjectDetails(sub)}
+                                                    className="px-3 py-1 border rounded-lg text-xs font-bold transition bg-slate-50 border-slate-100 text-slate-600 hover:border-indigo-200 hover:text-indigo-700"
+                                                >
                                                     {sub}
-                                                </span>
+                                                </button>
                                             ))}
                                         </div>
                                     </div>
@@ -277,7 +287,12 @@ const BatchDetailsPage = () => {
                                             const assignedTeacher = assignment ? assignment.teacherName : 'Unassigned';
 
                                             return (
-                                                <div key={sub} className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-100">
+                                                <button
+                                                    key={sub}
+                                                    type="button"
+                                                    onClick={() => goToSubjectDetails(sub)}
+                                                    className="w-full flex items-center justify-between p-3 rounded-lg border text-left transition bg-slate-50 border-slate-100 hover:border-indigo-200"
+                                                >
                                                     <span className="text-xs font-bold text-slate-700">{sub}</span>
                                                     <div className="flex items-center gap-1.5 focus-within:ring-2 ring-indigo-500/20 rounded transition-all">
                                                         <div className={`w-2 h-2 rounded-full ${assignedTeacher === 'Unassigned' ? 'bg-amber-400' : 'bg-green-500'}`}></div>
@@ -285,14 +300,15 @@ const BatchDetailsPage = () => {
                                                             {assignedTeacher}
                                                         </span>
                                                     </div>
-                                                </div>
+                                                </button>
                                             );
                                         })
                                     ) : (
                                         <div className="text-xs text-slate-400 font-medium italic">No subjects configured.</div>
                                     )}
                                 </div>
-                            </div>                            <div className="pt-6 border-t border-slate-50 space-y-4">
+                            </div>
+                            <div className="pt-6 border-t border-slate-50 space-y-4">
                                 <div className="flex items-center justify-between">
                                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Creation Date</span>
                                     <span className="text-xs font-bold text-slate-600">

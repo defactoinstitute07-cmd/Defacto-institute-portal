@@ -15,7 +15,7 @@ exports.checkAdmin = async (req, res) => {
         const adminCount = await Admin.countDocuments();
         res.status(200).json({ exists: adminCount > 0 });
     } catch (error) {
-        console.error('[CheckAdminError]', error);
+        console.error('[CheckAdminError] Unable to check admin status');
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 };
@@ -28,7 +28,6 @@ exports.signup = async (req, res) => {
             registrationNumber, classesOffered, phone, bio,
             instituteAddress, instituteEmail, institutePhone
         } = req.body;
-        console.log('[Signup] New attempt:', { adminName, email, coachingName });
 
         if (!adminName || !coachingName || !password) {
             return res.status(400).json({ message: 'adminName, coachingName and password are required.' });
@@ -40,13 +39,13 @@ exports.signup = async (req, res) => {
             try {
                 await connectDB(5, 1500);
             } catch (dbErr) {
-                console.error('[SignupError] MongoDB reconnect attempt failed:', dbErr.message);
+                console.error('[SignupError] MongoDB reconnect attempt failed');
                 return res.status(503).json({ message: 'Database unavailable. Please try again in a few seconds.' });
             }
         }
 
         if (mongoose.connection.readyState !== 1) {
-            console.error('[SignupError] MongoDB not connected after retry. Status:', mongoose.connection.readyState);
+            console.error('[SignupError] MongoDB not connected after retry');
             return res.status(503).json({ message: 'Database connecting, please try again in a few seconds.', status: mongoose.connection.readyState });
         }
 
@@ -92,7 +91,7 @@ exports.signup = async (req, res) => {
         await admin.save();
         res.status(201).json({ message: 'Admin account created successfully' });
     } catch (error) {
-        console.error('[SignupError]', error);
+        console.error('[SignupError] Failed to create admin account');
 
         if (error.code === 11000) {
             const duplicateField = Object.keys(error.keyValue || {})[0] || 'field';
@@ -116,22 +115,20 @@ exports.signup = async (req, res) => {
 exports.login = async (req, res) => {
     try {
         const { identifier, password } = req.body;
-        console.log('[Login] Attempt for identifier:', identifier);
         const admin = await Admin.findOne({
             $or: [{ adminName: identifier }, { email: identifier }]
         });
 
         if (!admin) {
-            console.warn('[Login] Admin not found for:', identifier);
+            console.warn('[Login] Admin not found');
             return res.status(400).json({ message: 'Invalid credentials' });
         }
 
         const isMatch = await bcrypt.compare(password, admin.password);
         if (!isMatch) {
-            console.warn('[Login] Password mismatch for:', identifier);
+            console.warn('[Login] Password mismatch');
             return res.status(400).json({ message: 'Invalid credentials' });
         }
-        console.log('[Login] Success for:', identifier);
 
         const token = jwt.sign(
             { id: admin._id, role: 'admin' },
@@ -149,7 +146,7 @@ exports.login = async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('[LoginError]', error);
+        console.error('[LoginError] Authentication failed');
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 };
@@ -266,7 +263,7 @@ exports.getDatabaseStats = async (req, res) => {
             usagePercentage: Math.min(usagePercentage, Number(usagePercentage)) > 100 ? 100 : usagePercentage
         });
     } catch (error) {
-        console.error('[DBStatsError]', error);
+        console.error('[DBStatsError] Failed to fetch database stats');
         res.status(500).json({ message: 'Failed to fetch database stats', error: error.message });
     }
 };
@@ -298,7 +295,7 @@ exports.wipeDatabase = async (req, res) => {
 
         res.json({ message: 'Database wiped successfully. All student, teacher, batch, and audit records have been deleted.' });
     } catch (err) {
-        console.error('[WipeDatabase Error]', err);
+        console.error('[WipeDatabase Error] Failed to wipe database');
         res.status(500).json({ message: 'Server error', error: err.message });
     }
 };

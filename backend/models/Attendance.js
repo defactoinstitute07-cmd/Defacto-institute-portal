@@ -31,7 +31,7 @@ attendanceSchema.pre('validate', function () {
 
     if (this.date) {
         const normalized = new Date(this.date);
-        normalized.setHours(0, 0, 0, 0);
+        normalized.setUTCHours(0, 0, 0, 0);
         this.date = normalized;
         this.attendanceDate = normalized;
     }

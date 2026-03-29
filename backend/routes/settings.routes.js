@@ -50,7 +50,7 @@ router.get('/', async (req, res) => {
         });
 
     } catch (err) {
-        console.error('[SettingsAPIError]', err);
+        console.error('[SettingsAPIError] Failed to fetch settings');
         res.status(500).json({ message: 'Settings API error', error: err.message });
     }
 });

@@ -112,7 +112,8 @@ exports.signup = async (req, res) => {
             eventType: 'studentRegistration',
             message: `Hello ${student.name}, your portal account has been activated successfully. Roll No: ${student.rollNo}`,
             data: {
-                rollNo: student.rollNo
+                rollNo: student.rollNo,
+                portalUrl: process.env.STUDENT_PORTAL_URL || `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login`
             }
         });
 
@@ -123,7 +124,7 @@ exports.signup = async (req, res) => {
             phoneRequired: !student.contact
         });
     } catch (err) {
-        console.error('[student.signup]', err);
+        console.error('[student.signup] Signup failed');
         res.status(500).json({ message: err.message });
     }
 };
@@ -159,7 +160,7 @@ exports.login = async (req, res) => {
             subject: 'New Login Alert',
             type: 'student_login',
             data: { time: new Date().toLocaleString(), ip: req.ip }
-        }).catch((error) => console.error('[student.login.log]', error));
+        }).catch(() => console.error('[student.login.log] Failed to store login notification event'));
 
         res.json({
             message: 'Login successful',
@@ -168,7 +169,7 @@ exports.login = async (req, res) => {
             phoneRequired: !student.contact
         });
     } catch (err) {
-        console.error('[student.login]', err);
+        console.error('[student.login] Login failed');
         res.status(500).json({ message: err.message });
     }
 };
@@ -213,7 +214,7 @@ exports.completeSetup = async (req, res) => {
             }
         });
     } catch (err) {
-        console.error('[student.completeSetup]', err);
+        console.error('[student.completeSetup] Setup failed');
         res.status(500).json({ message: err.message });
     }
 };
@@ -296,16 +297,11 @@ exports.registerDevice = async (req, res) => {
             }
         );
 
-        console.info('[student.registerDevice]', {
-            studentId: String(req.userId),
-            platform: deviceInfo.platform || 'unknown',
-            tokenTail: token.slice(-12),
-            registeredAt: now.toISOString()
-        });
+        console.info('[student.registerDevice] Device registered');
 
         res.json({ message: 'Device registered', registeredAt: now.toISOString() });
     } catch (err) {
-        console.error('[student.registerDevice]', err);
+        console.error('[student.registerDevice] Device registration failed');
         res.status(500).json({ message: err.message });
     }
 };
@@ -328,13 +324,6 @@ exports.trackActivity = async (req, res) => {
 
         if (event === 'app_open') {
             await Student.updateOne({ _id: req.userId }, update);
-            console.info('[student.trackActivity]', {
-                studentId: String(req.userId),
-                event,
-                platform: deviceInfo.platform || 'unknown',
-                updated: true,
-                recordedAt: now.toISOString()
-            });
             return res.json({ message: 'Activity recorded', updated: true });
         }
 
@@ -354,19 +343,10 @@ exports.trackActivity = async (req, res) => {
         );
 
         const updated = result.modifiedCount > 0;
-        if (updated) {
-            console.info('[student.trackActivity]', {
-                studentId: String(req.userId),
-                event,
-                platform: deviceInfo.platform || 'unknown',
-                updated,
-                recordedAt: now.toISOString()
-            });
-        }
 
         res.json({ message: 'Activity recorded', updated });
     } catch (err) {
-        console.error('[student.trackActivity]', err);
+        console.error('[student.trackActivity] Activity tracking failed');
         res.status(500).json({ message: err.message });
     }
 };
@@ -477,7 +457,7 @@ exports.getPerformance = async (req, res) => {
             totalStudentsInBatch
         });
     } catch (err) {
-        console.error('[student.getPerformance]', err);
+        console.error('[student.getPerformance] Failed to fetch performance');
         res.status(500).json({ message: err.message });
     }
 };

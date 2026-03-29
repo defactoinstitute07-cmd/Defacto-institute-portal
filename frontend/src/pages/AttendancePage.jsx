@@ -5,7 +5,8 @@ import ToastContainer, { useToast } from '../components/Toast';
 import {
     getAdminAttendanceSetup,
     getAdminAttendanceRoster,
-    markAdminAttendance
+    markAdminAttendance,
+    getAdminAttendanceReport
 } from '../api/attendanceApi';
 
 const STATUS_OPTIONS = [
@@ -14,19 +15,53 @@ const STATUS_OPTIONS = [
     { label: 'Late', value: 'Late', color: '#f59e0b', bg: '#fffbeb', activeBg: '#f59e0b', activeText: '#fff' },
 ];
 
-const todayString = () => new Date().toISOString().slice(0, 10);
+const toLocalDateInputValue = (date = new Date()) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const todayString = () => toLocalDateInputValue(new Date());
+
+const daysAgoString = (days) => {
+    const date = new Date();
+    date.setDate(date.getDate() - days);
+    return toLocalDateInputValue(date);
+};
+
+const formatReadableDate = (value) => {
+    if (!value) return '--';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return '--';
+    return parsed.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+    });
+};
 
 const AttendancePage = () => {
     const { toasts, toast, removeToast } = useToast();
     const [setup, setSetup] = useState({ batches: [], teachers: [], subjects: [], assignments: [] });
     const [roster, setRoster] = useState([]);
+    const [history, setHistory] = useState({
+        records: [],
+        summary: { total: 0, present: 0, absent: 0, late: 0 },
+        pagination: { page: 1, pages: 0, total: 0 }
+    });
     const [isMarked, setIsMarked] = useState(false);
-    const [loading, setLoading] = useState({ setup: true, roster: false, save: false });
+    const [activeTab, setActiveTab] = useState('mark');
+    const [loading, setLoading] = useState({ setup: true, roster: false, save: false, history: false });
 
     const [filters, setFilters] = useState({
         batchId: '',
         subjectId: '',
         date: todayString()
+    });
+    const [historyFilters, setHistoryFilters] = useState({
+        dateFrom: daysAgoString(30),
+        dateTo: todayString()
     });
 
     const selectedBatch = useMemo(
@@ -39,6 +74,47 @@ const AttendancePage = () => {
         const subjectIds = new Set((selectedBatch.subjectIds || []).map(id => String(id)));
         return setup.subjects.filter(s => subjectIds.has(String(s._id)));
     }, [selectedBatch, setup.subjects]);
+
+    const selectedSubject = useMemo(
+        () => setup.subjects.find((subject) => subject._id === filters.subjectId) || null,
+        [setup.subjects, filters.subjectId]
+    );
+
+    const studentWiseHistory = useMemo(() => {
+        const summaryMap = new Map();
+
+        (history.records || []).forEach((record) => {
+            const student = record.studentId || {};
+            const studentKey = String(student._id || record.studentId || 'unknown');
+
+            if (!summaryMap.has(studentKey)) {
+                summaryMap.set(studentKey, {
+                    studentId: studentKey,
+                    studentName: student.name || 'Unknown Student',
+                    rollNo: student.rollNo || '--',
+                    present: 0,
+                    absent: 0,
+                    late: 0,
+                    total: 0,
+                    lastMarkedAt: null
+                });
+            }
+
+            const current = summaryMap.get(studentKey);
+            const status = record.status;
+            if (status === 'Present') current.present += 1;
+            if (status === 'Absent') current.absent += 1;
+            if (status === 'Late') current.late += 1;
+            current.total += 1;
+
+            const markedAt = new Date(record.attendanceDate || record.date || record.createdAt || 0);
+            if (!Number.isNaN(markedAt.getTime()) && (!current.lastMarkedAt || markedAt > current.lastMarkedAt)) {
+                current.lastMarkedAt = markedAt;
+            }
+        });
+
+        return Array.from(summaryMap.values()).sort((a, b) => a.studentName.localeCompare(b.studentName));
+    }, [history.records]);
 
     const loadSetup = async () => {
         try {
@@ -67,6 +143,31 @@ const AttendancePage = () => {
         }
     };
 
+    const loadHistory = async (nextFilters = historyFilters) => {
+        if (!filters.batchId || !filters.subjectId) return;
+
+        try {
+            setLoading(l => ({ ...l, history: true }));
+            const response = await getAdminAttendanceReport({
+                batchId: filters.batchId,
+                subjectId: filters.subjectId,
+                dateFrom: nextFilters.dateFrom || undefined,
+                dateTo: nextFilters.dateTo || undefined,
+                limit: 300
+            });
+
+            setHistory({
+                records: response.data?.records || [],
+                summary: response.data?.summary || { total: 0, present: 0, absent: 0, late: 0 },
+                pagination: response.data?.pagination || { page: 1, pages: 0, total: 0 }
+            });
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Failed to load attendance history.');
+        } finally {
+            setLoading(l => ({ ...l, history: false }));
+        }
+    };
+
     useEffect(() => {
         loadSetup();
     }, []);
@@ -75,11 +176,25 @@ const AttendancePage = () => {
     useEffect(() => {
         if (filters.batchId && filters.subjectId) {
             loadRoster();
+            if (activeTab === 'history') {
+                loadHistory();
+            }
         } else {
             setRoster([]);
             setIsMarked(false);
+            setHistory({
+                records: [],
+                summary: { total: 0, present: 0, absent: 0, late: 0 },
+                pagination: { page: 1, pages: 0, total: 0 }
+            });
         }
     }, [filters.batchId, filters.subjectId, filters.date]);
+
+    useEffect(() => {
+        if (activeTab === 'history' && filters.batchId && filters.subjectId) {
+            loadHistory();
+        }
+    }, [activeTab]);
 
     const handleStatusChange = (studentId, status) => {
         setRoster(prev => prev.map(s => s._id === studentId ? { ...s, attendanceStatus: status } : s));
@@ -150,7 +265,10 @@ const AttendancePage = () => {
                         <select
                             className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base text-slate-700 font-bold focus:border-indigo-500 focus:bg-white transition-all outline-none appearance-none cursor-pointer"
                             value={filters.batchId}
-                            onChange={(e) => setFilters(f => ({ ...f, batchId: e.target.value, subjectId: '' }))}
+                            onChange={(e) => {
+                                setActiveTab('mark');
+                                setFilters(f => ({ ...f, batchId: e.target.value, subjectId: '' }));
+                            }}
                         >
                             <option value="">Choose a Batch...</option>
                             {setup.batches.map(b => <option key={b._id} value={b._id}>{b.name} ({b.course})</option>)}
@@ -164,7 +282,10 @@ const AttendancePage = () => {
                         <select
                             className={`w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base text-slate-700 font-bold focus:border-indigo-500 focus:bg-white transition-all outline-none appearance-none cursor-pointer ${!filters.batchId && 'opacity-50 cursor-not-allowed'}`}
                             value={filters.subjectId}
-                            onChange={(e) => setFilters(f => ({ ...f, subjectId: e.target.value }))}
+                            onChange={(e) => {
+                                setActiveTab('mark');
+                                setFilters(f => ({ ...f, subjectId: e.target.value }));
+                            }}
                             disabled={!filters.batchId}
                         >
                             <option value="">{filters.batchId ? 'Choose a Subject...' : 'Please select a batch first'}</option>
@@ -174,12 +295,36 @@ const AttendancePage = () => {
                 </div>
 
                 {/* Main Content Area */}
-                {loading.roster ? (
+                {(filters.batchId && filters.subjectId) && (
+                    <div className="bg-white rounded-2xl border border-slate-200/80 p-2 sm:p-3 shadow-sm">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('mark')}
+                                className={`px-4 py-2.5 rounded-xl text-sm font-black tracking-wide transition ${activeTab === 'mark' ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                            >
+                                Mark Attendance
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('history')}
+                                className={`px-4 py-2.5 rounded-xl text-sm font-black tracking-wide transition ${activeTab === 'history' ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                            >
+                                History
+                            </button>
+                        </div>
+                        <p className="mt-2 text-xs sm:text-sm text-slate-500 font-semibold">
+                            {selectedBatch?.name || 'Selected batch'} - {selectedSubject?.name || 'Selected subject'}
+                        </p>
+                    </div>
+                )}
+
+                {activeTab === 'mark' && loading.roster ? (
                     <div className="flex flex-col items-center justify-center py-20 animate-pulse">
                         <div className="w-10 h-10 sm:w-12 sm:h-12 border-4 border-indigo-500/20 border-t-indigo-600 rounded-full animate-spin"></div>
                         <p className="mt-4 text-slate-500 font-bold uppercase tracking-widest text-xs">Fetching Roster...</p>
                     </div>
-                ) : roster.length > 0 ? (
+                ) : activeTab === 'mark' && roster.length > 0 ? (
                     <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
 
                         {/* Status Warning */}
@@ -297,13 +442,157 @@ const AttendancePage = () => {
                             </button>
                         </div>
                     </div>
-                ) : (filters.batchId && filters.subjectId) ? (
+                ) : activeTab === 'mark' && (filters.batchId && filters.subjectId) ? (
                     <div className="bg-white rounded-3xl border-2 border-dashed border-slate-200 p-12 sm:p-20 flex flex-col items-center justify-center text-center mx-4 sm:mx-0">
                         <div className="p-4 bg-slate-50 rounded-full mb-4">
                             <Users size={32} className="text-slate-300 sm:w-10 sm:h-10" />
                         </div>
                         <h3 className="text-lg sm:text-xl font-black text-slate-800">No Students Found</h3>
                         <p className="text-sm sm:text-base text-slate-500 font-medium max-w-[300px] mt-2">There are no active students matched with this batch selection.</p>
+                    </div>
+                ) : activeTab === 'history' && (filters.batchId && filters.subjectId) ? (
+                    <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+                        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-sm">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-black uppercase tracking-wider text-slate-500">From</label>
+                                    <input
+                                        type="date"
+                                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold text-slate-700 outline-none focus:border-indigo-500"
+                                        value={historyFilters.dateFrom}
+                                        onChange={(e) => setHistoryFilters((current) => ({ ...current, dateFrom: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-black uppercase tracking-wider text-slate-500">To</label>
+                                    <input
+                                        type="date"
+                                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold text-slate-700 outline-none focus:border-indigo-500"
+                                        value={historyFilters.dateTo}
+                                        onChange={(e) => setHistoryFilters((current) => ({ ...current, dateTo: e.target.value }))}
+                                    />
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => loadHistory()}
+                                    disabled={loading.history}
+                                    className="h-[43px] mt-auto rounded-xl bg-slate-900 text-white font-black text-sm px-4 hover:bg-slate-800 transition disabled:opacity-60"
+                                >
+                                    {loading.history ? 'Loading...' : 'Load History'}
+                                </button>
+                                <div className="mt-auto rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold text-slate-700">
+                                    Total Records: {history.summary?.total || 0}
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+                                <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-3">
+                                    <p className="text-xs font-black uppercase tracking-wider text-emerald-700">Present</p>
+                                    <p className="text-xl font-black text-emerald-800 mt-1">{history.summary?.present || 0}</p>
+                                </div>
+                                <div className="rounded-xl bg-rose-50 border border-rose-200 px-3 py-3">
+                                    <p className="text-xs font-black uppercase tracking-wider text-rose-700">Absent</p>
+                                    <p className="text-xl font-black text-rose-800 mt-1">{history.summary?.absent || 0}</p>
+                                </div>
+                                <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-3">
+                                    <p className="text-xs font-black uppercase tracking-wider text-amber-700">Late</p>
+                                    <p className="text-xl font-black text-amber-800 mt-1">{history.summary?.late || 0}</p>
+                                </div>
+                                <div className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-3">
+                                    <p className="text-xs font-black uppercase tracking-wider text-slate-600">Students</p>
+                                    <p className="text-xl font-black text-slate-800 mt-1">{studentWiseHistory.length}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {loading.history ? (
+                            <div className="flex flex-col items-center justify-center py-20 animate-pulse">
+                                <div className="w-10 h-10 sm:w-12 sm:h-12 border-4 border-indigo-500/20 border-t-indigo-600 rounded-full animate-spin"></div>
+                                <p className="mt-4 text-slate-500 font-bold uppercase tracking-widest text-xs">Fetching History...</p>
+                            </div>
+                        ) : (history.records || []).length === 0 ? (
+                            <div className="bg-white rounded-3xl border-2 border-dashed border-slate-200 p-12 sm:p-20 flex flex-col items-center justify-center text-center mx-4 sm:mx-0">
+                                <div className="p-4 bg-slate-50 rounded-full mb-4">
+                                    <Users size={32} className="text-slate-300 sm:w-10 sm:h-10" />
+                                </div>
+                                <h3 className="text-lg sm:text-xl font-black text-slate-800">No History Available</h3>
+                                <p className="text-sm sm:text-base text-slate-500 font-medium max-w-[320px] mt-2">No attendance records found for the selected filters.</p>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-sm">
+                                    <h3 className="text-sm sm:text-base font-black text-slate-800 uppercase tracking-wider">Student-wise Attendance Summary</h3>
+                                    <div className="overflow-x-auto mt-4">
+                                        <table className="min-w-full text-sm">
+                                            <thead>
+                                                <tr className="border-b border-slate-200 text-slate-500 uppercase tracking-wider text-xs">
+                                                    <th className="text-left py-3 pr-3">Student</th>
+                                                    <th className="text-left py-3 pr-3">Roll</th>
+                                                    <th className="text-left py-3 pr-3">Present</th>
+                                                    <th className="text-left py-3 pr-3">Absent</th>
+                                                    <th className="text-left py-3 pr-3">Late</th>
+                                                    <th className="text-left py-3 pr-3">Total</th>
+                                                    <th className="text-left py-3 pr-3">Present %</th>
+                                                    <th className="text-left py-3 pr-3">Last Marked</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {studentWiseHistory.map((student) => {
+                                                    const presentRate = student.total > 0 ? Math.round((student.present / student.total) * 100) : 0;
+                                                    return (
+                                                        <tr key={student.studentId} className="border-b border-slate-100 last:border-b-0">
+                                                            <td className="py-3 pr-3 font-bold text-slate-800">{student.studentName}</td>
+                                                            <td className="py-3 pr-3 text-slate-600 font-semibold">{student.rollNo}</td>
+                                                            <td className="py-3 pr-3 text-emerald-700 font-black">{student.present}</td>
+                                                            <td className="py-3 pr-3 text-rose-700 font-black">{student.absent}</td>
+                                                            <td className="py-3 pr-3 text-amber-700 font-black">{student.late}</td>
+                                                            <td className="py-3 pr-3 text-slate-800 font-black">{student.total}</td>
+                                                            <td className="py-3 pr-3 text-slate-700 font-bold">{presentRate}%</td>
+                                                            <td className="py-3 pr-3 text-slate-600 font-semibold">{formatReadableDate(student.lastMarkedAt)}</td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-sm">
+                                    <h3 className="text-sm sm:text-base font-black text-slate-800 uppercase tracking-wider">Past Attendance Records</h3>
+                                    <div className="overflow-x-auto mt-4">
+                                        <table className="min-w-full text-sm">
+                                            <thead>
+                                                <tr className="border-b border-slate-200 text-slate-500 uppercase tracking-wider text-xs">
+                                                    <th className="text-left py-3 pr-3">Date</th>
+                                                    <th className="text-left py-3 pr-3">Student</th>
+                                                    <th className="text-left py-3 pr-3">Roll</th>
+                                                    <th className="text-left py-3 pr-3">Status</th>
+                                                    <th className="text-left py-3 pr-3">Notes</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {(history.records || []).map((record) => {
+                                                    const statusClass = record.status === 'Present'
+                                                        ? 'text-emerald-700'
+                                                        : record.status === 'Absent'
+                                                            ? 'text-rose-700'
+                                                            : 'text-amber-700';
+                                                    return (
+                                                        <tr key={record._id} className="border-b border-slate-100 last:border-b-0">
+                                                            <td className="py-3 pr-3 font-semibold text-slate-700">{formatReadableDate(record.attendanceDate || record.date)}</td>
+                                                            <td className="py-3 pr-3 font-bold text-slate-800">{record.studentId?.name || '--'}</td>
+                                                            <td className="py-3 pr-3 text-slate-600 font-semibold">{record.studentId?.rollNo || '--'}</td>
+                                                            <td className={`py-3 pr-3 font-black ${statusClass}`}>{record.status || '--'}</td>
+                                                            <td className="py-3 pr-3 text-slate-600 font-medium">{record.notes || '--'}</td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </>
+                        )}
                     </div>
                 ) : (
                     <div className="bg-slate-50 rounded-3xl p-10 sm:p-16 flex flex-col items-center justify-center text-center opacity-80 border-2 border-slate-100 mx-4 sm:mx-0">

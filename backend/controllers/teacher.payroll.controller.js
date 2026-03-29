@@ -33,7 +33,14 @@ exports.getSalaryProfile = async (req, res) => {
 exports.upsertSalaryProfile = async (req, res) => {
     try {
         const { teacherId } = req.params;
-        const { salaryType, baseSalary, bankDetails, status } = req.body;
+        const { salaryType, baseSalary, bankDetails, status, includeBonus, bonusType, bonusAmount } = req.body;
+
+        if (typeof baseSalary === 'number' && baseSalary < 0) {
+            return res.status(400).json({ message: 'Base salary cannot be negative' });
+        }
+        if (typeof bonusAmount === 'number' && bonusAmount < 0) {
+            return res.status(400).json({ message: 'Bonus amount cannot be negative' });
+        }
 
         const teacher = await Teacher.findById(teacherId);
         if (!teacher) return res.status(404).json({ message: 'Teacher not found' });
@@ -42,13 +49,25 @@ exports.upsertSalaryProfile = async (req, res) => {
 
         if (profile) {
             profile.salaryType = salaryType || profile.salaryType;
-            profile.baseSalary = baseSalary || profile.baseSalary;
+            if (typeof baseSalary === 'number' && baseSalary >= 0) profile.baseSalary = baseSalary;
+            if (typeof includeBonus === 'boolean') profile.includeBonus = includeBonus;
+            if (bonusType) profile.bonusType = bonusType;
+            if (typeof bonusAmount === 'number' && bonusAmount >= 0) profile.bonusAmount = bonusAmount;
             if (bankDetails) profile.bankDetails = bankDetails;
             if (status) profile.status = status;
             profile.updatedAt = Date.now();
             await profile.save();
         } else {
-            profile = new TeacherSalaryProfile({ teacherId, salaryType, baseSalary, bankDetails, status });
+            profile = new TeacherSalaryProfile({
+                teacherId,
+                salaryType,
+                baseSalary: typeof baseSalary === 'number' && baseSalary >= 0 ? baseSalary : 0,
+                includeBonus: Boolean(includeBonus),
+                bonusType: bonusType || 'Optional',
+                bonusAmount: typeof bonusAmount === 'number' && bonusAmount >= 0 ? bonusAmount : 0,
+                bankDetails,
+                status
+            });
             await profile.save();
         }
 
@@ -132,6 +151,7 @@ const calculateSalaryForTeacher = async (teacherId, monthYear) => {
     if (!profile) return null; // Inactive or no profile = skip generation
 
     const baseSalary = profile.baseSalary || 0;
+    const configuredBonus = profile.includeBonus ? Number(profile.bonusAmount || 0) : 0;
 
     // 1. Calculate Extra Classes
     const extraClasses = await TeacherExtraClass.find({ teacherId, monthRecord: monthYear });
@@ -139,7 +159,8 @@ const calculateSalaryForTeacher = async (teacherId, monthYear) => {
 
     // 2. Calculate Bonus
     const bonuses = await TeacherBonus.find({ teacherId, monthRecord: monthYear });
-    const bonusAmount = bonuses.reduce((sum, record) => sum + record.amount, 0);
+    const adhocBonusAmount = bonuses.reduce((sum, record) => sum + record.amount, 0);
+    const bonusAmount = configuredBonus + adhocBonusAmount;
 
     // Net = Base + Extra + Bonus
     let netSalary = baseSalary + extraClassesAmount + bonusAmount;
@@ -153,6 +174,9 @@ const calculateSalaryForTeacher = async (teacherId, monthYear) => {
         leaveDeductions: 0,
         advanceDeductions: 0,
         bonusAmount,
+        bonusReason: configuredBonus > 0
+            ? (adhocBonusAmount > 0 ? 'Configured + Additional Bonus' : 'Configured Bonus')
+            : (adhocBonusAmount > 0 ? 'Additional Bonus' : ''),
         netSalary,
         status: 'Pending'
     };
@@ -202,16 +226,39 @@ exports.markSalaryPaid = async (req, res) => {
 
         if (salary.status === 'Paid') return res.status(400).json({ message: 'Salary already fully paid' });
 
+        // Re-sync payable amounts from profile config at processing time.
+        const recalculatedSalary = await calculateSalaryForTeacher(salary.teacherId, salary.monthYear);
+        if (recalculatedSalary) {
+            salary.baseSalary = recalculatedSalary.baseSalary;
+            salary.extraClassesAmount = recalculatedSalary.extraClassesAmount;
+            salary.bonusAmount = recalculatedSalary.bonusAmount;
+            salary.bonusReason = recalculatedSalary.bonusReason;
+            salary.leaveDeductions = recalculatedSalary.leaveDeductions;
+            salary.advanceDeductions = recalculatedSalary.advanceDeductions;
+            salary.netSalary = recalculatedSalary.netSalary;
+        }
+
+        const payableNow = Number(salary.netSalary || 0);
+        if (Number(paidAmount) <= 0) {
+            return res.status(400).json({ message: 'Paid amount must be greater than zero' });
+        }
+
         // Calculate current total paid for this record
         const previousPayments = await TeacherPayment.find({ salaryRecordId });
         const totalPreviousPaid = previousPayments.reduce((sum, p) => sum + p.paidAmount, 0);
 
         const newTotalPaid = totalPreviousPaid + Number(paidAmount);
 
+        if (newTotalPaid > payableNow) {
+            return res.status(400).json({ message: `Payment exceeds total payable salary (₹${payableNow.toLocaleString('en-IN')})` });
+        }
+
         const payment = new TeacherPayment({
             salaryRecordId,
             teacherId: salary.teacherId,
             paidAmount: Number(paidAmount),
+            bonusApplied: Number(salary.bonusAmount || 0),
+            totalPayable: payableNow,
             paymentMethod,
             transactionId: transactionId || `PAY-${salary.monthYear.replace('-', '')}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
             notes
@@ -255,11 +302,11 @@ exports.markSalaryPaid = async (req, res) => {
                 category: 'Salary',
                 paymentMode: modeMapping[paymentMethod] || 'Cash',
                 date: new Date(),
-                description: `Salary disbursement for ${salary.monthYear}. Ref: ${payment.transactionId}. ${notes || ''}`,
+                description: `Salary disbursement for ${salary.monthYear}. Total payable: ₹${payableNow.toLocaleString('en-IN')}. Included bonus: ₹${Number(salary.bonusAmount || 0).toLocaleString('en-IN')}. Ref: ${payment.transactionId}. ${notes || ''}`,
                 status: 'Paid'
             });
         } catch (expErr) {
-            console.error('[PayrollToExpense] Failed to create expense record:', expErr);
+            console.error('[PayrollToExpense] Failed to create expense record');
         }
 
         // Log salary payment activity instead of sending email.
@@ -293,13 +340,13 @@ exports.markSalaryPaid = async (req, res) => {
                         paymentMethod,
                         transactionId: payment.transactionId
                     }
-                }).catch(e => console.error('[SalaryNotificationLog] Error:', e));
+                }).catch(() => console.error('[SalaryNotificationLog] Logging failed'));
             }
         } catch (notificationErr) {
-            console.error('[SalaryNotificationLog] Lookup error:', notificationErr);
+            console.error('[SalaryNotificationLog] Lookup error');
         }
 
-        res.json({ message: 'Payment recorded successfully', payment });
+        res.json({ message: 'Payment recorded successfully', payment, salary });
     } catch (error) {
         res.status(500).json({ message: 'Server error', error: error.message });
     }

@@ -164,7 +164,10 @@ const sendNotificationBatch = async ({
                 teacher: recipientType === 'teacher' ? recipient : null,
                 message, 
                 admin, 
-                subjectOverride: title 
+                subjectOverride: title,
+                messageType: type,
+                eventType: type,
+                recipientRole: recipientType
             });
             
             // Transform for Notification model schema (requires 'status' field)
@@ -379,11 +382,9 @@ const triggerAutomaticNotification = async ({ eventType, studentId, teacherId, m
         const methods = [];
         if (recipient.email && isEmailEnabled) methods.push('email');
         if (recipient.deviceTokens && recipient.deviceTokens.length > 0 && isPushEnabled) methods.push('push');
-        
-        console.log(`[NotificationService] Methods: [${methods.join(', ')}]`);
 
         if (methods.length === 0) {
-            console.log(`[AutoNotification] Skipped: No allowed delivery methods available for ${recipient.name} (Email: ${isEmailEnabled}, Push: ${isPushEnabled})`);
+            console.log('[AutoNotification] Skipped: No allowed delivery methods available');
             return;
         }
 
@@ -396,7 +397,12 @@ const triggerAutomaticNotification = async ({ eventType, studentId, teacherId, m
                 teacher: recipientType === 'teacher' ? recipient : null,
                 message: bodyEmail,
                 admin,
-                subjectOverride: subjectEmail
+                subjectOverride: subjectEmail,
+                messageType: eventType,
+                eventType,
+                recipientRole: recipientType,
+                portalUrl: data?.portalUrl,
+                teacherPortalUrl: data?.teacherPortalUrl
             });
         }
 
@@ -439,9 +445,9 @@ const triggerAutomaticNotification = async ({ eventType, studentId, teacherId, m
             targetId: String(recipient._id)
         });
 
-        console.log(`[AutoNotification] Event ${eventType} triggered for ${recipient.name} via [${methods.join(', ')}]`);
+        console.log(`[AutoNotification] Event ${eventType} triggered`);
     } catch (error) {
-        console.error(`[AutoNotification] Error triggering ${eventType}:`, error);
+        console.error(`[AutoNotification] Error triggering ${eventType}`);
     }
 };
 

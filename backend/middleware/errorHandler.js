@@ -7,12 +7,7 @@ const errorHandler = (err, req, res, next) => {
     error.message = err.message;
 
     // Log for server-side debugging
-    console.error(`[Error] [${new Date().toISOString()}]`);
-    console.error('Path:', req.path);
-    console.error('Message:', err.message);
-    if (process.env.NODE_ENV !== 'production') {
-        console.error('Stack:', err.stack);
-    }
+    console.error(`[Error] ${req.method} ${req.path} - ${err.message || 'Unexpected error'}`);
 
     // Mongoose bad ObjectId
     if (err.name === 'CastError') {

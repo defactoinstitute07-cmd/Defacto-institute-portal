@@ -63,7 +63,7 @@ router.post('/', trackVisitCors, async (req, res) => {
         return res.status(200).json({ success: true });
     } catch (error) {
         // Log but don't expose internals
-        console.error('PageVisit tracking error:', error.message);
+        console.error('PageVisit tracking error');
         return res.status(500).json({ success: false });
     }
 });

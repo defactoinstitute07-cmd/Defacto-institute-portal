@@ -33,11 +33,11 @@ exports.login = async (req, res) => {
             subject: 'Faculty Portal Login Alert',
             type: 'teacher_login',
             data: { time: new Date().toLocaleString() }
-        }).catch(err => console.error("Teacher Login Event Log Error:", err));
+        }).catch(() => console.error('Teacher Login Event Log Error'));
 
         res.json({ message: 'Login successful', token, teacher: profile });
     } catch (err) {
-        console.error('[teacher.login]', err);
+        console.error('[teacher.login] Login failed');
         res.status(500).json({ message: err.message });
     }
 };

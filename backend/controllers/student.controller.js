@@ -1,6 +1,7 @@
 const Student = require('../models/Student');
 const Batch = require('../models/Batch');
 const Attendance = require('../models/Attendance');
+const Fee = require('../models/Fee');
 const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
 const { triggerAutomaticNotification } = require('../services/notificationService');
@@ -103,6 +104,70 @@ const toActivityFilters = (query = {}) => {
     }
 
     return { activityStatus, studentStatus };
+};
+
+const createAdmissionFeeRecord = async ({ student, batchId, admissionDate, adminId }) => {
+    if (!student?._id || !batchId || !mongoose.Types.ObjectId.isValid(batchId)) {
+        return null;
+    }
+
+    const effectiveDate = admissionDate ? new Date(admissionDate) : new Date();
+    if (Number.isNaN(effectiveDate.getTime())) {
+        return null;
+    }
+
+    const month = effectiveDate.toLocaleString('en-US', { month: 'long' });
+    const year = String(effectiveDate.getFullYear());
+
+    const existingFee = await Fee.findOne({ studentId: student._id, month, year }).select('_id').lean();
+    if (existingFee) {
+        return existingFee;
+    }
+
+    const batch = await Batch.findById(batchId).select('fees').lean();
+    const monthlyTuitionFee = Number(batch?.fees ?? student.fees ?? 0);
+    const registrationFee = Number(student.registrationFee || 0);
+    const totalFee = monthlyTuitionFee + registrationFee;
+
+    const dueDate = new Date(effectiveDate.getFullYear(), effectiveDate.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    let fee;
+    try {
+        fee = await Fee.create({
+            studentId: student._id,
+            batchId,
+            month,
+            year,
+            monthlyTuitionFee,
+            registrationFee,
+            fine: 0,
+            totalFee,
+            amountPaid: 0,
+            pendingAmount: totalFee,
+            status: 'pending',
+            dueDate
+        });
+    } catch (error) {
+        if (error?.code === 11000) {
+            return Fee.findOne({ studentId: student._id, month, year }).select('_id').lean();
+        }
+        throw error;
+    }
+
+    triggerAutomaticNotification({
+        eventType: 'feeGenerated',
+        studentId: student._id,
+        adminId: adminId || null,
+        message: `New fee generated for ${month} ${year}. Due date: ${dueDate.toLocaleDateString('en-IN')}.`,
+        data: {
+            amount: totalFee,
+            month,
+            year,
+            dueDate: dueDate.toLocaleDateString('en-IN')
+        }
+    }).catch(() => console.error('[students.createAdmissionFeeRecord.notification] Notification dispatch failed'));
+
+    return fee;
 };
 
 // GET /api/students/stats
@@ -265,7 +330,7 @@ exports.getStudentActivity = async (req, res) => {
             thresholds: { onlineMinutes, inactiveDays }
         });
     } catch (err) {
-        console.error('[getStudentActivity]', err);
+        console.error('[getStudentActivity] Failed to fetch student activity');
         res.status(500).json({ message: 'Server error', error: err.message });
     }
 };
@@ -377,6 +442,15 @@ exports.createStudent = async (req, res) => {
         const student = new Student(studentData);
         await student.save();
 
+        if (student.batchId) {
+            await createAdmissionFeeRecord({
+                student,
+                batchId: student.batchId,
+                admissionDate: student.admissionDate,
+                adminId: req.admin?.id
+            });
+        }
+
         // Send onboarding notification
         if (student) {
             await triggerAutomaticNotification({
@@ -385,7 +459,8 @@ exports.createStudent = async (req, res) => {
                 eventType: 'studentRegistration',
                 adminId: req.admin?.id,
                 data: {
-                    password: req.body.password || 'student@123'
+                    password: req.body.password || 'student@123',
+                    portalUrl: process.env.STUDENT_PORTAL_URL || `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login`
                 }
             });
         }
@@ -397,7 +472,7 @@ exports.createStudent = async (req, res) => {
             student: result
         });
     } catch (err) {
-        console.error('[createStudent]', err);
+        console.error('[createStudent] Failed to create student');
         res.status(500).json({ message: 'Server error', error: err.message });
     }
 };
@@ -436,6 +511,13 @@ exports.updateStudent = async (req, res) => {
 
         if (isActivatingBatch) {
             if (student && data.batchId) {
+                await createAdmissionFeeRecord({
+                    student,
+                    batchId: data.batchId,
+                    admissionDate: student.admissionDate,
+                    adminId: req.admin?.id
+                });
+
                 const batch = await require('../models/Batch').findById(data.batchId);
                 await triggerAutomaticNotification({
                     studentId: student._id,
@@ -560,6 +642,15 @@ exports.bulkUpload = async (req, res) => {
                     portalAccess: { signupStatus: 'no' }
                 });
                 await student.save();
+
+                if (student.batchId) {
+                    await createAdmissionFeeRecord({
+                        student,
+                        batchId: student.batchId,
+                        admissionDate: student.admissionDate,
+                        adminId: req.admin?.id
+                    });
+                }
 
                 // Send onboarding notification
                 if (student) {
