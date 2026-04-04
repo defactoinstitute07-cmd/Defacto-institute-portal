@@ -3,7 +3,7 @@ import { clearClientSession } from '../utils/authSession';
 
 const getBaseUrl = () => {
     if (import.meta.env.VITE_API_BASE_URL !== undefined) {
-        return import.meta.env.VITE_API_BASE_URL;
+        return String(import.meta.env.VITE_API_BASE_URL).trim();
     }
     // Fallback for local development
     if (import.meta.env.DEV) {
@@ -14,7 +14,7 @@ const getBaseUrl = () => {
 };
 
 export const API_BASE_URL = getBaseUrl().replace(/\/$/, '');
-export const TEACHER_API_BASE_URL = (import.meta.env.VITE_TEACHER_API_BASE_URL || API_BASE_URL).replace(/\/$/, '');
+export const TEACHER_API_BASE_URL = String(import.meta.env.VITE_TEACHER_API_BASE_URL || API_BASE_URL).trim().replace(/\/$/, '');
 
 export const attachAuthToken = (instance) => {
     instance.interceptors.request.use((config) => {
