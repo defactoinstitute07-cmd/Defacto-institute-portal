@@ -48,8 +48,6 @@ const studentSchema = new mongoose.Schema({
     fatherName: { type: String, trim: true },
     motherName: { type: String, trim: true },
     parentPhone: { type: String, trim: true },
-    parentEmail: { type: String, lowercase: true, trim: true },
-    currentYear: { type: String, default: '1' },
     password: { type: String },
     phoneLockedByAdmin: { type: Boolean, default: false },
     deviceTokens: {

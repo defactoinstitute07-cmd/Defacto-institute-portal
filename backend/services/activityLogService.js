@@ -8,8 +8,6 @@ const logNotificationEvent = async ({ recipientEmail, recipientName, subject, ty
         data,
         loggedAt: new Date().toISOString()
     };
-
-    console.log('[NotificationEvent] Event logged');
     return entry;
 };
 

@@ -79,8 +79,7 @@ const TeacherBulkImportModal = ({
     const downloadTemplate = () => {
         const headers = [
             "NAME", "EMAIL ADDRESS", "MOBILE NUMBER", "GENDER",
-            "DATE OF BIRTH", "DEPARTMENT", "DESIGNATION",
-            "MONTHLY SALARY", "EXPERIENCE", "QUALIFICATIONS", "JOINING DATE"
+            "DATE OF BIRTH", "JOINING DATE"
         ];
         const data = [
             {
@@ -89,11 +88,6 @@ const TeacherBulkImportModal = ({
                 "MOBILE NUMBER": "9876543210",
                 "GENDER": "Male",
                 "DATE OF BIRTH": "01-01-1985",
-                "DEPARTMENT": "Mathematics",
-                "DESIGNATION": "Senior Professor",
-                "MONTHLY SALARY": 45000,
-                "EXPERIENCE": "10 Years",
-                "QUALIFICATIONS": "Ph.D in Mathematics",
                 "JOINING DATE": "04-03-2026"
             }
         ];
@@ -170,11 +164,6 @@ const TeacherBulkImportModal = ({
                                 <li style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                                     <span>• DATE OF BIRTH <br /><i style={{ fontSize: '0.65rem', opacity: 0.7 }}>(DD-MM-YYYY)</i></span>
                                 </li>
-                                <li style={{ display: 'flex', alignItems: 'center', gap: 8 }}>• DEPARTMENT</li>
-                                <li style={{ display: 'flex', alignItems: 'center', gap: 8 }}>• DESIGNATION</li>
-                                <li style={{ display: 'flex', alignItems: 'center', gap: 8 }}>• MONTHLY SALARY</li>
-                                <li style={{ display: 'flex', alignItems: 'center', gap: 8 }}>• EXPERIENCE</li>
-                                <li style={{ display: 'flex', alignItems: 'center', gap: 8 }}>• QUALIFICATIONS</li>
                                 <li style={{ display: 'flex', alignItems: 'center', gap: 8 }}>• JOINING DATE</li>
                             </ul>
 

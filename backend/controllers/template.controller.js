@@ -19,7 +19,7 @@ exports.updateTemplate = async (req, res) => {
         const template = await NotificationTemplate.findByIdAndUpdate(
             id,
             { subject, body, isActive },
-            { new: true }
+            { returnDocument: 'after' }
         );
 
         if (!template) {
@@ -57,24 +57,17 @@ exports.seedDefaults = async () => {
             placeholders: ['studentName', 'amountPaid', 'receiptNo']
         },
         {
-            name: 'Batch Assignment',
-            eventType: 'batchAssignment',
-            subject: 'New Batch Assigned - {{instituteName}}',
-            body: 'Hello {{studentName}}, you have been assigned to the batch: {{batchName}}. Timing: {{timing}}.',
-            placeholders: ['studentName', 'batchName', 'timing', 'instituteName']
-        },
-        {
             name: 'Fee Overdue',
             eventType: 'feeOverdue',
-            subject: 'Emergency Reminder: Fee Overdue for {{month}}',
-            body: 'Hello {{studentName}}, your fee of ₹{{pendingAmount}} for {{month}} is overdue. Please settle it by {{deadline}} to avoid penalties.',
+            subject: 'Reminder: Fee Overdue for {{month}}',
+            body: 'Hello {{studentName}}, your fee of ₹{{pendingAmount}} for {{month}} is overdue. \n Please settle it by {{deadline}} Thank you.',
             placeholders: ['studentName', 'pendingAmount', 'month', 'deadline', 'instituteName']
         },
         {
             name: 'Exam Result',
             eventType: 'examResult',
             subject: 'Exam Result Published: {{examName}}',
-            body: 'Hello {{studentName}}, the results for {{examName}} held on {{examDate}} have been published. Your score: {{score}}/{{totalMarks}}. Status: {{passStatus}}.',
+            body: 'Hello {{studentName}}, the results for {{examName}} held on {{examDate}} have been published. \nYour score: {{score}}/{{totalMarks}}. Status: {{passStatus}}.',
             placeholders: ['studentName', 'examName', 'examDate', 'score', 'totalMarks', 'passStatus', 'instituteName']
         },
         {
@@ -84,27 +77,12 @@ exports.seedDefaults = async () => {
             body: 'Hello {{teacherName}}, welcome to our team. Your faculty account has been created. Username: {{email}}, Password: {{password}}. Please login at {{portalUrl}}.',
             placeholders: ['teacherName', 'email', 'password', 'portalUrl', 'instituteName']
         },
-        {
-            name: 'Salary Paid',
-            eventType: 'salaryPaid',
-            subject: 'Salary Processed: {{month}} {{year}}',
-            body: 'Hello {{teacherName}}, your salary for {{month}} {{year}} has been processed. Net Paid: ₹{{amountPaid}}. Reference: {{transactionRef}}.',
-            placeholders: ['teacherName', 'amountPaid', 'month', 'year', 'transactionRef', 'instituteName']
-        },
-        {
-            name: 'Teacher Batch Assignment',
-            eventType: 'teacherBatchAssignment',
-            subject: 'New Batch Assignment: {{batchName}}',
-            body: 'Hello {{teacherName}}, you have been assigned as the lead teacher for the new batch: {{batchName}}. Schedule: {{schedule}}.',
-            placeholders: ['teacherName', 'batchName', 'schedule', 'instituteName']
-        }
     ];
 
     for (const def of defaults) {
         const exists = await NotificationTemplate.findOne({ eventType: def.eventType });
         if (!exists) {
             await NotificationTemplate.create(def);
-            console.log(`[Seed] Template created: ${def.name}`);
         }
     }
 };

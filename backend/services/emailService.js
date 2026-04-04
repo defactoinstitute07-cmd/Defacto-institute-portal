@@ -33,7 +33,7 @@ const detectTheme = (messageType = '', eventType = '') => {
     const normalizedType = String(messageType || '').toLowerCase();
     const normalizedEvent = String(eventType || '').toLowerCase();
 
-    if (['success', 'paid', 'completed'].includes(normalizedType) || ['feepayment', 'salarypaid'].includes(normalizedEvent)) {
+    if (['success', 'paid', 'completed'].includes(normalizedType) || ['feepayment'].includes(normalizedEvent)) {
         return 'success';
     }
 

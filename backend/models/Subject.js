@@ -1,5 +1,39 @@
 const mongoose = require('mongoose');
 
+const chapterSchema = new mongoose.Schema({
+    name: {
+        type: String,
+        required: true,
+        trim: true
+    },
+    durationDays: {
+        type: Number,
+        required: true,
+        min: 1
+    },
+    status: {
+        type: String,
+        enum: ['ongoing', 'completed'],
+        default: 'ongoing'
+    },
+    createdAt: {
+        type: Date,
+        default: Date.now
+    },
+    completedAt: {
+        type: Date,
+        default: null
+    },
+    projectedStartDate: {
+        type: Date,
+        default: null
+    },
+    projectedCompletionDate: {
+        type: Date,
+        default: null
+    }
+}, { _id: true });
+
 const subjectSchema = new mongoose.Schema({
     name: {
         type: String,
@@ -18,10 +52,20 @@ const subjectSchema = new mongoose.Schema({
         required: true,
         index: true
     },
+    teacherId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Teacher',
+        default: null,
+        index: true
+    },
     totalChapters: {
         type: Number,
         default: null,
         min: 0
+    },
+    chapters: {
+        type: [chapterSchema],
+        default: []
     },
     isActive: {
         type: Boolean,
@@ -36,6 +80,18 @@ const subjectSchema = new mongoose.Schema({
         type: Date,
         default: Date.now
     }
+});
+
+subjectSchema.pre('validate', function () {
+    if (!Array.isArray(this.chapters)) return;
+
+    this.chapters.forEach((chapter) => {
+        if (!chapter || typeof chapter.status !== 'string') return;
+        const normalized = chapter.status.trim().toLowerCase();
+        if (normalized === 'completed' || normalized === 'ongoing') {
+            chapter.status = normalized;
+        }
+    });
 });
 
 subjectSchema.pre('save', function () {

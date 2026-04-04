@@ -63,26 +63,6 @@ const adminSchema = new mongoose.Schema({
         type: Number,
         required: [true, 'Number of rooms is required']
     },
-    wipeOtp: {
-        type: String,
-        default: null
-    },
-    wipeOtpExpiry: {
-        type: Date,
-        default: null
-    },
-    fcmServerKey: {
-        type: String,
-        default: ''
-    },
-    gmailEmail: {
-        type: String,
-        default: ''
-    },
-    gmailAppPassword: {
-        type: String,
-        default: ''
-    },
     notificationsEnabled: {
         type: Boolean,
         default: true
@@ -91,24 +71,18 @@ const adminSchema = new mongoose.Schema({
         studentRegistration: { type: Boolean, default: true },
         feeGenerated: { type: Boolean, default: true },
         feePayment: { type: Boolean, default: true },
-        batchAssignment: { type: Boolean, default: true },
         feeOverdue: { type: Boolean, default: true },
         examResult: { type: Boolean, default: true },
         teacherRegistration: { type: Boolean, default: true },
-        salaryPaid: { type: Boolean, default: true },
-        teacherBatchAssignment: { type: Boolean, default: true },
         testAnnouncement: { type: Boolean, default: true }
     },
     pushEvents: {
         studentRegistration: { type: Boolean, default: true },
         feeGenerated: { type: Boolean, default: true },
         feePayment: { type: Boolean, default: true },
-        batchAssignment: { type: Boolean, default: true },
         feeOverdue: { type: Boolean, default: true },
         examResult: { type: Boolean, default: true },
         teacherRegistration: { type: Boolean, default: true },
-        salaryPaid: { type: Boolean, default: true },
-        teacherBatchAssignment: { type: Boolean, default: true },
         testAnnouncement: { type: Boolean, default: true }
     },
     receiptSettings: {

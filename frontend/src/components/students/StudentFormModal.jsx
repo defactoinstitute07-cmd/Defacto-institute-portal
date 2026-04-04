@@ -159,7 +159,7 @@ const StudentFormModal = ({
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
                     <div>
                       <label style={{ fontWeight: 800, fontSize: '0.7rem', color: '#475569' }}>FULL NAME *</label>
-                      <input name="name" value={form.name} onChange={handleForm} placeholder="John Doe" required style={inputStyle} />
+                      <input name="name" value={form.name} onChange={handleForm} placeholder="Full Name" required style={inputStyle} />
                     </div>
                     <div style={{ display: 'flex', gap: 16 }} className="flex-mob-stack">
                       <div style={{ flex: 1 }}>
@@ -190,27 +190,20 @@ const StudentFormModal = ({
                   </div>
                 </div>
 
-                {/* Parents Info */}
                 <div style={{ display: 'flex', gap: 16 }} className="flex-mob-stack">
                   <div style={{ flex: 1 }}>
                     <label style={{ fontWeight: 800, fontSize: '0.7rem', color: '#475569' }}>FATHER'S NAME</label>
-                    <input type="text" name="fatherName" value={form.fatherName} onChange={handleForm} placeholder="Father's Full Name" style={inputStyle} />
+                    <input type="text" name="fatherName" value={form.fatherName || ''} onChange={handleForm} placeholder="Father's Full Name" style={inputStyle} />
                   </div>
                   <div style={{ flex: 1 }}>
                     <label style={{ fontWeight: 800, fontSize: '0.7rem', color: '#475569' }}>MOTHER'S NAME</label>
-                    <input type="text" name="motherName" value={form.motherName} onChange={handleForm} placeholder="Mother's Full Name" style={inputStyle} />
+                    <input type="text" name="motherName" value={form.motherName || ''} onChange={handleForm} placeholder="Mother's Full Name" style={inputStyle} />
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', gap: 16 }} className="flex-mob-stack">
-                  <div style={{ flex: 1 }}>
-                    <label style={{ fontWeight: 800, fontSize: '0.7rem', color: '#475569' }}>PARENT PHONE NUMBER</label>
-                    <input type="text" name="parentPhone" value={form.parentPhone || ''} onChange={handleForm} placeholder="+91 0000000000" style={inputStyle} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <label style={{ fontWeight: 800, fontSize: '0.7rem', color: '#475569' }}>PARENT EMAIL ADDRESS</label>
-                    <input type="email" name="parentEmail" value={form.parentEmail || ''} onChange={handleForm} placeholder="parent@example.com" style={inputStyle} />
-                  </div>
+                <div>
+                  <label style={{ fontWeight: 800, fontSize: '0.7rem', color: '#475569' }}>PARENT CONTACT NUMBER</label>
+                  <input type="text" name="parentPhone" value={form.parentPhone || ''} onChange={handleForm} placeholder="+91 0000000000" style={inputStyle} />
                 </div>
 
                 {/* Address */}

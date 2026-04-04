@@ -1,5 +1,4 @@
 const Exam = require('../models/Exam');
-const Holiday = require('../models/Holiday');
 const Student = require('../models/Student');
 const { logNotificationEvent } = require('../services/activityLogService');
 
@@ -32,37 +31,6 @@ exports.createExam = async (req, res) => {
         }
 
         res.status(201).json({ message: 'Exam created successfully', exam });
-    } catch (err) {
-        res.status(500).json({ message: 'Server error', error: err.message });
-    }
-};
-
-/**
- * Announces a holiday and logs student notification events.
- */
-exports.announceHoliday = async (req, res) => {
-    try {
-        const { title, date, reason } = req.body;
-        const holiday = new Holiday({ title, date, reason });
-        await holiday.save();
-
-        // Log notification events for all active students.
-        const students = await Student.find({ status: 'active' });
-        for (const s of students) {
-            if (s.email) {
-                await logNotificationEvent({
-                    recipientEmail: s.email,
-                    recipientName: s.name,
-                    subject: `Holiday Announcement: ${title}`,
-                    type: 'holiday',
-                    data: {
-                        message: `A holiday has been announced for ${new Date(date).toLocaleDateString()}. Reason: ${reason}`
-                    }
-                });
-            }
-        }
-
-        res.status(201).json({ message: 'Holiday announced successfully', holiday });
     } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });
     }

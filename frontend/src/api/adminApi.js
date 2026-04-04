@@ -1,9 +1,13 @@
 import axios from 'axios';
 import { API_BASE_URL, attachAuthToken } from './apiConfig';
 
-
 const API = attachAuthToken(axios.create({
     baseURL: `${API_BASE_URL}/api/admin`,
+    withCredentials: true
+}));
+
+const genericAPI = attachAuthToken(axios.create({
+    baseURL: `${API_BASE_URL}/api`,
     withCredentials: true
 }));
 
@@ -15,12 +19,7 @@ export const adminLogout = () => API.post('/logout');
 export const getAdminProfile = () => API.get('/profile');
 export const updateAdminProfile = (data) => API.put('/profile', data);
 export const updateSettings = (data) => API.put('/settings', data);
-
-// Settings page extra metrics
-export const getDatabaseStats = () => axios.get(`${API_BASE_URL}/api/settings/db-stats`, { withCredentials: true });
-
-// The dashboard work routes are also under this base
-export const fetchDashboard = () => API.get('/');
+export const getDatabaseStorageStats = () => genericAPI.get('/settings/db-stats');
 
 // Database Wipe APIs
 export const wipeDatabase = (password) => API.post('/wipe-database', { password });

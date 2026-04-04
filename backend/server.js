@@ -12,27 +12,21 @@ const { adminAuth } = require('./middleware/auth.middleware');
 const rateLimit = require('express-rate-limit');
 
 const adminRoutes = require('./routes/adminRoutes');
-const adminWorkRoutes = require('./routes/admin.work');
 const studentRoutes = require('./routes/student.routes');
 const batchRoutes = require('./routes/batch.routes');
 const schedulerRoutes = require('./routes/scheduler.routes');
 const settingsRoutes = require('./routes/settings.routes');
 const teacherRoutes = require('./routes/teacher.routes');
-const teacherPayrollRoutes = require('./routes/teacher.payroll.routes');
-const expenseRoutes = require('./routes/expense.routes');
 const feesRoutes = require('./routes/fees.routes');
 const eventRoutes = require('./routes/event.routes');
 const examRoutes = require('./routes/exam.routes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const attendanceRoutes = require('./routes/attendance.routes');
 const subjectRoutes = require('./routes/subject.routes');
-const teacherAssignmentRoutes = require('./routes/teacherAssignment.routes');
 const templateRoutes = require('./routes/templateRoutes');
-const teacherPortalRoutes = require('./routes/teacher.portal.routes');
+const dashboardRoutes = require('./routes/dashboard.routes');
 
-const pageVisitRoutes = require('./routes/pageVisit.routes');
-
-const { initSalaryScheduler, initScheduler } = require('./utils/scheduler');
+const { initScheduler } = require('./utils/scheduler');
 // Portal auth routes
 const studentAuthRoutes = require('./routes/student.auth.routes');
 const teacherAuthRoutes = require('./routes/teacher.auth.routes');
@@ -44,7 +38,6 @@ const app = express();
 app.set('trust proxy', 1);
 
 if (process.env.NODE_ENV !== 'production') {
-    initSalaryScheduler();
     initScheduler();
 }
 
@@ -57,9 +50,6 @@ const allowedOrigins = [
     'https://tutution-erp-frontend.vercel.app',
     process.env.CORS_ORIGIN
 ].filter(Boolean);
-
-// Log start-up diagnostics
-console.log('Server startup checks completed');
 
 app.use(cors({
     origin: function (origin, callback) {
@@ -124,7 +114,6 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // API Routes
 app.use('/api/admin', adminRoutes); // Auth & basic profile
-app.use('/api/admin', adminWorkRoutes); // Work/Dashboard data
 app.use('/api/students', studentRoutes);
 app.use('/api/batches', batchRoutes);
 app.use('/api/scheduler', schedulerRoutes);
@@ -135,19 +124,15 @@ app.use('/api/exams', examRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/subjects', subjectRoutes);
-app.use('/api/teacher-assignments', teacherAssignmentRoutes);
 app.use('/api/templates', templateRoutes);
-app.use('/api/teacher-portal', teacherPortalRoutes);
-app.use('/api/payroll', adminAuth, teacherPayrollRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+
 app.use('/api/fees', adminAuth, feesRoutes);
-app.use('/api/expenses', adminAuth, expenseRoutes);
 
 // Portal auth routes
 app.use('/api/student', studentAuthRoutes);
 app.use('/api/teacher', teacherAuthRoutes);
 app.use('/api/demo', demoRoutes);
-
-app.use('/api/track-visit', pageVisitRoutes); // Scoped CORS handled inside the router
 
 // Health check route
 app.get('/api/health', (req, res) => {
@@ -184,5 +169,5 @@ module.exports = app;
 // Start server only in local development (not on Vercel)
 if (process.env.NODE_ENV !== 'production') {
     const PORT = process.env.PORT || 5000;
-    app.listen(PORT, () => { console.log(`Server running on port ${PORT}`); });
+    app.listen(PORT);
 }

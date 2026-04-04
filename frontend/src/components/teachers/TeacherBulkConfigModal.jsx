@@ -6,17 +6,12 @@ import {
     AlertTriangle,
     Loader2,
     ShieldCheck,
-    Briefcase,
-    Building2,
-    IndianRupee,
     UserCheck,
 } from "lucide-react";
 
 const TeacherBulkConfigModal = ({ isOpen, onClose, onConfirm, selectedCount, loading, error }) => {
     const [updates, setUpdates] = useState({
         status: "",
-        department: "",
-        designation: "",
     });
     const [adminPassword, setAdminPassword] = useState("");
 
@@ -115,34 +110,6 @@ const TeacherBulkConfigModal = ({ isOpen, onClose, onConfirm, selectedCount, loa
                                 <option value="active">Active</option>
                                 <option value="inactive">Inactive</option>
                             </select>
-                        </div>
-
-                        <div>
-                            <label className="config-label">
-                                <Building2 size={12} /> DEPARTMENT
-                            </label>
-                            <input
-                                type="text"
-                                name="department"
-                                placeholder="e.g. Mathematics"
-                                value={updates.department}
-                                onChange={handleChange}
-                                className="erp-input"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="config-label">
-                                <Briefcase size={12} /> DESIGNATION
-                            </label>
-                            <input
-                                type="text"
-                                name="designation"
-                                placeholder="e.g. Senior Professor"
-                                value={updates.designation}
-                                onChange={handleChange}
-                                className="erp-input"
-                            />
                         </div>
 
                         <div

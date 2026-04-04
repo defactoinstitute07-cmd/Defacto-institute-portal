@@ -56,7 +56,6 @@ const StudentTable = ({
                         <th>Batch Details</th>
                         <th>App Activity</th>
                         <th>Status</th>
-                        <th>Fee Status</th>
                         <th>Attendance</th>
                         <th className="text-right !pr-6">Actions</th>
                     </tr>
@@ -135,13 +134,6 @@ const StudentTable = ({
                                         {s.status === 'batch_pending' ? 'Batch Pending' : s.status}
                                     </span>
                                 </div>
-                            </td>
-                            <td data-label="Fee Status">
-                                <div className="text-sm font-bold text-slate-700">₹ {(s.feesPaid || 0).toLocaleString()}</div>
-                                <div className="w-24 h-1.5 bg-slate-100 rounded-sm mt-1.5 overflow-hidden">
-                                    <div className="h-full bg-blue-500" style={{ width: `${Math.min(100, ((s.feesPaid || 0) / (s.fees || 1)) * 100)}%` }}></div>
-                                </div>
-                                <div className="text-[10px] text-slate-400 mt-0.5">Total: ₹ {(s.fees || 0).toLocaleString()}</div>
                             </td>
                             <td data-label="Attendance">
                                 <div className="flex flex-col">

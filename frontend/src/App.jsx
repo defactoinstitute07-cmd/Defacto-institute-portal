@@ -2,31 +2,27 @@ import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import axios from 'axios';
 import AdminLoginPage from './pages/AdminLoginPage';
-import AdminDashboard from './pages/AdminDashboard';
 import AdminProfilePage from './pages/AdminProfilePage';
 import StudentsPage from './pages/StudentsPage';
 import FeesPage from './pages/FeesPage';
 import BatchesPage from './pages/BatchesPage';
 import TeachersPage from './pages/TeachersPage';
-import ExpensesPage from './pages/ExpensesPage';
-import TeacherPayrollDashboard from './pages/TeacherPayrollDashboard';
 import { API_BASE_URL } from './api/apiConfig';
-import AnalyticsPage from './pages/AnalyticsPage';
 import BatchDetailsPage from './pages/BatchDetailsPage';
-import BatchSubjectDetailsPage from './pages/BatchSubjectDetailsPage';
 import StudentProfilePage from './pages/StudentProfilePage';
 import SettingsPage from './pages/SettingsPage';
 import ExamsPage from './pages/ExamsPage';
 import NotificationsPage from './pages/NotificationsPage';
 import AttendancePage from './pages/AttendancePage';
 import SubjectsPage from './pages/SubjectsPage';
+import SubjectDetailsPage from './pages/SubjectDetailsPage';
 import SignupPage from './pages/SignupPage';
 import EmailTemplatesPage from './pages/EmailTemplatesPage';
+import DashboardPage from './pages/DashboardPage';
 import { checkAdminExists } from './api/adminApi';
 import ProtectedRoute from './components/ProtectedRoute';
 
 import { Loader2 } from 'lucide-react';
-import { Analytics } from '@vercel/analytics/react';
 import { Toaster } from 'react-hot-toast';
 
 function App() {
@@ -43,8 +39,8 @@ function App() {
 
     useEffect(() => {
         // Default to the dashboard accent until institute-specific settings are loaded.
-        document.documentElement.style.setProperty('--erp-primary', '#5b57d9');
-        document.documentElement.style.setProperty('--erp-secondary', '#8d85ff');
+        document.documentElement.style.setProperty('--erp-primary', '#193466');
+        document.documentElement.style.setProperty('--erp-secondary', '#FFC50F');
 
         // Fetch baseline institute settings (Publicly accessible)
         axios.get(`${API_BASE_URL}/api/settings`)
@@ -98,21 +94,19 @@ function App() {
                 />
 
                 {/* Admin Routes */}
-                <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard /></ProtectedRoute>} />
+                <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['admin']}><DashboardPage /></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute allowedRoles={['admin']}><AdminProfilePage /></ProtectedRoute>} />
                 <Route path="/students" element={<ProtectedRoute allowedRoles={['admin']}><StudentsPage /></ProtectedRoute>} />
                 <Route path="/students/:id" element={<ProtectedRoute allowedRoles={['admin']}><StudentProfilePage /></ProtectedRoute>} />
                 <Route path="/fees" element={<ProtectedRoute allowedRoles={['admin']}><FeesPage /></ProtectedRoute>} />
                 <Route path="/batches" element={<ProtectedRoute allowedRoles={['admin']}><BatchesPage /></ProtectedRoute>} />
                 <Route path="/batches/:id" element={<ProtectedRoute allowedRoles={['admin']}><BatchDetailsPage /></ProtectedRoute>} />
-                <Route path="/batches/:id/subjects/:subjectName" element={<ProtectedRoute allowedRoles={['admin']}><BatchSubjectDetailsPage /></ProtectedRoute>} />
                 <Route path="/teachers" element={<ProtectedRoute allowedRoles={['admin']}><TeachersPage /></ProtectedRoute>} />
-                <Route path="/payroll" element={<ProtectedRoute allowedRoles={['admin']}><TeacherPayrollDashboard /></ProtectedRoute>} />
-                <Route path="/expenses" element={<ProtectedRoute allowedRoles={['admin']}><ExpensesPage /></ProtectedRoute>} />
-                <Route path="/analytics" element={<ProtectedRoute allowedRoles={['admin']}><AnalyticsPage /></ProtectedRoute>} />
+                <Route path="/analytics" element={<Navigate to="/students" replace />} />
                 <Route path="/notifications" element={<ProtectedRoute allowedRoles={['admin']}><NotificationsPage /></ProtectedRoute>} />
                 <Route path="/attendance" element={<ProtectedRoute allowedRoles={['admin']}><AttendancePage /></ProtectedRoute>} />
                 <Route path="/subjects" element={<ProtectedRoute allowedRoles={['admin']}><SubjectsPage /></ProtectedRoute>} />
+                <Route path="/subjects/:id" element={<ProtectedRoute allowedRoles={['admin']}><SubjectDetailsPage /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute allowedRoles={['admin']}><SettingsPage /></ProtectedRoute>} />
                 <Route path="/templates" element={<ProtectedRoute allowedRoles={['admin']}><EmailTemplatesPage /></ProtectedRoute>} />
                 <Route path="/exams" element={<ProtectedRoute allowedRoles={['admin']}><ExamsPage /></ProtectedRoute>} />
@@ -126,7 +120,6 @@ function App() {
                 <Route path="/" element={<Navigate to="/login" replace />} />
                 <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
-            <Analytics />
             <Toaster position="top-right" />
         </Router>
     );

@@ -55,8 +55,6 @@ router.get('/', async (req, res) => {
     }
 });
 
-// GET /api/settings/db-stats
-// Returns MongoDB usage statistics (Required for admin dashboard)
-router.get('/db-stats', adminAuth, adminController.getDatabaseStats);
+router.get('/db-stats', adminAuth, adminController.getDatabaseStorageStats);
 
 module.exports = router;

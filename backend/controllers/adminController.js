@@ -5,6 +5,7 @@ const Batch = require('../models/Batch');
 const AuditLog = require('../models/AuditLog');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const { JWT_SECRET } = require('../middleware/auth.middleware');
 const emailService = require('../services/emailService');
 const connectDB = require('../config/db');
@@ -218,11 +219,8 @@ exports.updateSettings = async (req, res) => {
         const admin = await Admin.findById(req.admin.id).select('-password');
         if (!admin) return res.status(404).json({ message: 'Admin not found' });
 
-        const { fcmServerKey, gmailEmail, gmailAppPassword, notificationsEnabled, emailEvents, pushEvents, receiptSettings } = req.body;
+        const { notificationsEnabled, emailEvents, pushEvents, receiptSettings } = req.body;
 
-        if (fcmServerKey !== undefined) admin.fcmServerKey = fcmServerKey;
-        if (gmailEmail !== undefined) admin.gmailEmail = gmailEmail;
-        if (gmailAppPassword !== undefined) admin.gmailAppPassword = gmailAppPassword;
         if (notificationsEnabled !== undefined) admin.notificationsEnabled = notificationsEnabled;
         if (emailEvents !== undefined) {
             admin.emailEvents = { ...admin.emailEvents, ...emailEvents };
@@ -242,29 +240,32 @@ exports.updateSettings = async (req, res) => {
     }
 };
 
-// Get Database Stats
-exports.getDatabaseStats = async (req, res) => {
+exports.getDatabaseStorageStats = async (_req, res) => {
     try {
-        const mongoose = require('mongoose');
         const stats = await mongoose.connection.db.stats();
+        const atlasLimitMB = Math.max(Number(process.env.MONGODB_ATLAS_LIMIT_MB) || 512, 1);
+        const toMB = (value) => Number(((Number(value) || 0) / (1024 * 1024)).toFixed(2));
+        const dataSizeMB = toMB(stats.dataSize);
+        const storageSizeMB = toMB(stats.storageSize);
+        const indexSizeMB = toMB(stats.indexSize);
+        const usagePercentage = Number(Math.min((storageSizeMB / atlasLimitMB) * 100, 100).toFixed(2));
 
-        const atlasLimitMB = 512;
-        const storageSizeMB = (stats.storageSize / (1024 * 1024)).toFixed(2);
-        const dataSizeMB = (stats.dataSize / (1024 * 1024)).toFixed(2);
-        const usagePercentage = ((storageSizeMB / atlasLimitMB) * 100).toFixed(2);
-
-        res.json({
+        return res.json({
             dbName: stats.db,
-            collections: stats.collections,
-            objects: stats.objects,
+            collections: Number(stats.collections) || 0,
+            objects: Number(stats.objects) || 0,
             dataSizeMB,
             storageSizeMB,
-            limitMB: atlasLimitMB,
-            usagePercentage: Math.min(usagePercentage, Number(usagePercentage)) > 100 ? 100 : usagePercentage
+            indexSizeMB,
+            atlasLimitMB,
+            usagePercentage
         });
     } catch (error) {
-        console.error('[DBStatsError] Failed to fetch database stats');
-        res.status(500).json({ message: 'Failed to fetch database stats', error: error.message });
+        console.error('[DBStorageStatsError] Failed to fetch MongoDB Atlas stats');
+        return res.status(500).json({
+            message: 'Failed to fetch database storage stats.',
+            error: error.message
+        });
     }
 };
 

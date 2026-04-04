@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Save, Loader2, Bell, AlertTriangle } from 'lucide-react';
 import ERPLayout from '../components/ERPLayout';
 import AlertMessage from '../components/common/AlertMessage';
-import DatabaseUsage from '../components/settings/DatabaseUsage';
+import DatabaseStorageCard from '../components/settings/DatabaseStorageCard';
 import { getAdminProfile, updateSettings, wipeDatabase } from '../api/adminApi';
 import '../index.css';
 
@@ -11,9 +11,6 @@ const SettingsPage = () => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [settings, setSettings] = useState({
-        fcmServerKey: '',
-        gmailEmail: '',
-        gmailAppPassword: '',
         notificationsEnabled: true,
         emailEvents: {},
         pushEvents: {}
@@ -21,17 +18,10 @@ const SettingsPage = () => {
 
     // Wipe DB State
     const [wipeModal, setWipeModal] = useState({ isOpen: false, step: 1, password: '', otp: '', loading: false, error: null });
-
-    const emailConfigured = Boolean(String(settings.gmailEmail || '').trim() && String(settings.gmailAppPassword || '').trim());
-    const pushConfigured = Boolean(String(settings.fcmServerKey || '').trim());
-
     useEffect(() => {
         getAdminProfile()
             .then(({ data }) => {
                 setSettings({
-                    fcmServerKey: data.fcmServerKey || '',
-                    gmailEmail: data.gmailEmail || '',
-                    gmailAppPassword: data.gmailAppPassword || '',
                     notificationsEnabled: data.notificationsEnabled !== undefined ? data.notificationsEnabled : true,
                     emailEvents: data.emailEvents || {},
                     pushEvents: data.pushEvents || {}
@@ -40,7 +30,6 @@ const SettingsPage = () => {
             .catch(() => setAlert({ type: 'error', text: 'Failed to load settings.' }))
             .finally(() => setLoading(false));
     }, []);
-
     const handleChange = (e) => {
         setSettings({ ...settings, [e.target.name]: e.target.value });
     };
@@ -90,6 +79,8 @@ const SettingsPage = () => {
             <div style={{ maxWidth: 800, margin: '0 auto' }}>
                 {alert && <AlertMessage type={alert.type} message={alert.text} onClose={() => setAlert(null)} />}
 
+                <DatabaseStorageCard />
+
                 <div className="card" style={{ padding: 32, marginBottom: 24 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24, borderBottom: '1px solid #e2e8f0', paddingBottom: 16 }}>
                         <div style={{ padding: 12, background: '#f8fafc', borderRadius: 6 }}>
@@ -101,21 +92,13 @@ const SettingsPage = () => {
                         </div>
                     </div>
 
-                    <div style={{ padding: 20, background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0', marginBottom: 32 }}>
-                        <p style={{ margin: 0, fontSize: '0.95rem', color: '#1e293b', fontWeight: 600 }}>Email & Push Notifications</p>
-                        <p style={{ margin: '8px 0 0', fontSize: '0.85rem', color: '#64748b', lineHeight: 1.6 }}>
-                            Configure your Gmail SMTP credentials and Firebase keys below.
-                            When enabled, the system will automatically dispatch alerts for critical student and fee events.
-                        </p>
-                    </div>
-
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24, borderBottom: '1px solid #e2e8f0', paddingBottom: 16 }}>
                         <div style={{ padding: 12, background: '#fef3c7', borderRadius: 6 }}>
                             <Bell size={24} color="var(--erp-text-warning)" />
                         </div>
                         <div>
-                            <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#1e293b' }}>Notification Setup</h2>
-                            <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: '#64748b' }}>Manage your API keys and automated triggers.</p>
+                            <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#1e293b' }}>Notification Center</h2>
+                            <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: '#64748b' }}>Manage your automated notification triggers.</p>
                         </div>
                     </div>
 
@@ -125,97 +108,6 @@ const SettingsPage = () => {
                         </div>
                     ) : (
                         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
-                                <div style={{ padding: 18, background: '#ffffff', borderRadius: 10, border: '1px solid #e2e8f0', boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                                        <div style={{ fontWeight: 700, color: '#1e293b' }}>Email Delivery</div>
-                                        <span style={{
-                                            fontSize: '0.72rem',
-                                            fontWeight: 800,
-                                            letterSpacing: '0.08em',
-                                            textTransform: 'uppercase',
-                                            color: emailConfigured ? '#047857' : '#b45309',
-                                            background: emailConfigured ? '#dcfce7' : '#fef3c7',
-                                            padding: '4px 8px',
-                                            borderRadius: 999
-                                        }}>
-                                            {emailConfigured ? 'Ready' : 'Setup needed'}
-                                        </span>
-                                    </div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                        <div>
-                                            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: 6 }}>Gmail Address</label>
-                                            <input
-                                                type="email"
-                                                name="gmailEmail"
-                                                value={settings.gmailEmail}
-                                                onChange={handleChange}
-                                                placeholder="yourgmail@gmail.com"
-                                                className="w-full"
-                                                style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.9rem' }}
-                                            />
-                                        </div>
-                                        <div>
-                                            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: 6 }}>Gmail App Password</label>
-                                            <input
-                                                type="password"
-                                                name="gmailAppPassword"
-                                                value={settings.gmailAppPassword}
-                                                onChange={handleChange}
-                                                placeholder="16-character app password"
-                                                className="w-full"
-                                                style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.9rem' }}
-                                            />
-                                        </div>
-                                        <p style={{ margin: 0, fontSize: '0.78rem', color: '#64748b', lineHeight: 1.6 }}>
-                                            Student Registration and other email triggers will only send after both values are saved here.
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div style={{ padding: 18, background: '#ffffff', borderRadius: 10, border: '1px solid #e2e8f0', boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                                        <div style={{ fontWeight: 700, color: '#1e293b' }}>Push Delivery</div>
-                                        <span style={{
-                                            fontSize: '0.72rem',
-                                            fontWeight: 800,
-                                            letterSpacing: '0.08em',
-                                            textTransform: 'uppercase',
-                                            color: pushConfigured ? '#1d4ed8' : '#64748b',
-                                            background: pushConfigured ? '#dbeafe' : '#e2e8f0',
-                                            padding: '4px 8px',
-                                            borderRadius: 999
-                                        }}>
-                                            {pushConfigured ? 'Ready' : 'Optional'}
-                                        </span>
-                                    </div>
-                                    <div>
-                                        <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#475569', marginBottom: 6 }}>Firebase Server Key</label>
-                                        <textarea
-                                            name="fcmServerKey"
-                                            value={settings.fcmServerKey}
-                                            onChange={handleChange}
-                                            rows={4}
-                                            placeholder="Paste your Firebase server key for push notifications"
-                                            className="w-full"
-                                            style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.9rem', resize: 'vertical' }}
-                                        />
-                                    </div>
-                                    <p style={{ margin: '12px 0 0', fontSize: '0.78rem', color: '#64748b', lineHeight: 1.6 }}>
-                                        Push delivery is separate from email. Student Registration email can still work even if Firebase is not configured.
-                                    </p>
-                                </div>
-                            </div>
-
-                            {!emailConfigured && (
-                                <div style={{ padding: '14px 16px', borderRadius: 10, border: '1px solid #fcd34d', background: '#fffbeb', color: '#92400e' }}>
-                                    <div style={{ fontWeight: 700, marginBottom: 4 }}>Email is not configured yet</div>
-                                    <div style={{ fontSize: '0.86rem', lineHeight: 1.6 }}>
-                                        Automatic emails like Student Registration, Fee Generated, Fee Payment, and Faculty Registration will fail until you save a Gmail address and app password.
-                                    </div>
-                                </div>
-                            )}
-
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
                                 <div>
                                     <div style={{ fontWeight: 700, color: '#1e293b' }}>Global Notifications</div>
@@ -246,12 +138,10 @@ const SettingsPage = () => {
                                         { key: 'studentRegistration', label: 'Student Registration' },
                                         { key: 'feeGenerated', label: 'Standard Fee Generated' },
                                         { key: 'feePayment', label: 'Standard Fee Payment' },
-                                        { key: 'batchAssignment', label: 'Standard Batch Assignment' },
                                         { key: 'feeOverdue', label: 'Standard Fee Overdue' },
                                         { key: 'examResult', label: 'Standard Exam Result' },
                                         { key: 'testAnnouncement', label: 'Test Announcement' },
                                         { key: 'teacherRegistration', label: 'Faculty Registration' },
-                                        { key: 'salaryPaid', label: 'Faculty Salary Paid' },
                                     ].map((event) => (
                                         <div key={event.key} style={{ padding: 16, background: '#fff', borderRadius: 8, border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 12 }}>
                                             <div style={{ fontWeight: 600, color: '#1e293b', fontSize: '0.9rem' }}>{event.label}</div>
@@ -289,15 +179,12 @@ const SettingsPage = () => {
                             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
                                 <button type="submit" disabled={saving} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 24px', background: '#0f172a', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, cursor: 'pointer' }}>
                                     {saving ? <Loader2 size={18} className="spin" /> : <Save size={18} />}
-                                    Save Notification Settings
+                                    Save Settings
                                 </button>
                             </div>
                         </form>
                     )}
                 </div>
-
-                <DatabaseUsage setAlert={setAlert} />
-
 
             </div>
 

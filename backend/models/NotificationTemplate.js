@@ -13,14 +13,10 @@ const notificationTemplateSchema = new mongoose.Schema({
             'studentRegistration',
             'feeGenerated',
             'feePayment',
-            'batchAssignment',
             'feeOverdue',
             'examResult',
             'teacherRegistration',
-            'salaryPaid',
-            'teacherBatchAssignment',
-            'testAnnouncement',
-            'surchargeAdded'
+            'testAnnouncement'
         ]
     },
     subject: {

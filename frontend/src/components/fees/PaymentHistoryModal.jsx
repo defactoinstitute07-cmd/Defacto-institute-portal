@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, History, Download, Calendar, ArrowUpRight, IndianRupee, Receipt, Eye } from 'lucide-react';
+import { X, History, Receipt } from 'lucide-react';
 
 const PaymentHistoryModal = ({ fee, onClose, onViewReceipt }) => {
     if (!fee) return null;
@@ -118,21 +118,12 @@ const PaymentHistoryModal = ({ fee, onClose, onViewReceipt }) => {
                                                 <Receipt size={13} /> View Receipt
                                             </button>
                                         </div>
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
                                             <div>
                                                 <div className="td-sm">Receipt #</div>
                                                 <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--erp-text)' }}>{pay.receiptNo}</div>
                                             </div>
-                                            <div className="text-right">
-                                                <div className="td-sm">Ref ID</div>
-                                                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--erp-text)' }}>{pay.transactionId || 'N/A'}</div>
-                                            </div>
                                         </div>
-                                        {pay.remarks && (
-                                            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--erp-bg2)', fontSize: '0.8rem', color: 'var(--erp-muted2)', fontStyle: 'italic' }}>
-                                                "{pay.remarks}"
-                                            </div>
-                                        )}
                                     </div>
                                 </div>
                             ))

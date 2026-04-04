@@ -3,21 +3,14 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import authApi from '../api/authApi';
 import { clearClientSession } from '../utils/authSession';
 import {
-    Banknote,
+    BarChart3,
     Bell,
     BookOpen,
     Building2,
-    ChevronDown,
     ClipboardCheck,
     GraduationCap,
-    Languages,
-    LayoutDashboard,
-    LineChart,
     LogOut,
-    Mail,
     Menu,
-    Receipt,
-    Search,
     Settings,
     Trophy,
     UserCircle,
@@ -28,9 +21,9 @@ import {
 
 const NAV_ITEMS = [
     {
-        section: 'Main',
+        section: 'Overview',
         items: [
-            { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' }
+            { to: '/dashboard', icon: BarChart3, label: 'Dashboard' }
         ]
     },
     {
@@ -47,10 +40,7 @@ const NAV_ITEMS = [
     {
         section: 'Finance',
         items: [
-            { to: '/fees', icon: Wallet, label: 'Fee Management' },
-            { to: '/payroll', icon: Banknote, label: 'Teacher Payroll' },
-            { to: '/expenses', icon: Receipt, label: 'Expenses' },
-            { to: '/analytics', icon: LineChart, label: 'Analytics Dashboard' }
+            { to: '/fees', icon: Wallet, label: 'Fee Management' }
         ]
     },
     {

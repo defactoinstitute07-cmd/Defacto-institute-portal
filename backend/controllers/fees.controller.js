@@ -1,7 +1,12 @@
 const Fee = require('../models/Fee');
 const Student = require('../models/Student');
 const Batch = require('../models/Batch');
+const Admin = require('../models/Admin');
+const PDFDocument = require('pdfkit');
+const path = require('path');
+const fs = require('fs');
 const { triggerAutomaticNotification } = require('../services/notificationService');
+const { sendEmail } = require('../services/emailService');
 
 // Helper to recalc pending & status
 const recalcStatus = (feeDoc) => {
@@ -15,6 +20,271 @@ const recalcStatus = (feeDoc) => {
     else feeDoc.status = 'pending';
 };
 
+const formatCurrency = (value) => {
+    const numValue = Number(value || 0);
+    return numValue.toLocaleString('en-IN', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2
+    });
+};
+
+const createFeeReceiptPdfBuffer = ({ fee, payment, admin }) => {
+    const student = fee.studentId || {};
+    const batch = fee.batchId || {};
+
+    return new Promise((resolve, reject) => {
+        const doc = new PDFDocument({ size: 'A4', margin: 0, compress: false });
+        const chunks = [];
+
+        doc.on('data', (chunk) => chunks.push(chunk));
+        doc.on('end', () => resolve(Buffer.concat(chunks)));
+        doc.on('error', reject);
+
+        const pageWidth = 595;
+        const pageHeight = 842;
+        const margin = 40;
+        const contentWidth = pageWidth - (2 * margin);
+        
+        // ===== COLOR SCHEME =====
+        const primaryColor = '#193466'; // Dark Blue
+        const secondaryColor = '#FFC50F'; // Yellow
+        const textColor = '#2b2e45'; // Dark Text
+        const lightText = '#7a7f96'; // Muted Text
+        const borderColor = '#e2e8f0'; // Light Border
+        const rowBgColor = '#f9fafb'; // Very Light Background
+
+        // ===== WATERMARK IMAGE (Background) =====
+        try {
+            const watermarkPath = path.join(__dirname, '../../frontend/public/assets/watermark/watermark.png');
+            if (fs.existsSync(watermarkPath)) {
+                doc.opacity(0.08);
+                doc.image(watermarkPath, (pageWidth - 200) / 2, (pageHeight - 200) / 2, { width: 200, height: 200 });
+                doc.opacity(1.0); // Reset opacity
+            }
+        } catch (err) {
+            console.warn('[fees.createFeeReceiptPdfBuffer] Watermark image not found or error loading:', err.message);
+        }
+
+        // ===== HEADER SECTION WITH LOGO =====
+        // Background Rectangle
+        doc.rect(0, 0, pageWidth, 120).fill(primaryColor);
+
+        // Logo or Placeholder (left side)
+        const logoX = margin;
+        const logoY = 20;
+        const logoSize = 60;
+        
+        try {
+            let logoAdded = false;
+            if (admin?.instituteLogo) {
+                // Resolve path from project root
+                const logoPath = path.resolve(process.cwd(), admin.instituteLogo);
+                if (fs.existsSync(logoPath)) {
+                    doc.image(logoPath, logoX, logoY, { width: logoSize, height: logoSize, fit: [logoSize, logoSize] });
+                    logoAdded = true;
+                }
+            }
+            
+            if (!logoAdded) {
+                // Fallback: show placeholder with border
+                doc.rect(logoX, logoY, logoSize, logoSize)
+                    .stroke(secondaryColor);
+                doc.fillColor('#ffffff')
+                    .fontSize(12)
+                    .font('Helvetica-Bold')
+                    .text('LOGO', logoX, logoY + 20, {
+                        width: logoSize,
+                        align: 'center',
+                        height: logoSize,
+                        valign: 'center'
+                    });
+            }
+        } catch (err) {
+            console.warn('[fees.createFeeReceiptPdfBuffer] Logo image error:', err.message);
+            // Fallback: show placeholder
+            doc.rect(logoX, logoY, logoSize, logoSize)
+                .stroke(secondaryColor);
+            doc.fillColor('#ffffff')
+                .fontSize(12)
+                .font('Helvetica-Bold')
+                .text('LOGO', logoX, logoY + 20, {
+                    width: logoSize,
+                    align: 'center',
+                    height: logoSize,
+                    valign: 'center'
+                });
+        }
+
+        // Institute Name & Title (center)
+        const titleX = logoX + logoSize + 30;
+        const titleWidth = pageWidth - titleX - margin;
+        
+        doc.fillColor(secondaryColor)
+            .fontSize(22)
+            .font('Helvetica-Bold')
+            .text(String(admin?.coachingName || 'ERP ACADEMY').toUpperCase(), titleX, 28, {
+                width: titleWidth,
+                align: 'left',
+                lineGap: -5
+            });
+
+        doc.fillColor('#ffffff')
+            .fontSize(14)
+            .font('Helvetica-Bold')
+            .text('Fee Payment Receipt', titleX, 60, {
+                width: titleWidth,
+                align: 'left'
+            });
+
+        // ===== YELLOW SEPARATOR LINE =====
+        doc.strokeColor(secondaryColor)
+            .lineWidth(3)
+            .moveTo(margin, 120)
+            .lineTo(pageWidth - margin, 120)
+            .stroke();
+
+        let currentY = 140;
+
+        // ===== RECEIPT HEADER INFO (2 COLUMNS) =====
+        const colWidth = (contentWidth - 20) / 2;
+        const col1X = margin;
+        const col2X = margin + colWidth + 20;
+
+        // Left Column: Receipt Info
+        doc.fillColor(primaryColor)
+            .fontSize(9)
+            .font('Helvetica-Bold')
+            .text('RECEIPT INFORMATION', col1X, currentY);
+        currentY += 18;
+
+        const drawInfoRow = (label, value, x, y) => {
+            doc.fillColor(lightText)
+                .fontSize(9)
+                .font('Helvetica')
+                .text(`${label}:`, x, y);
+            doc.fillColor(textColor)
+                .fontSize(9)
+                .font('Helvetica-Bold')
+                .text(value, x + 100, y);
+            return y + 16;
+        };
+
+        currentY = drawInfoRow('Receipt No', payment.receiptNo || 'N/A', col1X, currentY);
+        currentY = drawInfoRow('Date', new Date(payment.date || Date.now()).toLocaleDateString('en-IN', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric'
+        }), col1X, currentY);
+
+        // Right Column: Student Info
+        let col2Y = 140;
+        doc.fillColor(primaryColor)
+            .fontSize(9)
+            .font('Helvetica-Bold')
+            .text('STUDENT INFORMATION', col2X, col2Y);
+        col2Y += 18;
+
+        col2Y = drawInfoRow('Name', student.name || 'N/A', col2X, col2Y);
+        col2Y = drawInfoRow('Roll No', student.rollNo || 'N/A', col2X, col2Y);
+        col2Y = drawInfoRow('Batch', batch.name || 'N/A', col2X, col2Y);
+
+        currentY = Math.max(currentY, col2Y) + 20;
+
+        // ===== FEE DETAILS TABLE =====
+        const tableX = margin;
+        const col1Width = 280;
+        const col2Width = contentWidth - col1Width;
+        const rowHeight = 28;
+        const headerBgColor = primaryColor;
+        const headerTextColor = secondaryColor;
+
+        // Table Header
+        doc.rect(tableX, currentY, col1Width, rowHeight).fill(headerBgColor);
+        doc.rect(tableX + col1Width, currentY, col2Width, rowHeight).fill(headerBgColor);
+
+        doc.fillColor(headerTextColor)
+            .fontSize(11)
+            .font('Helvetica-Bold')
+            .text('Fee Type', tableX + 12, currentY + 8, { width: col1Width - 24 });
+
+        doc.text('Amount', tableX + col1Width + 12, currentY + 8, { width: col2Width - 24, align: 'right' });
+
+        currentY += rowHeight;
+
+        // Table Rows
+        const feeRows = [
+            { label: `Tuition Fee (${fee.month} ${fee.year})`, value: fee.monthlyTuitionFee || 0 },
+            { label: 'Registration Fee', value: fee.registrationFee || 0 },
+            { label: 'Late Fine', value: fee.fine || 0 },
+            { label: 'Payment Received', value: payment.paidAmount || 0, isBold: true, bgColor: '#e0f2f1' },
+            { label: 'Pending Balance', value: Math.max(Number(fee.totalFee || 0) - Number(fee.amountPaid || 0), 0), isBold: true, bgColor: '#fff3e0' }
+        ];
+
+        feeRows.forEach((row, idx) => {
+            const bgColor = row.bgColor || (idx % 2 === 0 ? rowBgColor : '#ffffff');
+            
+            doc.rect(tableX, currentY, col1Width, rowHeight).fill(bgColor);
+            doc.rect(tableX + col1Width, currentY, col2Width, rowHeight).fill(bgColor);
+
+            doc.fillColor(textColor)
+                .fontSize(10)
+                .font(row.isBold ? 'Helvetica-Bold' : 'Helvetica')
+                .text(row.label, tableX + 12, currentY + 8, { width: col1Width - 24 });
+
+            doc.fillColor(row.isBold ? primaryColor : textColor)
+                .font(row.isBold ? 'Helvetica-Bold' : 'Helvetica')
+                .text(formatCurrency(row.value), tableX + col1Width + 12, currentY + 8, { width: col2Width - 24, align: 'right' });
+
+            currentY += rowHeight;
+        });
+
+        // ===== SEPARATOR LINE =====
+        currentY += 16;
+        doc.strokeColor(borderColor)
+            .lineWidth(1)
+            .moveTo(tableX, currentY)
+            .lineTo(pageWidth - margin, currentY)
+            .stroke();
+
+        // ===== FOOTER =====
+        currentY += 20;
+        doc.fillColor(lightText)
+            .fontSize(8)
+            .font('Helvetica')
+            .text('This fee receipt has been generated by Defacto\'s ERP system.', margin, currentY, {
+                width: contentWidth,
+                align: 'center'
+            });
+
+        currentY += 16;
+        doc.fillColor(primaryColor)
+            .fontSize(9)
+            .font('Helvetica-Bold')
+            .text(`Authorized by: ${admin?.adminName || 'Administrator'}`, margin, currentY, {
+                width: contentWidth,
+                align: 'center'
+            });
+
+        currentY += 14;
+        doc.fillColor(lightText)
+            .fontSize(7)
+            .font('Helvetica-Oblique')
+            .text(`Generated on: ${new Date().toLocaleString('en-IN', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            })}`, margin, currentY, {
+                width: contentWidth,
+                align: 'center'
+            });
+
+        doc.end();
+    });
+};
+
 // GET /api/fees
 exports.getFees = async (req, res) => {
     try {
@@ -22,11 +292,13 @@ exports.getFees = async (req, res) => {
         const limit = parseInt(req.query.limit, 10) || 10;
         const skip = (page - 1) * limit;
 
-        const { status, batchId, course } = req.query;
+        const { status, batchId, course, month, year } = req.query;
 
         const query = {};
         if (status) query.status = status;
         if (batchId) query.batchId = batchId;
+        if (month) query.month = month;
+        if (year) query.year = String(year);
 
         // If course filter is provided, resolve batches for that course
         if (course) {
@@ -37,7 +309,7 @@ exports.getFees = async (req, res) => {
 
         const total = await Fee.countDocuments(query);
         const fees = await Fee.find(query)
-            .populate('studentId', 'name rollNo profileImage className session fatherName motherName address')
+            .populate('studentId', 'name rollNo profileImage className session address')
             .populate('batchId', 'name course')
             .sort({ createdAt: -1 })
             .skip(skip)
@@ -79,21 +351,11 @@ exports.getMetrics = async (req, res) => {
             status: { $in: ['pending', 'partial', 'overdue'] }
         });
 
-        const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-        const [aggMonthly] = await Fee.aggregate([
-            { $unwind: '$paymentHistory' },
-            { $match: { 'paymentHistory.date': { $gte: startOfMonth } } },
-            { $group: { _id: null, monthlyCollection: { $sum: '$paymentHistory.paidAmount' } } }
-        ]);
-
         return res.json({
             totalCollected: aggOverall ? aggOverall.totalCollected : 0,
             totalPending: aggOverall ? aggOverall.totalPending : 0,
             overdueAmount: aggOverdue ? aggOverdue.overdueAmount : 0,
-            pendingStudents: pendingStudents.length,
-            monthlyCollection: aggMonthly ? aggMonthly.monthlyCollection : 0
+            pendingStudents: pendingStudents.length
         });
     } catch (err) {
         console.error('Error fetching fee metrics');
@@ -168,7 +430,11 @@ exports.createFee = async (req, res) => {
 exports.recordPayment = async (req, res) => {
     try {
         const { id } = req.params;
-        const { amountPaid, mode, transactionId, remarks, fine, bankName } = req.body;
+        const { amountPaid, mode, fine } = req.body;
+
+        // Validate payment method
+        const allowedModes = ['UPI', 'Cash'];
+        const paymentMode = allowedModes.includes(mode) ? mode : 'Cash';
 
         const fee = await Fee.findById(id);
         if (!fee) {
@@ -193,70 +459,55 @@ exports.recordPayment = async (req, res) => {
 
         fee.paymentHistory.push({
             paidAmount: paid,
-            paymentMethod: mode || 'Cash',
-            transactionId: transactionId || '',
-            bankName: bankName || '',
-            remarks: remarks || '',
+            paymentMethod: paymentMode,
+            remarks: '',
             receiptNo,
             date: new Date()
         });
 
         await fee.save();
+        await fee.populate('batchId', 'name course');
+        await fee.populate('studentId', 'name rollNo email');
 
-        const student = await Student.findById(fee.studentId).select('_id name').lean();
-        if (student?._id) {
-            triggerAutomaticNotification({
-                eventType: 'feePayment',
-                studentId: student._id,
-                adminId: req.admin?.id || null,
-                message: `Payment of Rs ${paid} received. Receipt: ${receiptNo}.`,
-                data: {
-                    amountPaid: paid,
-                    receiptNo,
-                    month: fee.month,
-                    year: fee.year,
-                    dueDate: fee.dueDate ? new Date(fee.dueDate).toLocaleDateString('en-IN') : ''
+        const latestPayment = fee.paymentHistory[fee.paymentHistory.length - 1] || null;
+
+        if (latestPayment) {
+            const recipientEmail = fee.studentId?.email || '';
+            if (recipientEmail) {
+                try {
+                    const admin = await Admin.findById(req.admin?.id).lean() || await Admin.findOne().lean();
+                    const receiptBuffer = await createFeeReceiptPdfBuffer({
+                        fee,
+                        payment: latestPayment,
+                        admin
+                    });
+
+                    await sendEmail({
+                        student: {
+                            name: fee.studentId?.name,
+                            email: recipientEmail
+                        },
+                        admin,
+                        subjectOverride: `Fee Payment Received - Receipt ${latestPayment.receiptNo}`,
+                        message: `We have successfully received your payment of ${formatCurrency(latestPayment.paidAmount)}. Your receipt ${latestPayment.receiptNo} is attached with this email.`,
+                        messageType: 'success',
+                        eventType: 'feePayment',
+                        recipientRole: 'student',
+                        attachments: [{
+                            filename: `Receipt_${latestPayment.receiptNo}.pdf`,
+                            content: receiptBuffer,
+                            contentType: 'application/pdf'
+                        }]
+                    });
+                } catch (emailError) {
+                    console.error('[fees.recordPayment.email] Failed to send receipt email', emailError?.message || emailError);
                 }
-            }).catch(() => console.error('[fees.recordPayment.notification] Notification dispatch failed'));
+            }
         }
 
         return res.json({ success: true, receiptNo, fee });
     } catch (err) {
         console.error('Error recording payment');
-        return res.status(500).json({ message: 'Server error', error: err.message });
-    }
-};
-
-// POST /api/fees/:id/expense
-exports.addExpenseToFee = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { title, amount, date, description } = req.body;
-
-        if (!title || !amount) {
-            return res.status(400).json({ message: 'Title and amount are required' });
-        }
-
-        const fee = await Fee.findById(id);
-        if (!fee) {
-            return res.status(404).json({ message: 'Fee record not found' });
-        }
-
-        const amt = Number(amount);
-        fee.otherExpenses.push({
-            title,
-            amount: amt,
-            date: date ? new Date(date) : new Date(),
-            description: description || ''
-        });
-
-        fee.totalFee = Number(fee.totalFee || 0) + amt;
-        recalcStatus(fee);
-
-        await fee.save();
-        return res.json({ success: true, fee });
-    } catch (err) {
-        console.error('Error adding extra expense to fee');
         return res.status(500).json({ message: 'Server error', error: err.message });
     }
 };
@@ -379,36 +630,6 @@ exports.remindOverdue = async (req, res) => {
         });
     } catch (err) {
         console.error('Error sending overdue reminders');
-        return res.status(500).json({ message: 'Server error', error: err.message });
-    }
-};
-
-// POST /api/fees/bulk-surcharge
-exports.bulkSurcharge = async (req, res) => {
-    try {
-        const { title, amount, date, description, feeIds } = req.body;
-        if (!title || !amount || !Array.isArray(feeIds) || feeIds.length === 0) {
-            return res.status(400).json({ message: 'Title, amount and feeIds are required' });
-        }
-
-        const amt = Number(amount);
-
-        const fees = await Fee.find({ _id: { $in: feeIds } });
-        for (const fee of fees) {
-            fee.otherExpenses.push({
-                title,
-                amount: amt,
-                date: date ? new Date(date) : new Date(),
-                description: description || ''
-            });
-            fee.totalFee = Number(fee.totalFee || 0) + amt;
-            recalcStatus(fee);
-            await fee.save();
-        }
-
-        return res.json({ success: true, updated: fees.length });
-    } catch (err) {
-        console.error('Error applying bulk surcharge');
         return res.status(500).json({ message: 'Server error', error: err.message });
     }
 };

@@ -1,16 +1,11 @@
 const Teacher = require('../models/Teacher');
 const { triggerAutomaticNotification } = require('../services/notificationService');
-const Batch = require('../models/Batch');
-const Student = require('../models/Student');
-const bcrypt = require('bcryptjs');
-const fs = require('fs');
-const path = require('path');
 const { logNotificationEvent } = require('../services/activityLogService');
 
 // GET /api/teachers
 exports.getAllTeachers = async (req, res) => {
     try {
-        const { status = '', batchId = '', search = '', page = 1, limit = 20 } = req.query;
+        const { status = '', search = '', page = 1, limit = 20 } = req.query;
         const query = {};
         if (status) query.status = status;
         if (search) query.$or = [
@@ -18,31 +13,14 @@ exports.getAllTeachers = async (req, res) => {
             { email: { $regex: search, $options: 'i' } },
             { regNo: { $regex: search, $options: 'i' } },
         ];
-        if (batchId) query['assignments.batchId'] = batchId;
 
         const skip = (parseInt(page) - 1) * parseInt(limit);
         const total = await Teacher.countDocuments(query);
-        const rawTeachers = await Teacher.find(query)
-            .populate('assignments.batchId', 'name')
+        const teachers = await Teacher.find(query)
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(parseInt(limit))
             .lean();
-
-        // Dynamically calculate enrollment for each batch assignment
-        const teachers = await Promise.all(rawTeachers.map(async t => {
-            const enrichedAssignments = await Promise.all((t.assignments || []).map(async a => {
-                const count = a.batchId ? await Student.countDocuments({ batchId: a.batchId._id }) : 0;
-                return {
-                    ...a,
-                    enrolled: count
-                };
-            }));
-            return {
-                ...t,
-                assignments: enrichedAssignments
-            };
-        }));
 
         res.json({ teachers, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
     } catch (err) {
@@ -55,15 +33,11 @@ exports.getSummary = async (req, res) => {
     try {
         const teachers = await Teacher.find().lean();
         const activeTeachers = teachers.filter(t => t.status === 'active');
-        const monthlyPayroll = teachers.reduce((s, t) => s + (t.salary || 0), 0);
-        const monthExpenditure = activeTeachers.reduce((s, t) => s + (t.salary || 0), 0);
-        const activeClasses = activeTeachers.reduce((s, t) => s + (t.assignments?.length || 0), 0);
-
+        const inactiveTeachers = teachers.filter(t => t.status !== 'active');
         res.json({
             totalFaculty: teachers.length,
-            monthlyPayroll,
-            monthExpenditure,
-            activeClasses,
+            activeFaculty: activeTeachers.length,
+            inactiveFaculty: inactiveTeachers.length
         });
     } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });
@@ -74,9 +48,8 @@ exports.getSummary = async (req, res) => {
 exports.createTeacher = async (req, res) => {
     try {
         const {
-            name, dob, gender, email, phone, altPhone, currentAddress, permanentAddress,
-            joiningDate, status, salary, password, assignments, department,
-            designation, qualifications, experience, systemRole
+            name, dob, gender, email, phone,
+            joiningDate, status, password
         } = req.body;
 
         if (!name) return res.status(400).json({ message: 'Teacher name is required' });
@@ -93,19 +66,17 @@ exports.createTeacher = async (req, res) => {
         }
         const TCHregNo = `${yearPrefix}${String(nextNum).padStart(2, '0')}`;
 
-        const parsed = typeof assignments === 'string' ? JSON.parse(assignments || '[]') : (assignments || []);
         const profileImage = req.file ? req.file.path : null;
+        const teacherPassword = password || 'teacher@123';
 
         const teacher = new Teacher({
-            name, dob, gender, email, phone, altPhone,
-            address: { current: currentAddress, permanent: permanentAddress },
+            name, dob, gender, email, phone,
             profileImage,
             regNo: TCHregNo || undefined,
-            department, designation, qualifications, experience,
             joiningDate: joiningDate || undefined,
-            salary: Number(salary) || 0,
-            assignments: parsed,
-            password, systemRole, status
+            password: teacherPassword,
+            systemRole: 'Teacher',
+            status
         });
 
         await teacher.save();
@@ -117,7 +88,7 @@ exports.createTeacher = async (req, res) => {
                 teacherId: teacher._id,
                 message: `Your faculty account has been created. Reg No: ${teacher.regNo}`,
                 data: {
-                    password: password || 'teacher@123',
+                    password: teacherPassword,
                            portalUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
                            teacherPortalUrl: process.env.TEACHER_PORTAL_URL || `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login`
                 }
@@ -129,8 +100,7 @@ exports.createTeacher = async (req, res) => {
                 subject: `Welcome to Institute — Your Faculty Account`,
                 type: 'teacher_registration',
                 data: {
-                    regNo: teacher.regNo,
-                    designation: teacher.designation || 'Faculty'
+                    regNo: teacher.regNo
                 }
             }).catch(() => console.error('[TeacherNotificationLog] Admission logging failed'));
         }
@@ -150,26 +120,20 @@ exports.createTeacher = async (req, res) => {
 exports.updateTeacher = async (req, res) => {
     try {
         const {
-            adminPassword, password, assignments, salary, department, designation,
-            dob, gender, altPhone, currentAddress, permanentAddress,
-            qualifications, experience, systemRole, status, ...rest
+            adminPassword, password,
+            name, dob, gender, email, phone,
+            joiningDate, status
         } = req.body;
 
-        // Convert empty strings to undefined so they don't collide with sparse indexes
-        if (rest.regNo === '') rest.regNo = undefined;
-        if (rest.email === '') rest.email = undefined;
-        if (rest.phone === '') rest.phone = undefined;
-
         const update = {
-            ...rest,
-            salary: Number(salary) || 0,
-            department, designation, dob, gender, altPhone,
-            address: { current: currentAddress, permanent: permanentAddress },
-            qualifications, experience, systemRole, status
+            name,
+            dob,
+            gender,
+            email,
+            phone,
+            joiningDate,
+            status
         };
-
-        const parsed = typeof assignments === 'string' ? JSON.parse(assignments || '[]') : (assignments || []);
-        if (parsed.length) update.assignments = parsed;
 
         if (req.file) {
             update.profileImage = req.file.path;
@@ -179,8 +143,9 @@ exports.updateTeacher = async (req, res) => {
             update.password = password; // hashing is handled by pre-save hook
         }
 
-        const teacher = await Teacher.findByIdAndUpdate(req.params.id, update, { new: true });
+        const teacher = await Teacher.findByIdAndUpdate(req.params.id, update, { returnDocument: 'after' });
         if (!teacher) return res.status(404).json({ message: 'Teacher not found' });
+
         res.json({ message: 'Teacher updated', teacher });
     } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });
@@ -204,7 +169,7 @@ exports.bulkUpdate = async (req, res) => {
         const { ids, updates } = req.body;
         if (!ids || !ids.length) return res.status(400).json({ message: 'No IDs provided' });
         if (!updates || typeof updates !== 'object') return res.status(400).json({ message: 'No updates provided' });
-        const allowedFields = ['status', 'department', 'designation'];
+        const allowedFields = ['status'];
         const cleanUpdates = {};
 
         allowedFields.forEach(field => {
@@ -219,34 +184,6 @@ exports.bulkUpdate = async (req, res) => {
 
         await Teacher.updateMany({ _id: { $in: ids } }, { $set: cleanUpdates });
         res.json({ message: `Successfully updated ${ids.length} faculty members.` });
-    } catch (err) {
-        res.status(500).json({ message: 'Server error', error: err.message });
-    }
-};
-
-// GET /api/batches/:id/subjects — batch subjects + who is assigned
-exports.getBatchSubjectsWithAssignments = async (req, res) => {
-    try {
-        const { excludeTeacherId } = req.query;
-        const batch = await Batch.findById(req.params.id).select('subjects name');
-        if (!batch) return res.status(404).json({ message: 'Batch not found' });
-
-        const teacherQuery = { 'assignments.batchId': req.params.id };
-        if (excludeTeacherId) teacherQuery._id = { $ne: excludeTeacherId };
-        const teachers = await Teacher.find(teacherQuery).select('name assignments');
-
-        const assignedMap = {};
-        teachers.forEach(t => {
-            t.assignments.forEach(a => {
-                if (a.batchId?.toString() === req.params.id) {
-                    a.subjects.forEach(sub => {
-                        assignedMap[sub] = { teacherId: t._id, teacherName: t.name };
-                    });
-                }
-            });
-        });
-
-        res.json({ batchId: batch._id, batchName: batch.name, subjects: batch.subjects || [], assignments: assignedMap });
     } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });
     }
@@ -298,16 +235,12 @@ exports.bulkUpload = async (req, res) => {
                     name: String(getValue(['name', 'NAME', 'Teacher Name', 'TEACHER NAME']) || '').trim(),
                     email: String(getValue(['email', 'EMAIL', 'EMAIL ADDRESS', 'Email Address']) || '').toLowerCase().trim() || undefined,
                     phone: String(getValue(['phone', 'PHONE', 'MOBILE NUMBER', 'Mobile']) || '').trim() || undefined,
-                    gender: String(getValue(['gender', 'GENDER']) || '').trim().replace(/^\w/, c => c.toUpperCase()), // capitalize first letter
+                    gender: String(getValue(['gender', 'GENDER']) || '').trim().replace(/^\w/, c => c.toUpperCase()),
                     dob: parseExcelDate(getValue(['dob', 'DOB', 'DATE OF BIRTH', 'Date of Birth'])),
-                    department: String(getValue(['department', 'DEPARTMENT']) || '').trim(),
-                    designation: String(getValue(['designation', 'DESIGNATION']) || '').trim(),
-                    salary: Number(getValue(['salary', 'SALARY', 'MONTHLY SALARY'])) || 0,
-                    experience: String(getValue(['experience', 'EXPERIENCE']) || '').trim(),
-                    qualifications: String(getValue(['qualifications', 'QUALIFICATIONS']) || '').trim(),
                     joiningDate: parseExcelDate(getValue(['joiningDate', 'JOINING DATE', 'Joining Date'])) || new Date(),
                     regNo: `${yearPrefix}${String(nextNum + i).padStart(2, '0')}`,
                     password: defaultPassword,
+                    systemRole: 'Teacher',
                     status: 'active'
                 });
 
@@ -345,4 +278,5 @@ exports.bulkUpload = async (req, res) => {
         res.status(500).json({ message: 'Server error', error: err.message });
     }
 };
+
 

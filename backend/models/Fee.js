@@ -3,18 +3,13 @@ const mongoose = require('mongoose');
 const paymentHistorySchema = new mongoose.Schema({
     paidAmount: { type: Number, default: 0 },
     date: { type: Date, default: Date.now },
-    paymentMethod: { type: String, default: 'Cash' },
-    transactionId: { type: String, default: '' },
-    bankName: { type: String, default: '' },
+    paymentMethod: {
+        type: String,
+        enum: ['UPI', 'Cash'],
+        default: 'Cash'
+    },
     remarks: { type: String, default: '' },
     receiptNo: { type: String, required: true }
-}, { _id: true });
-
-const extraExpenseSchema = new mongoose.Schema({
-    title: { type: String, required: true, trim: true },
-    amount: { type: Number, required: true },
-    date: { type: Date, default: Date.now },
-    description: { type: String, trim: true }
 }, { _id: true });
 
 const feeSchema = new mongoose.Schema({
@@ -27,8 +22,6 @@ const feeSchema = new mongoose.Schema({
     monthlyTuitionFee: { type: Number, default: 0 },
     registrationFee: { type: Number, default: 0 },
     fine: { type: Number, default: 0 },
-
-    otherExpenses: { type: [extraExpenseSchema], default: [] },
 
     totalFee: { type: Number, default: 0 },
     amountPaid: { type: Number, default: 0 },

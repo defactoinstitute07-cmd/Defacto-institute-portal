@@ -132,16 +132,12 @@ const StudentProfileModal = ({ isOpen, onClose, student, onDownloadID }) => {
 
                                 {/* Personal & Family Details */}
                                 <div style={{ background: '#fff', borderRadius: sharpRadius, border: `2px solid ${borderColor}`, padding: '24px' }}>
-                                    <SectionHeading title="Identity & Family Details" icon={UserCircle2} color="#000" />
+                                    <SectionHeading title="Identity Details" icon={UserCircle2} color="#000" />
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px' }}>
                                         <DetailItem label="DATE OF BIRTH" value={student.dob ? new Date(student.dob).toLocaleDateString() : '—'} icon={Calendar} />
                                         <DetailItem label="GENDER" value={student.gender || '—'} icon={User} />
-                                        <DetailItem label="FATHER'S NAME" value={student.fatherName || '—'} icon={Info} />
-                                        <DetailItem label="MOTHER'S NAME" value={student.motherName || '—'} icon={Info} />
                                         <DetailItem label="WHATSAPP NUMBER" value={student.contact || '—'} icon={Phone} />
                                         <DetailItem label="EMAIL ADDRESS" value={student.email || '—'} icon={Mail} />
-                                        <DetailItem label="PARENT PHONE" value={student.parentPhone || '—'} icon={Phone} />
-                                        <DetailItem label="PARENT EMAIL" value={student.parentEmail || '—'} icon={Mail} />
                                         <DetailItem label="ADMISSION DATE" value={new Date(student.admissionDate || student.joinedAt).toLocaleDateString()} icon={Calendar} />
                                         <DetailItem label="ACADEMIC SESSION" value={student.session || '—'} icon={Calendar} />
                                         <DetailItem label="REGISTRATION FEE" value={`₹ ${student.registrationFee || 0}`} icon={IndianRupee} />

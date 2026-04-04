@@ -9,16 +9,6 @@ exports.getAdminSetup = async (_req, res) => {
     }
 };
 
-exports.getTeacherAssignedBatches = async (req, res) => {
-    try {
-        const data = await attendanceService.getTeacherAssignedBatches(req.userId);
-        res.json(data);
-    } catch (error) {
-        const status = error.status || 500;
-        res.status(status).json({ message: error.message || 'Failed to load teacher assignments.' });
-    }
-};
-
 exports.getRoster = async (req, res) => {
     try {
         const data = await attendanceService.getAttendanceRoster({

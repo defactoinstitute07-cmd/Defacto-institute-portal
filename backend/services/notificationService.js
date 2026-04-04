@@ -318,7 +318,6 @@ const triggerAutomaticNotification = async ({ eventType, studentId, teacherId, m
         }
 
         if (!recipient) {
-            console.log(`[AutoNotification] Skipped: No recipient found`);
             return;
         }
 
@@ -327,7 +326,6 @@ const triggerAutomaticNotification = async ({ eventType, studentId, teacherId, m
             : await Admin.findOne().lean();
 
         if (!admin || !admin.notificationsEnabled) {
-            console.log(`[AutoNotification] Skipped: Notifications disabled globally`);
             return;
         }
 
@@ -337,13 +335,11 @@ const triggerAutomaticNotification = async ({ eventType, studentId, teacherId, m
         let isPushEnabled = admin.pushEvents?.[eventType] !== false;
 
         if (!isEmailEnabled && !isPushEnabled) {
-            console.log(`[AutoNotification] Skipped: Both Email and Push for ${eventType} are disabled`);
             return;
         }
 
         // Fetch custom template
         const template = await NotificationTemplate.findOne({ eventType, isActive: true }).lean();
-        console.log(`[NotificationService] Template for ${eventType}: ${template ? 'Found' : 'Not Found'}`);
 
         let subjectEmail = 'Institute Notification';
         let bodyEmail = fallbackMessage;
@@ -384,7 +380,6 @@ const triggerAutomaticNotification = async ({ eventType, studentId, teacherId, m
         if (recipient.deviceTokens && recipient.deviceTokens.length > 0 && isPushEnabled) methods.push('push');
 
         if (methods.length === 0) {
-            console.log('[AutoNotification] Skipped: No allowed delivery methods available');
             return;
         }
 
@@ -445,7 +440,6 @@ const triggerAutomaticNotification = async ({ eventType, studentId, teacherId, m
             targetId: String(recipient._id)
         });
 
-        console.log(`[AutoNotification] Event ${eventType} triggered`);
     } catch (error) {
         console.error(`[AutoNotification] Error triggering ${eventType}`);
     }
@@ -455,8 +449,6 @@ const cleanupOldNotifications = async (days = 7) => {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - days);
 
-    console.log(`[NotificationService] Cleaning up notifications older than ${cutoffDate.toISOString()} (${days} days)`);
-    
     // We only delete notifications that are NOT scheduled in the future (though cutoffDate handles that)
     const result = await Notification.deleteMany({
         createdAt: { $lt: cutoffDate },

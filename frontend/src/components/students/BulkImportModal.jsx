@@ -77,18 +77,18 @@ const BulkImportModal = ({
   const downloadTemplate = () => {
     const headers = [
       "NAME", "DATE OF BIRTH", "GENDER", "MOBILE NUMBER",
-      "EMAIL ADDRESS", "FATHER'S NAME", "MOTHER'S NAME",
-      "FULL ADDRESS", "STANDARD / COURSE", "BATCHNAME"
+      "EMAIL ADDRESS", "FATHER'S NAME", "MOTHER'S NAME", "PARENT CONTACT NUMBER", "FULL ADDRESS", "STANDARD / COURSE", "BATCHNAME"
     ];
     const data = [
       {
-        "NAME": "John Doe",
+        "NAME": "Full Name",
         "DATE OF BIRTH": "15-05-2010",
         "GENDER": "Male",
         "MOBILE NUMBER": "9876543210",
         "EMAIL ADDRESS": "john@example.com",
         "FATHER'S NAME": "Robert Doe",
         "MOTHER'S NAME": "Jane Doe",
+        "PARENT CONTACT NUMBER": "9876500000",
         "FULL ADDRESS": "123 Main St, Springfield",
         "STANDARD / COURSE": "10th",
         "BATCHNAME": "Morning Batch A"
@@ -169,6 +169,7 @@ const BulkImportModal = ({
                 <li style={{ display: 'flex', alignItems: 'center', gap: 8 }}>• GENDER</li>
                 <li style={{ display: 'flex', alignItems: 'center', gap: 8 }}>• FATHER'S NAME</li>
                 <li style={{ display: 'flex', alignItems: 'center', gap: 8 }}>• MOTHER'S NAME</li>
+                <li style={{ display: 'flex', alignItems: 'center', gap: 8 }}>• PARENT CONTACT NUMBER</li>
                 <li style={{ display: 'flex', alignItems: 'center', gap: 8 }}>• FULL ADDRESS</li>
                 <li style={{ display: 'flex', alignItems: 'center', gap: 8 }}>• STANDARD / COURSE</li>
                 <li style={{ display: 'flex', alignItems: 'center', gap: 8 }}>• BATCHNAME</li>

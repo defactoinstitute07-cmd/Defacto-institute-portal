@@ -11,10 +11,8 @@ const batchSchema = new mongoose.Schema({
     schedule: [{ day: String, time: String, subject: String, teacher: String, room: { type: String, trim: true } }],
     // Legacy freeform display slots (kept for backward compat)
     timeSlots: [{ type: String, trim: true }],
-    teacher: { type: String },
     fees: { type: Number, default: 0 },
     enrolledCount: { type: Number, default: 0 },
-    hasChapterPlanning: { type: Boolean, default: false },
     startDate: { type: Date },
     endDate: { type: Date },
     isActive: { type: Boolean, default: true },

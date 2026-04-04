@@ -4,8 +4,6 @@ const Batch = require('../models/Batch');
 const Student = require('../models/Student');
 const Subject = require('../models/Subject');
 const Teacher = require('../models/Teacher');
-const TeacherAssignment = require('../models/TeacherAssignment');
-const { triggerAutomaticNotification } = require('./notificationService');
 
 const VALID_STATUSES = ['Present', 'Absent', 'Late'];
 
@@ -77,21 +75,81 @@ const normalizeStatus = (value) => {
     return map[normalized];
 };
 
-const ensureTeacherAccess = async (teacherId, batchId, subjectId) => {
-    const assignment = await TeacherAssignment.findOne({
-        teacherId,
-        batchId,
-        subjectId,
-        isActive: true
-    }).lean();
-
-    if (!assignment) {
-        const error = new Error('You are not assigned to this batch and subject.');
-        error.status = 403;
+const normalizeChapterStatus = (value) => {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (!['ongoing', 'completed'].includes(normalized)) {
+        const error = new Error('Chapter status must be ongoing or completed.');
+        error.status = 400;
         throw error;
     }
+    return normalized;
+};
 
-    return assignment;
+const addDaysUtc = (date, days) => {
+    const base = new Date(date.getTime());
+    base.setUTCHours(0, 0, 0, 0);
+    base.setUTCDate(base.getUTCDate() + Number(days || 0));
+    return base;
+};
+
+const recalculateChapterTimeline = (subject) => {
+    let previousCompletionDate = null;
+
+    subject.chapters.forEach((chapter) => {
+        if (chapter.status === 'completed' && chapter.completedAt) {
+            chapter.projectedStartDate = chapter.projectedStartDate || previousCompletionDate;
+            chapter.projectedCompletionDate = chapter.completedAt;
+            previousCompletionDate = chapter.completedAt;
+            return;
+        }
+
+        if (!previousCompletionDate) {
+            chapter.projectedStartDate = null;
+            chapter.projectedCompletionDate = null;
+            return;
+        }
+
+        chapter.projectedStartDate = previousCompletionDate;
+        chapter.projectedCompletionDate = addDaysUtc(previousCompletionDate, chapter.durationDays);
+        previousCompletionDate = chapter.projectedCompletionDate;
+    });
+};
+
+const buildSubjectProgress = (subject) => {
+    const chapters = Array.isArray(subject?.chapters) ? subject.chapters : [];
+    const totalChapters = chapters.length;
+    const completedCount = chapters.filter((chapter) => chapter.status === 'completed').length;
+    const remainingCount = Math.max(totalChapters - completedCount, 0);
+    const progressPercentage = totalChapters === 0
+        ? 0
+        : Math.round((completedCount / totalChapters) * 100);
+
+    const nextChapter = chapters.find((chapter) => chapter.status !== 'completed') || null;
+
+    let dueInDays = null;
+    if (nextChapter?.projectedCompletionDate) {
+        const now = new Date();
+        now.setUTCHours(0, 0, 0, 0);
+        const projected = new Date(nextChapter.projectedCompletionDate);
+        projected.setUTCHours(0, 0, 0, 0);
+        dueInDays = Math.max(Math.ceil((projected.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)), 0);
+    }
+
+    return {
+        totalChapters,
+        completedChapters: completedCount,
+        remainingChapters: remainingCount,
+        progressPercentage,
+        nextChapter: nextChapter
+            ? {
+                id: nextChapter._id,
+                name: nextChapter.name,
+                durationDays: nextChapter.durationDays,
+                dueInDays: dueInDays === null ? nextChapter.durationDays : dueInDays,
+                projectedCompletionDate: nextChapter.projectedCompletionDate || null
+            }
+            : null
+    };
 };
 
 const ensureSubjectLinkedToBatch = async (batch, subject) => {
@@ -110,47 +168,6 @@ const ensureSubjectLinkedToBatch = async (batch, subject) => {
     if (Object.keys(updates).length > 0) {
         await Batch.findByIdAndUpdate(batch._id, updates);
     }
-};
-
-const syncLegacyTeacherAssignments = async (teacherId) => {
-    const assignments = await TeacherAssignment.find({ teacherId, isActive: true })
-        .populate('batchId', 'name')
-        .populate('subjectId', 'name')
-        .lean();
-
-    const grouped = new Map();
-
-    assignments.forEach((assignment) => {
-        const batchKey = assignment.batchId?._id?.toString() || assignment.batchId?.toString();
-        if (!batchKey) return;
-
-        if (!grouped.has(batchKey)) {
-            grouped.set(batchKey, {
-                batchId: assignment.batchId?._id || assignment.batchId,
-                batchName: assignment.batchId?.name || '',
-                subjects: []
-            });
-        }
-
-        const current = grouped.get(batchKey);
-        const subjectName = assignment.subjectId?.name || '';
-        if (subjectName && !current.subjects.includes(subjectName)) {
-            current.subjects.push(subjectName);
-        }
-    });
-
-    await Teacher.findByIdAndUpdate(teacherId, {
-        assignments: Array.from(grouped.values())
-    });
-};
-
-const buildAssignmentQuery = ({ teacherId, batchId, subjectId, activeOnly = true }) => {
-    const query = {};
-    if (teacherId) query.teacherId = asObjectId(teacherId, 'Teacher');
-    if (batchId) query.batchId = asObjectId(batchId, 'Batch');
-    if (subjectId) query.subjectId = asObjectId(subjectId, 'Subject');
-    if (activeOnly) query.isActive = true;
-    return query;
 };
 
 exports.createSubject = async ({ name, code, batchId, totalChapters }) => {
@@ -193,32 +210,17 @@ exports.listSubjects = async ({ activeOnly = true, batchId } = {}) => {
     if (batchId) {
         query.batchId = asObjectId(batchId, 'Batch');
     }
-    return Subject.find(query).sort({ name: 1 }).lean();
+    return Subject.find(query)
+        .populate('teacherId', 'name regNo email phone gender profileImage status')
+        .sort({ name: 1 })
+        .lean();
 };
 
-exports.createOrUpdateAssignment = async ({ teacherId, batchId, subjectId, assignedBy }) => {
-    const teacherObjectId = asObjectId(teacherId, 'Teacher');
-    const batchObjectId = asObjectId(batchId, 'Batch');
-    const subjectObjectId = asObjectId(subjectId, 'Subject');
-
-    const [teacher, batch, subject, previousAssignment] = await Promise.all([
-        Teacher.findById(teacherObjectId).select('name regNo').lean(),
-        Batch.findById(batchObjectId).select('name course subjects subjectIds').lean(),
-        Subject.findById(subjectObjectId).select('name code').lean(),
-        TeacherAssignment.findOne({ batchId: batchObjectId, subjectId: subjectObjectId }).lean()
-    ]);
-
-    if (!teacher) {
-        const error = new Error('Teacher not found.');
-        error.status = 404;
-        throw error;
-    }
-
-    if (!batch) {
-        const error = new Error('Batch not found.');
-        error.status = 404;
-        throw error;
-    }
+exports.getSubjectById = async ({ subjectId }) => {
+    const objectId = asObjectId(subjectId, 'Subject');
+    const subject = await Subject.findById(objectId)
+        .populate('teacherId', 'name regNo email phone gender profileImage status')
+        .lean();
 
     if (!subject) {
         const error = new Error('Subject not found.');
@@ -226,122 +228,244 @@ exports.createOrUpdateAssignment = async ({ teacherId, batchId, subjectId, assig
         throw error;
     }
 
-    await ensureSubjectLinkedToBatch(batch, subject);
+    const progress = buildSubjectProgress(subject);
 
-    const assignment = await TeacherAssignment.findOneAndUpdate(
-        { batchId: batchObjectId, subjectId: subjectObjectId },
-        {
-            teacherId: teacherObjectId,
-            batchId: batchObjectId,
-            subjectId: subjectObjectId,
-            assignedBy: assignedBy || null,
-            isActive: true,
-            updatedAt: new Date()
-        },
-        {
-            new: true,
-            upsert: true,
-            setDefaultsOnInsert: true
-        }
-    )
-        .populate('teacherId', 'name regNo')
-        .populate('batchId', 'name course')
-        .populate('subjectId', 'name code');
-
-    await syncLegacyTeacherAssignments(teacherObjectId);
-
-    if (previousAssignment && previousAssignment.teacherId?.toString() !== teacherObjectId.toString()) {
-        await syncLegacyTeacherAssignments(previousAssignment.teacherId);
-    }
-
-    // Trigger Automatic Notification
-    triggerAutomaticNotification({
-        eventType: 'teacherBatchAssignment',
-        teacherId: teacherObjectId,
-        message: `You have been assigned to batch ${batch.name} for ${subject.name}.`,
-        data: {
-            batchName: batch.name,
-            schedule: 'Check your dashboard for schedule details' // Or extract from batch if available
-        }
-    });
-
-    return assignment.toObject();
+    return {
+        ...subject,
+        totalChapters: progress.totalChapters,
+        progress
+    };
 };
 
-exports.listAssignments = async ({ teacherId, batchId, subjectId, activeOnly = true } = {}) => {
-    const query = buildAssignmentQuery({ teacherId, batchId, subjectId, activeOnly });
-    return TeacherAssignment.find(query)
-        .populate('teacherId', 'name regNo')
-        .populate('batchId', 'name course')
-        .populate('subjectId', 'name code')
-        .sort({ createdAt: -1 })
+exports.assignTeacherToSubject = async ({ subjectId, teacherId }) => {
+    const subjectObjectId = asObjectId(subjectId, 'Subject');
+
+    const subject = await Subject.findById(subjectObjectId);
+    if (!subject) {
+        const error = new Error('Subject not found.');
+        error.status = 404;
+        throw error;
+    }
+
+    if (!teacherId) {
+        subject.teacherId = null;
+        await subject.save();
+        const populated = await Subject.findById(subject._id)
+            .populate('teacherId', 'name regNo email phone gender profileImage status')
+            .lean();
+        const progress = buildSubjectProgress(populated);
+        return {
+            ...populated,
+            totalChapters: progress.totalChapters,
+            progress
+        };
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(teacherId)) {
+        const error = new Error('A valid teacherId is required.');
+        error.status = 400;
+        throw error;
+    }
+
+    const teacher = await Teacher.findById(teacherId).select('_id status').lean();
+    if (!teacher) {
+        const error = new Error('Teacher not found.');
+        error.status = 404;
+        throw error;
+    }
+
+    if (teacher.status !== 'active') {
+        const error = new Error('Only active teachers can be assigned.');
+        error.status = 400;
+        throw error;
+    }
+
+    subject.teacherId = teacher._id;
+    await subject.save();
+
+    const populated = await Subject.findById(subject._id)
+        .populate('teacherId', 'name regNo email phone gender profileImage status')
         .lean();
+    const progress = buildSubjectProgress(populated);
+
+    return {
+        ...populated,
+        totalChapters: progress.totalChapters,
+        progress
+    };
+};
+
+exports.addChapterToSubject = async ({ subjectId, name, durationDays }) => {
+    const objectId = asObjectId(subjectId, 'Subject');
+
+    if (!name || !String(name).trim()) {
+        const error = new Error('Chapter name is required.');
+        error.status = 400;
+        throw error;
+    }
+
+    const parsedDuration = Number(durationDays);
+    if (!Number.isFinite(parsedDuration) || parsedDuration < 1) {
+        const error = new Error('Chapter durationDays must be at least 1.');
+        error.status = 400;
+        throw error;
+    }
+
+    const subject = await Subject.findById(objectId);
+    if (!subject) {
+        const error = new Error('Subject not found.');
+        error.status = 404;
+        throw error;
+    }
+
+    subject.chapters.push({
+        name: String(name).trim(),
+        durationDays: Math.round(parsedDuration),
+        status: 'ongoing',
+        completedAt: null,
+        projectedStartDate: null,
+        projectedCompletionDate: null
+    });
+    recalculateChapterTimeline(subject);
+    subject.totalChapters = subject.chapters.length;
+    await subject.save();
+
+    const response = subject.toObject();
+    const progress = buildSubjectProgress(response);
+
+    return {
+        ...response,
+        totalChapters: progress.totalChapters,
+        progress
+    };
+};
+
+exports.updateChapterDetails = async ({ subjectId, chapterId, name, durationDays, status, actorRole, adminOverride = false }) => {
+    const subjectObjectId = asObjectId(subjectId, 'Subject');
+
+    if (!chapterId || !mongoose.Types.ObjectId.isValid(chapterId)) {
+        const error = new Error('A valid chapterId is required.');
+        error.status = 400;
+        throw error;
+    }
+
+    const subject = await Subject.findById(subjectObjectId);
+    if (!subject) {
+        const error = new Error('Subject not found.');
+        error.status = 404;
+        throw error;
+    }
+
+    const chapter = subject.chapters.id(chapterId);
+    if (!chapter) {
+        const error = new Error('Chapter not found.');
+        error.status = 404;
+        throw error;
+    }
+
+    if (chapter.status === 'completed' && !(adminOverride && actorRole === 'admin')) {
+        const error = new Error('Completed chapters are locked. Use admin override to edit.');
+        error.status = 403;
+        throw error;
+    }
+
+    if (name !== undefined) {
+        if (!String(name).trim()) {
+            const error = new Error('Chapter name cannot be empty.');
+            error.status = 400;
+            throw error;
+        }
+        chapter.name = String(name).trim();
+    }
+
+    if (durationDays !== undefined) {
+        const parsedDuration = Number(durationDays);
+        if (!Number.isFinite(parsedDuration) || parsedDuration < 1) {
+            const error = new Error('Chapter durationDays must be at least 1.');
+            error.status = 400;
+            throw error;
+        }
+        chapter.durationDays = Math.round(parsedDuration);
+    }
+
+    if (status !== undefined) {
+        const normalizedStatus = normalizeChapterStatus(status);
+        if (normalizedStatus !== 'ongoing') {
+            const error = new Error('Only ongoing status can be updated here. Use status endpoint for completion.');
+            error.status = 400;
+            throw error;
+        }
+        chapter.status = 'ongoing';
+        chapter.completedAt = null;
+    }
+
+    recalculateChapterTimeline(subject);
+    subject.totalChapters = subject.chapters.length;
+    await subject.save();
+
+    const response = subject.toObject();
+    const progress = buildSubjectProgress(response);
+
+    return {
+        ...response,
+        totalChapters: progress.totalChapters,
+        progress
+    };
+};
+
+exports.updateChapterStatus = async ({ subjectId, chapterId, status }) => {
+    const subjectObjectId = asObjectId(subjectId, 'Subject');
+    const normalizedStatus = normalizeChapterStatus(status);
+
+    if (!chapterId || !mongoose.Types.ObjectId.isValid(chapterId)) {
+        const error = new Error('A valid chapterId is required.');
+        error.status = 400;
+        throw error;
+    }
+
+    const subject = await Subject.findById(subjectObjectId);
+    if (!subject) {
+        const error = new Error('Subject not found.');
+        error.status = 404;
+        throw error;
+    }
+
+    const chapter = subject.chapters.id(chapterId);
+    if (!chapter) {
+        const error = new Error('Chapter not found.');
+        error.status = 404;
+        throw error;
+    }
+
+    chapter.status = normalizedStatus;
+    chapter.completedAt = normalizedStatus === 'completed' ? new Date() : null;
+    recalculateChapterTimeline(subject);
+    subject.totalChapters = subject.chapters.length;
+    await subject.save();
+
+    const response = subject.toObject();
+    const progress = buildSubjectProgress(response);
+
+    return {
+        ...response,
+        totalChapters: progress.totalChapters,
+        progress
+    };
 };
 
 exports.getAdminSetupData = async () => {
-    const [batches, teachers, subjects, assignments] = await Promise.all([
+    const [batches, subjects] = await Promise.all([
         Batch.find({ isActive: true }).select('name course subjects subjectIds').sort({ name: 1 }).lean(),
-        Teacher.find({ status: 'active' }).select('name regNo').sort({ name: 1 }).lean(),
-        Subject.find({ isActive: true }).select('name code').sort({ name: 1 }).lean(),
-        TeacherAssignment.find({ isActive: true })
-            .populate('teacherId', 'name regNo')
-            .populate('batchId', 'name course')
-            .populate('subjectId', 'name code')
-            .sort({ createdAt: -1 })
-            .lean()
+        Subject.find({ isActive: true }).select('name code').sort({ name: 1 }).lean()
     ]);
 
-    return { batches, teachers, subjects, assignments };
-};
-
-exports.getTeacherAssignedBatches = async (teacherId) => {
-    const teacherObjectId = asObjectId(teacherId, 'Teacher');
-
-    const assignments = await TeacherAssignment.find({
-        teacherId: teacherObjectId,
-        isActive: true
-    })
-        .populate('batchId', 'name course')
-        .populate('subjectId', 'name code')
-        .sort({ createdAt: -1 })
-        .lean();
-
-    const grouped = new Map();
-    assignments.forEach((assignment) => {
-        const batchKey = assignment.batchId?._id?.toString();
-        if (!batchKey) return;
-
-        if (!grouped.has(batchKey)) {
-            grouped.set(batchKey, {
-                batchId: assignment.batchId._id,
-                batchName: assignment.batchId.name,
-                course: assignment.batchId.course || '',
-                subjects: []
-            });
-        }
-
-        grouped.get(batchKey).subjects.push({
-            assignmentId: assignment._id,
-            subjectId: assignment.subjectId?._id,
-            subjectName: assignment.subjectId?.name || '',
-            subjectCode: assignment.subjectId?.code || ''
-        });
-    });
-
-    return {
-        assignments,
-        batches: Array.from(grouped.values())
-    };
+    return { batches, subjects };
 };
 
 exports.getAttendanceRoster = async ({ actorRole, actorId, batchId, subjectId, date }) => {
     const batchObjectId = asObjectId(batchId, 'Batch');
     const subjectObjectId = asObjectId(subjectId, 'Subject');
     const attendanceDate = normalizeAttendanceDate(date || new Date());
-
-    if (actorRole === 'teacher') {
-        await ensureTeacherAccess(actorId, batchObjectId, subjectObjectId);
-    }
 
     const [batch, subject, students, existingAttendance] = await Promise.all([
         Batch.findById(batchObjectId).select('name course subjects subjectIds').lean(),
@@ -401,10 +525,6 @@ exports.markAttendance = async ({ actorRole, actorId, batchId, subjectId, date, 
         const error = new Error('Attendance entries are required.');
         error.status = 400;
         throw error;
-    }
-
-    if (actorRole === 'teacher') {
-        await ensureTeacherAccess(actorId, batchObjectId, subjectObjectId);
     }
 
     const [batch, subject] = await Promise.all([
@@ -521,10 +641,6 @@ exports.updateAttendanceRecord = async ({ actorRole, actorId, attendanceId, stat
         throw error;
     }
 
-    if (actorRole === 'teacher') {
-        await ensureTeacherAccess(actorId, attendance.batchId, attendance.subjectId);
-    }
-
     attendance.status = normalizeStatus(status);
     attendance.notes = notes ? String(notes).trim() : attendance.notes;
     attendance.markedBy = actorId || attendance.markedBy;
@@ -566,26 +682,6 @@ exports.getAttendanceReport = async ({
         query.attendanceDate = {};
         if (dateFrom) query.attendanceDate.$gte = normalizeAttendanceDate(dateFrom);
         if (dateTo) query.attendanceDate.$lte = normalizeAttendanceDate(dateTo);
-    }
-
-    if (actorRole === 'teacher') {
-        const teacherAssignments = await TeacherAssignment.find({
-            teacherId: asObjectId(actorId, 'Teacher'),
-            isActive: true
-        }).select('batchId subjectId').lean();
-
-        if (teacherAssignments.length === 0) {
-            return {
-                records: [],
-                summary: { total: 0, present: 0, absent: 0, late: 0 },
-                pagination: { page: Number(page), limit: Number(limit), total: 0, pages: 0 }
-            };
-        }
-
-        query.$or = teacherAssignments.map((assignment) => ({
-            batchId: assignment.batchId,
-            subjectId: assignment.subjectId
-        }));
     }
 
     const safePage = Math.max(1, Number(page) || 1);

@@ -2,8 +2,8 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import {
-    Users, IndianRupee, Clock, BookOpen, ChevronLeft,
-    User, ArrowUpRight, Calendar,
+    Users, User, IndianRupee, Clock, BookOpen, ChevronLeft,
+    ArrowUpRight, Calendar,
     Search, FileDown,
     Eye, X, Download
 } from 'lucide-react';
@@ -13,6 +13,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { SkeletonStat, SkeletonTable, SkeletonSidebarItem } from '../components/common/SkeletonLoaders';
 import apiClient from '../api/apiConfig';
+import { getSubjects } from '../api/subjectApi';
 
 const BatchDetailsPage = () => {
     const { id } = useParams();
@@ -23,7 +24,7 @@ const BatchDetailsPage = () => {
     const [config, setConfig] = useState(null);
     const [showPreview, setShowPreview] = useState(false);
     const [pdfUrl, setPdfUrl] = useState(null);
-    const [assignmentsMap, setAssignmentsMap] = useState({});
+    const [batchSubjects, setBatchSubjects] = useState([]);
     const batch = data?.batch || {};
     const students = data?.students || [];
 
@@ -43,22 +44,18 @@ const BatchDetailsPage = () => {
     useEffect(() => { loadBatch(); }, [loadBatch]);
 
     useEffect(() => {
-        if (!id) return;
-        apiClient.get(`/batches/${id}/subjects`)
-            .then(({ data }) => setAssignmentsMap(data.assignments || {}))
-            .catch(() => console.error('Failed to load batch assignments'));
-    }, [id]);
-
-    useEffect(() => {
         apiClient.get('/scheduler/config')
             .then(({ data }) => setConfig(data))
             .catch(() => console.error('Failed to load scheduler config'));
     }, []);
 
-    const goToSubjectDetails = useCallback((subjectName) => {
-        if (!subjectName) return;
-        navigate(`/batches/${id}/subjects/${encodeURIComponent(subjectName)}`);
-    }, [id, navigate]);
+    useEffect(() => {
+        if (!id) return;
+
+        getSubjects({ batchId: id, activeOnly: true })
+            .then(({ data }) => setBatchSubjects(data.subjects || []))
+            .catch(() => setBatchSubjects([]));
+    }, [id]);
 
     if (!data && !loading) return null;
 
@@ -122,6 +119,10 @@ const BatchDetailsPage = () => {
         (batch.schedule || []).map(s => s.room || batch.classroom).filter(Boolean)
     )];
     if (uniqueRooms.length === 0 && batch.classroom) uniqueRooms.push(batch.classroom);
+
+    const subjectNameToIdMap = new Map(
+        (batchSubjects || []).map((subject) => [String(subject.name || '').toLowerCase(), subject._id])
+    );
 
     return (
         <ERPLayout title={`Batch: ${batch.name}`}>
@@ -188,13 +189,7 @@ const BatchDetailsPage = () => {
                         </div>
 
                         <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
-                                <IndianRupee size={24} />
-                            </div>
-                            <div>
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Revenue</p>
-                                <p className="text-2xl font-black text-slate-800">₹ {(batch.totalEarnings || 0).toLocaleString()}</p>
-                            </div>
+                            {/* Total Revenue card removed as per request */}
                         </div>
 
                         <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm flex items-center gap-4">
@@ -245,16 +240,26 @@ const BatchDetailsPage = () => {
                                     <div>
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Subjects covered</label>
                                         <div className="flex flex-wrap gap-2 mt-2">
-                                            {batch.subjects?.map(sub => (
-                                                <button
-                                                    key={sub}
-                                                    type="button"
-                                                    onClick={() => goToSubjectDetails(sub)}
-                                                    className="px-3 py-1 border rounded-lg text-xs font-bold transition bg-slate-50 border-slate-100 text-slate-600 hover:border-indigo-200 hover:text-indigo-700"
-                                                >
-                                                    {sub}
-                                                </button>
-                                            ))}
+                                            {batch.subjects?.map(sub => {
+                                                const subjectId = subjectNameToIdMap.get(String(sub || '').toLowerCase());
+                                                if (!subjectId) {
+                                                    return (
+                                                        <span key={sub} className="px-3 py-1 border rounded-lg text-xs font-bold transition bg-slate-50 border-slate-100 text-slate-600">
+                                                            {sub}
+                                                        </span>
+                                                    );
+                                                }
+
+                                                return (
+                                                    <Link
+                                                        key={subjectId}
+                                                        to={`/subjects/${subjectId}?batchId=${id}`}
+                                                        className="px-3 py-1 border rounded-lg text-xs font-bold transition bg-indigo-50 border-indigo-100 text-indigo-700 hover:bg-indigo-100"
+                                                    >
+                                                        {sub}
+                                                    </Link>
+                                                );
+                                            })}
                                         </div>
                                     </div>
 
@@ -275,39 +280,6 @@ const BatchDetailsPage = () => {
                                 </>
                             )}
 
-                            <div className="pt-6 border-t border-slate-100">
-                                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-4 flex items-center gap-2">
-                                    <User size={14} className="text-indigo-500" /> Subject Faculties
-                                </label>
-                                <div className="grid gap-2">
-                                    {batch.subjects && batch.subjects.length > 0 ? (
-                                        batch.subjects.map(sub => {
-                                            // Source of truth: Explicit teacher assignments from the assignmentsMap
-                                            const assignment = assignmentsMap[sub];
-                                            const assignedTeacher = assignment ? assignment.teacherName : 'Unassigned';
-
-                                            return (
-                                                <button
-                                                    key={sub}
-                                                    type="button"
-                                                    onClick={() => goToSubjectDetails(sub)}
-                                                    className="w-full flex items-center justify-between p-3 rounded-lg border text-left transition bg-slate-50 border-slate-100 hover:border-indigo-200"
-                                                >
-                                                    <span className="text-xs font-bold text-slate-700">{sub}</span>
-                                                    <div className="flex items-center gap-1.5 focus-within:ring-2 ring-indigo-500/20 rounded transition-all">
-                                                        <div className={`w-2 h-2 rounded-full ${assignedTeacher === 'Unassigned' ? 'bg-amber-400' : 'bg-green-500'}`}></div>
-                                                        <span className={`text-[11px] font-bold ${assignedTeacher === 'Unassigned' ? 'text-amber-600' : 'text-slate-600'}`}>
-                                                            {assignedTeacher}
-                                                        </span>
-                                                    </div>
-                                                </button>
-                                            );
-                                        })
-                                    ) : (
-                                        <div className="text-xs text-slate-400 font-medium italic">No subjects configured.</div>
-                                    )}
-                                </div>
-                            </div>
                             <div className="pt-6 border-t border-slate-50 space-y-4">
                                 <div className="flex items-center justify-between">
                                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Creation Date</span>

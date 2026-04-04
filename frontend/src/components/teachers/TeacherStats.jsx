@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, IndianRupee, BookOpen } from 'lucide-react';
+import { Users, UserCheck, UserX } from 'lucide-react';
 
 const StatCard = ({ icon: Icon, label, value, sub, cls }) => (
     <div className="stat-card">
@@ -12,15 +12,14 @@ const StatCard = ({ icon: Icon, label, value, sub, cls }) => (
     </div>
 );
 
-const TeacherStats = ({ summary, fmt }) => {
+const TeacherStats = ({ summary }) => {
     if (!summary) return null;
 
     return (
         <div className="stats-grid" style={{ marginBottom: 20 }}>
-            <StatCard icon={Users} label="Total Faculty" value={summary.totalFaculty} sub="registered" cls="ic-green" />
-            <StatCard icon={IndianRupee} label="Monthly Payroll" value={`₹ ${fmt(summary.monthlyPayroll)}`} sub="all staff" cls="ic-green" />
-            <StatCard icon={IndianRupee} label="Month Expenditure" value={`₹ ${fmt(summary.monthExpenditure)}`} sub="active staff" cls="ic-green" />
-            <StatCard icon={BookOpen} label="Active Classes" value={summary.activeClasses} sub="batch assignments" cls="ic-green" />
+            <StatCard icon={Users} label="Total Faculty" value={summary.totalFaculty || 0} sub="registered" cls="ic-green" />
+            <StatCard icon={UserCheck} label="Active Faculty" value={summary.activeFaculty || 0} sub="currently available" cls="ic-green" />
+            <StatCard icon={UserX} label="Inactive Faculty" value={summary.inactiveFaculty || 0} sub="needs review" cls="ic-red" />
         </div>
     );
 };

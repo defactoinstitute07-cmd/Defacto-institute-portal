@@ -304,8 +304,6 @@ const StudentProfilePage = () => {
                                     <InfoTile icon={User} label="Gender" value={student.gender || '- '} />
                                     <InfoTile icon={Mail} label="Email Address" value={student.email || '- '} />
                                     <InfoTile icon={Phone} label="Contact Number" value={student.contact || '- '} />
-                                    <InfoTile icon={User} label="Father's Name" value={student.fatherName || '- '} />
-                                    <InfoTile icon={User} label="Mother's Name" value={student.motherName || '- '} />
                                     <InfoTile icon={IndianRupee} label="Registration Fee" value={formatCurrency(student.registrationFee)} />
                                     <InfoTile icon={MapPin} label="Address" value={student.address || '- '} wide />
                                 </div>

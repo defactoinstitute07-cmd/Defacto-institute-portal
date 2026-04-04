@@ -435,6 +435,7 @@ exports.createStudent = async (req, res) => {
             registrationFee: data.registrationFee || 0,
             fatherName: data.fatherName,
             motherName: data.motherName,
+            parentPhone: data.parentPhone,
             currentYear: data.currentYear || '1',
             status: data.batchId ? 'active' : 'batch_pending'
         };
@@ -507,7 +508,7 @@ exports.updateStudent = async (req, res) => {
             data.status = 'active';
         }
 
-        const student = await Student.findByIdAndUpdate(req.params.id, data, { new: true });
+        const student = await Student.findByIdAndUpdate(req.params.id, data, { returnDocument: 'after' });
 
         if (isActivatingBatch) {
             if (student && data.batchId) {
@@ -516,18 +517,6 @@ exports.updateStudent = async (req, res) => {
                     batchId: data.batchId,
                     admissionDate: student.admissionDate,
                     adminId: req.admin?.id
-                });
-
-                const batch = await require('../models/Batch').findById(data.batchId);
-                await triggerAutomaticNotification({
-                    studentId: student._id,
-                    message: `Hello ${student.name}, you have been assigned to the batch: ${batch?.name || 'Assigned Batch'}. Timing: ${batch?.timeSlots?.[0] || 'TBA'}.`,
-                    eventType: 'batchAssignment',
-                    adminId: req.admin?.id,
-                    data: {
-                        batchName: batch?.name || 'Assigned Batch',
-                        timing: batch?.timeSlots?.[0] || 'TBA'
-                    }
                 });
             }
         }
@@ -628,7 +617,10 @@ exports.bulkUpload = async (req, res) => {
                     className: String(getValue(['className', 'CLASSNAME', 'STANDARD / COURSE', 'Standard', 'Course', 'CLASS']) || '').trim(),
                     contact: String(getValue(['phone', 'PHONE', 'contact', 'CONTACT', 'MOBILE NUMBER', 'Mobile']) || '').trim(),
                     email: String(getValue(['email', 'EMAIL', 'EMAIL ADDRESS', 'Email Address']) || '').toLowerCase().trim() || undefined,
-                    gender: String(getValue(['gender', 'GENDER']) || '').trim().replace(/^\w/, c => c.toUpperCase()),
+                    gender: (() => {
+                        const g = String(getValue(['gender', 'GENDER']) || '').trim();
+                        return g ? g.replace(/^\w/, c => c.toUpperCase()) : undefined;
+                    })(),
                     address: String(getValue(['address', 'ADDRESS', 'FULL ADDRESS', 'Full Address']) || '').trim(),
                     dob: parseExcelDate(getValue(['dob', 'DOB', 'DATE OF BIRTH', 'Date of Birth'])),
                     admissionDate: parseExcelDate(getValue(['admissionDate', 'ADMISSION DATE', 'Admission Date'])) || new Date(),
@@ -637,6 +629,7 @@ exports.bulkUpload = async (req, res) => {
                     status: resolvedBatchId ? 'active' : 'batch_pending',
                     fatherName: String(getValue(['fatherName', 'FATHER NAME', "FATHER'S NAME", 'Father Name']) || '').trim(),
                     motherName: String(getValue(['motherName', 'MOTHER NAME', "MOTHER'S NAME", 'Mother Name']) || '').trim(),
+                    parentPhone: String(getValue(['parentPhone', 'PARENT PHONE', 'Parent Phone', 'GUARDIAN CONTACT', 'Guardian Contact', 'PARENT CONTACT NUMBER']) || '').trim(),
                     currentYear: String(getValue(['currentYear', 'CURRENT YEAR']) || '1').trim(),
                     password: 'student@123',
                     portalAccess: { signupStatus: 'no' }

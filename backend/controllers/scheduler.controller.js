@@ -1,6 +1,5 @@
 const Batch = require('../models/Batch');
 const Admin = require('../models/Admin');
-const Teacher = require('../models/Teacher');
 const Schedule = require('../models/Schedule');
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -12,6 +11,13 @@ const buildTimeSlots = () => {
     }
     return slots;
 };
+
+const deriveScheduledTeacher = (teacherName, subject) => {
+    const normalized = String(teacherName || '').trim();
+    return normalized || `Faculty Pending - ${subject}`;
+};
+
+const hasConcreteTeacher = (teacherName) => !String(teacherName || '').startsWith('Faculty Pending - ');
 
 // POST /api/scheduler/auto
 // Heuristic "AI" scheduler: Generates a weekly schedule based on required subjects
@@ -121,9 +127,8 @@ exports.autoSchedule = async (req, res) => {
 };
 
 // POST /api/scheduler/auto-batch
-// Fully automated: Takes a batchId, looks at its subjects, 
-// finds an available room, finds assigned teachers for each subject, 
-// and generates the time slots with teacher names.
+// Fully automated: Takes a batchId, looks at its subjects,
+// finds an available room, and generates the time slots with teacher labels.
 // POST /api/scheduler/expert-auto
 // Specialized Scheduler: 3 subjects, 3 timings, X days
 exports.expertAISchedule = async (req, res) => {
@@ -161,18 +166,10 @@ exports.expertAISchedule = async (req, res) => {
             });
         });
 
-        // 2. Fetch teachers assigned to these subjects for this batch
-        const teachers = await Teacher.find({ status: 'active' });
         const subjectTeachers = {};
 
-        subjects.forEach(sub => {
-            const found = teachers.find(t =>
-                t.assignments?.some(a =>
-                    (a.batchId?.toString() === batchId || a.batchName === batchName) &&
-                    a.subjects?.includes(sub)
-                )
-            );
-            subjectTeachers[sub] = found ? found.name : 'Unassigned';
+        subjects.forEach((subject) => {
+            subjectTeachers[subject] = deriveScheduledTeacher('', subject);
         });
 
         // 3. Generate Schedule
@@ -202,7 +199,9 @@ exports.expertAISchedule = async (req, res) => {
                     isMerged = true;
                 } else {
                     // Rule 2: Teacher Busy Check
-                    const teacherBusy = slotsAtTime.find(s => s.teacher === teacher);
+                    const teacherBusy = hasConcreteTeacher(teacher)
+                        ? slotsAtTime.find(s => s.teacher === teacher)
+                        : null;
                     if (teacherBusy) {
                         return res.status(400).json({
                             message: `Conflict: Teacher ${teacher} is busy in ${teacherBusy.room} teaching ${teacherBusy.subject} at ${time}.`
@@ -314,8 +313,6 @@ exports.autoScheduleBatch = async (req, res) => {
             });
         });
 
-        // 3. Fetch all active teachers
-        const teachers = await Teacher.find({ status: 'active' });
         const timeSlots = buildTimeSlots();
         let selectedRoom = null;
         let generatedEntries = [];
@@ -327,15 +324,7 @@ exports.autoScheduleBatch = async (req, res) => {
             let possible = true;
 
             for (const subject of subjects) {
-                const potentialTeachers = teachers.filter(t =>
-                    t.assignments?.some(a =>
-                        (a.batchId?.toString() === batchId.toString() || a.batchName === batch.name) &&
-                        a.subjects?.includes(subject)
-                    )
-                );
-
-                const teacherToUse = potentialTeachers.length > 0 ? potentialTeachers[0] : null;
-                const teacherName = teacherToUse ? teacherToUse.name : 'Unassigned';
+                const teacherName = deriveScheduledTeacher(batch.teacher, subject);
 
                 let foundSlot = false;
                 for (const day of DAYS) {
@@ -364,7 +353,9 @@ exports.autoScheduleBatch = async (req, res) => {
                         }
 
                         // Rule 2: Teacher Busy Check
-                        const isTeacherBusy = slotsAtTime.some(s => s.teacher === teacherName);
+                        const isTeacherBusy = hasConcreteTeacher(teacherName)
+                            ? slotsAtTime.some(s => s.teacher === teacherName)
+                            : false;
                         if (isTeacherBusy) continue;
 
                         // Rule 3: Split Subject Logic / Room Availability
@@ -407,7 +398,7 @@ exports.autoScheduleBatch = async (req, res) => {
         }
 
         if (!selectedRoom) {
-            return res.status(400).json({ message: 'Could not find a conflict-free schedule for all subjects in any room with assigned teachers.' });
+            return res.status(400).json({ message: 'Could not find a conflict-free schedule for all subjects in any room.' });
         }
 
         // Sort entries
@@ -446,7 +437,7 @@ exports.autoScheduleBatch = async (req, res) => {
         return res.json({
             schedule: generatedEntries,
             classroom: selectedRoom,
-            teacher: generatedEntries[0]?.teacher || 'Unassigned'
+            teacher: generatedEntries[0]?.teacher || 'Faculty Pending'
         });
 
     } catch (err) {
@@ -473,27 +464,12 @@ exports.smartAutoSchedule = async (req, res) => {
             return res.status(400).json({ message: 'Invalid start time.' });
         }
 
-        // 1. Verify Teacher Assignments & Cache Teacher Names
-        const teachers = await Teacher.find({ status: 'active' });
-        const teacherMap = {}; 
-        
+        // 1. Cache fallback teacher labels for each subject
+        const teacherMap = {};
+
         for (const config of subjectsConfig) {
             const subName = config.subject;
-            const assigned = teachers.filter(t => 
-                t.assignments?.some(a => 
-                    (a.batchId?.toString() === batchId || a.batchName === batch.name) &&
-                    a.subjects?.includes(subName)
-                )
-            );
-            
-            if (assigned.length === 0) {
-                return res.status(400).json({ 
-                    message: `Please assign a teacher to the subject "${subName}" first.`,
-                    type: 'TEACHER_MISSING',
-                    subject: subName
-                });
-            }
-            teacherMap[subName] = assigned.map(t => t.name);
+            teacherMap[subName] = [deriveScheduledTeacher(batch.teacher, subName)];
         }
 
         // 2. Fetch Global Occupancy
@@ -503,7 +479,7 @@ exports.smartAutoSchedule = async (req, res) => {
             const key = `${s.day}-${s.timeSlot}`;
             if (!occupancy[key]) occupancy[key] = { rooms: new Set(), teachers: new Set() };
             occupancy[key].rooms.add(s.roomAllotted);
-            if (s.teacher) occupancy[key].teachers.add(s.teacher);
+            if (hasConcreteTeacher(s.teacher)) occupancy[key].teachers.add(s.teacher);
         });
 
         const admin = await Admin.findOne().select('roomsAvailable');
@@ -561,7 +537,7 @@ exports.smartAutoSchedule = async (req, res) => {
             const key = `${day}-${time}`;
             if (!sessionOccupancy[key]) sessionOccupancy[key] = { rooms: [], teachers: [] };
             sessionOccupancy[key].rooms.push(room);
-            sessionOccupancy[key].teachers.push(teacher);
+            if (hasConcreteTeacher(teacher)) sessionOccupancy[key].teachers.push(teacher);
         };
 
         let success = true;

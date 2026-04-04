@@ -43,7 +43,7 @@ const formatReadableDate = (value) => {
 
 const AttendancePage = () => {
     const { toasts, toast, removeToast } = useToast();
-    const [setup, setSetup] = useState({ batches: [], teachers: [], subjects: [], assignments: [] });
+    const [setup, setSetup] = useState({ batches: [], teachers: [], subjects: [] });
     const [roster, setRoster] = useState([]);
     const [history, setHistory] = useState({
         records: [],

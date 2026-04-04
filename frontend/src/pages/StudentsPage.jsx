@@ -22,7 +22,7 @@ const EMPTY_FORM = {
     name: '', dob: '', gender: 'Male', phone: '', email: '', address: '',
     className: '', batchId: '', admissionDate: new Date().toISOString().slice(0, 10),
     session: '2026-2027', fees: '', registrationFee: '', status: 'active', notes: '', password: '', profileImage: null,
-    fatherName: '', motherName: '', parentPhone: '', parentEmail: '', currentYear: '1'
+    fatherName: '', motherName: '', parentPhone: '', currentYear: '1'
 };
 const LIVE_REFRESH_MS = 30000;
 
@@ -259,7 +259,7 @@ const StudentsPage = () => {
             addToast('Exported as PDF');
         } else {
             const csvRows = [];
-            const headers = ['Student Name', 'Roll No', 'Class', 'Batch', 'Contact Number', 'Email', 'Admission Date', 'Status', 'Total Fees', 'Fees Paid'];
+            const headers = ['Student Name', 'Roll No', 'Class', 'Batch', 'Contact Number', 'Email', 'Admission Date', 'Status'];
             csvRows.push(headers.join(','));
 
             students.forEach(s => {
@@ -271,12 +271,9 @@ const StudentsPage = () => {
                 const email = s.email || '';
                 const admission = s.admissionDate ? new Date(s.admissionDate).toLocaleDateString('en-IN') : 'N/A';
                 const status = s.status || '';
-                const totalFees = s.fees || 0;
-                const paidFees = s.feesPaid || 0;
-
                 csvRows.push([
                     `"${name}"`, `"${roll}"`, `"${className}"`, `"${batch}"`, `"${phone}"`, `"${email}"`, `"${admission}"`,
-                    status, totalFees, paidFees
+                    status
                 ].join(','));
             });
 
@@ -505,8 +502,9 @@ const StudentsPage = () => {
                             session: s.session || '2026-2027', fees: s.fees || '',
                             registrationFee: s.registrationFee || '',
                             status: s.status || 'active', notes: s.notes || '', profileImage: null,
-                            fatherName: s.fatherName || '', motherName: s.motherName || '',
-                            parentPhone: s.parentPhone || '', parentEmail: s.parentEmail || '',
+                            fatherName: s.fatherName || '',
+                            motherName: s.motherName || '',
+                            parentPhone: s.parentPhone || '',
                             currentYear: s.currentYear || '1'
                         });
                         setStep(1); setModal('admission');

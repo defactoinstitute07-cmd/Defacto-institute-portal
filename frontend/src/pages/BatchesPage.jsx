@@ -33,8 +33,6 @@ const EMPTY_FORM = {
     name: '', course: '', capacity: 30, subjects: [],
     classroom: '', schedule: [], fees: '',
     startDate: '', endDate: '',
-    hasChapterPlanning: false,
-    subjectPlans: {},
     schedulerConfig: { daysCount: 6, timings: ['09:00', '10:00', '11:00'] }
 };
 
@@ -325,6 +323,8 @@ const BatchesPage = () => {
             .catch(() => toast.warning('Could not load scheduler config'));
     }, []);
 
+
+
     useEffect(() => { loadBatches(); }, [loadBatches]);
     useEffect(() => { const t = setTimeout(() => { setPage(1); loadBatches(); }, 400); return () => clearTimeout(t); }, [search]);
     useEffect(() => { setPage(1); }, [filterCourse]);
@@ -376,24 +376,15 @@ const BatchesPage = () => {
             classroom: batch.classroom || '',
             schedule: Array.isArray(batch.schedule) ? batch.schedule : [],
             fees: batch.fees || '',
-            teacher: batch.teacher || '',
+
             startDate: toDateInputValue(batch.startDate),
             endDate: toDateInputValue(batch.endDate),
-            hasChapterPlanning: Boolean(batch.hasChapterPlanning),
-            subjectPlans: {},
             schedulerConfig: batch.schedulerConfig || { daysCount: 6, timings: ['09:00', '10:00', '11:00'] }
         });
 
         getSubjects({ activeOnly: false, batchId: batch._id })
             .then(({ data }) => {
-                const planMap = (data.subjects || []).reduce((acc, item) => {
-                    if (item?.name) {
-                        acc[item.name] = Number.isFinite(Number(item.totalChapters)) ? Number(item.totalChapters) : '';
-                    }
-                    return acc;
-                }, {});
-
-                setForm((prev) => ({ ...prev, subjectPlans: planMap }));
+                // subjectPlans removed
             })
             .catch(() => { });
 
@@ -410,13 +401,7 @@ const BatchesPage = () => {
             ...f,
             subjects: f.subjects.includes(sub)
                 ? f.subjects.filter(s => s !== sub)
-                : [...f.subjects, sub],
-            subjectPlans: f.subjects.includes(sub)
-                ? Object.fromEntries(Object.entries(f.subjectPlans || {}).filter(([key]) => key !== sub))
-                : {
-                    ...(f.subjectPlans || {}),
-                    [sub]: Object.prototype.hasOwnProperty.call(f.subjectPlans || {}, sub) ? f.subjectPlans[sub] : ''
-                }
+                : [...f.subjects, sub]
         }));
     };
 
@@ -439,15 +424,8 @@ const BatchesPage = () => {
         setFormSaving(true);
         try {
             const { schedulerConfig, ...rawPayload } = form;
-            const subjectPlans = rawPayload.hasChapterPlanning
-                ? (rawPayload.subjects || []).map((name) => ({
-                    name,
-                    totalChapters: Number(rawPayload.subjectPlans?.[name]) || 0
-                }))
-                : [];
             const payload = {
                 ...rawPayload,
-                subjectPlans,
                 startDate: rawPayload.startDate || null,
                 endDate: rawPayload.endDate || null
             };
@@ -463,15 +441,8 @@ const BatchesPage = () => {
     // ── Save (UPDATE) — open password modal first ─────────────
     const handleUpdateIntent = () => {
         const { schedulerConfig, ...rawPayload } = form;
-        const subjectPlans = rawPayload.hasChapterPlanning
-            ? (rawPayload.subjects || []).map((name) => ({
-                name,
-                totalChapters: Number(rawPayload.subjectPlans?.[name]) || 0
-            }))
-            : [];
         const payload = {
             ...rawPayload,
-            subjectPlans,
             startDate: rawPayload.startDate || null,
             endDate: rawPayload.endDate || null
         };
@@ -874,19 +845,7 @@ const BatchesPage = () => {
                                         </div>
                                     </div>
 
-                                    <div style={{ marginBottom: 24, padding: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8 }}>
-                                        <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
-                                            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Has Chapter Planning</span>
-                                            <input
-                                                type="checkbox"
-                                                checked={Boolean(form.hasChapterPlanning)}
-                                                onChange={(e) => setForm((f) => ({ ...f, hasChapterPlanning: e.target.checked }))}
-                                            />
-                                        </label>
-                                        <p style={{ margin: '8px 0 0 0', fontSize: '0.75rem', color: '#64748b' }}>
-                                            Enable this to set total chapters per subject and unlock chapter analytics.
-                                        </p>
-                                    </div>
+
 
                                     {/* ── Subject Selection ── */}
                                     <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -957,35 +916,6 @@ const BatchesPage = () => {
                                         )}
                                     </div>
 
-                                    {form.hasChapterPlanning && form.subjects.length > 0 && (
-                                        <div style={{ marginBottom: 30 }}>
-                                            <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>
-                                                Subject Chapter Planning
-                                            </div>
-                                            <div style={{ display: 'grid', gap: 10 }}>
-                                                {form.subjects.map((subjectName) => (
-                                                    <div key={subjectName} style={{ display: 'grid', gridTemplateColumns: '1fr 180px', gap: 12, alignItems: 'center' }}>
-                                                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#334155' }}>{subjectName}</div>
-                                                        <input
-                                                            type="number"
-                                                            min="0"
-                                                            className="erp-input"
-                                                            style={{ width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: 8, fontSize: '0.85rem' }}
-                                                            placeholder="Total chapters"
-                                                            value={form.subjectPlans?.[subjectName] ?? ''}
-                                                            onChange={(e) => setForm((f) => ({
-                                                                ...f,
-                                                                subjectPlans: {
-                                                                    ...(f.subjectPlans || {}),
-                                                                    [subjectName]: e.target.value
-                                                                }
-                                                            }))}
-                                                        />
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
 
                                     {/* ── Classroom & Timetable Section ── */}
                                     <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -1104,7 +1034,7 @@ const BatchesPage = () => {
                         onClose={() => { setShowDelModal(false); setDelBatch(null); }}
                         onConfirm={confirmDelete}
                         title="Delete Batch"
-                        description={`You are about to delete "${delBatch?.name}". All timetable slots and assignments will be lost.`}
+                        description={`You are about to delete "${delBatch?.name}". All timetable slots for this batch will be lost.`}
                         actionType="delete"
                         loading={delLoading}
                         error={delError}
