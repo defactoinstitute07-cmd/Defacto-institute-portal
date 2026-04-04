@@ -42,13 +42,18 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // Middleware
+const envCorsOrigins = String(process.env.CORS_ORIGIN || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
 const allowedOrigins = [
     'http://localhost:5173',
     'http://localhost:5174', // Added for user's current frontend port
     'http://localhost:3000',
     'https://tutution-erp-demo.vercel.app',
     'https://tutution-erp-frontend.vercel.app',
-    process.env.CORS_ORIGIN
+    ...envCorsOrigins
 ].filter(Boolean);
 
 app.use(cors({
