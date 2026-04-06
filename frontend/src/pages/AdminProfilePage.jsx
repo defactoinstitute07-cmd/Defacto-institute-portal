@@ -265,6 +265,7 @@ const AdminProfilePage = () => {
                                         <InfoBlock icon={<User />} label="Administrator" value={profile?.adminName} />
                                         <InfoBlock icon={<Mail />} label="Admin Email" value={profile?.email} />
                                         <InfoBlock icon={<Phone />} label="Admin Contact" value={profile?.phone} />
+                                        <InfoBlock icon={<BookOpen />} label="Bio" value={profile?.bio} />
                                     </div>
                                 </div>
 
@@ -282,6 +283,7 @@ const AdminProfilePage = () => {
                                     <div className="space-y-6">
                                         <InfoBlock icon={<FileDigit />} label="Reg. Number" value={profile?.registrationNumber} />
                                         <InfoBlock icon={<Home />} label="Rooms Available" value={profile?.roomsAvailable} />
+                                        <InfoBlock icon={<BookOpen />} label="Classes Offered" value={(profile?.classesOffered || []).join(', ')} />
                                         <InfoBlock icon={<MapPin />} label="Address" value={profile?.instituteAddress} />
                                         <ThemePalettePreview colors={profile?.themeColors} />
                                     </div>
@@ -295,6 +297,17 @@ const AdminProfilePage = () => {
                                     <FormInput label="Institute Name" name="coachingName" value={form.coachingName} onChange={handle} placeholder="Coaching Name" />
                                     <FormInput label="Admin Email" name="email" value={form.email} onChange={handle} placeholder="email@admin.com" />
                                     <FormInput label="Admin Phone" name="phone" value={form.phone} onChange={handle} placeholder="+91 00000 00000" />
+                                    <div className="space-y-2">
+                                        <label className="info-label"><BookOpen size={14} /> Bio</label>
+                                        <textarea
+                                            name="bio"
+                                            value={form.bio}
+                                            onChange={handle}
+                                            rows={3}
+                                            className="w-full bg-white border-2 border-slate-100 rounded-2xl p-4 text-sm font-bold text-slate-800 focus:border-blue-500 outline-none transition-all shadow-inner"
+                                            placeholder="Write a short administrator bio..."
+                                        />
+                                    </div>
                                 </div>
                                 <div className="space-y-6">
                                     <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Institute Configuration</h4>
@@ -304,6 +317,7 @@ const AdminProfilePage = () => {
                                     </div>
                                     <FormInput label="Institute Email" name="instituteEmail" value={form.instituteEmail} onChange={handle} />
                                     <FormInput label="Institute Phone" name="institutePhone" value={form.institutePhone} onChange={handle} />
+                                    <FormInput label="Classes Offered (comma separated)" name="classesOffered" value={form.classesOffered} onChange={handle} placeholder="Class 9, Class 10, PCM" />
                                     <div className="space-y-3 pt-1">
                                         <label className="info-label"><Palette size={14} /> Brand Colors</label>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

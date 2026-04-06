@@ -3,7 +3,28 @@ const { triggerAutomaticNotification } = require('../services/notificationServic
 const ExamResult = require('../models/ExamResult');
 const Student = require('../models/Student');
 const Batch = require('../models/Batch');
+const Subject = require('../models/Subject');
 const { logNotificationEvent } = require('../services/activityLogService');
+
+const resolveExamLinkedBatchIds = async (exam) => {
+    if (!exam) return [];
+
+    if (exam.subjectId) {
+        const subject = await Subject.findById(exam.subjectId).select('batchIds').lean();
+        const ids = Array.isArray(subject?.batchIds)
+            ? subject.batchIds.map((id) => String(id))
+            : [];
+        if (ids.length > 0) {
+            return ids;
+        }
+    }
+
+    if (exam.batchId) {
+        return [String(exam.batchId)];
+    }
+
+    return [];
+};
 
 // GET /api/exams — list all exams
 exports.getAllExams = async (req, res) => {
@@ -12,7 +33,67 @@ exports.getAllExams = async (req, res) => {
             .populate('batchId', 'name subjects')
             .sort({ createdAt: -1 })
             .lean();
-        res.json({ exams });
+
+        const subjectIds = Array.from(new Set(
+            exams
+                .map((exam) => String(exam.subjectId || '').trim())
+                .filter(Boolean)
+        ));
+
+        const subjects = subjectIds.length > 0
+            ? await Subject.find({ _id: { $in: subjectIds } }).select('_id batchIds').lean()
+            : [];
+
+        const subjectMap = new Map(subjects.map((subject) => [String(subject._id), subject]));
+
+        const allBatchIds = new Set();
+        subjects.forEach((subject) => {
+            (subject.batchIds || []).forEach((batchId) => allBatchIds.add(String(batchId)));
+        });
+
+        const allBatches = allBatchIds.size > 0
+            ? await Batch.find({ _id: { $in: Array.from(allBatchIds) } }).select('name course').lean()
+            : [];
+
+        const batchMap = new Map(allBatches.map((batch) => [String(batch._id), batch]));
+
+        const enriched = exams.map((exam) => {
+            const subject = exam.subjectId ? subjectMap.get(String(exam.subjectId)) : null;
+            const linkedBatchIds = Array.isArray(subject?.batchIds) && subject.batchIds.length > 0
+                ? subject.batchIds.map((id) => String(id))
+                : (exam.batchId?._id ? [String(exam.batchId._id)] : []);
+
+            const linkedBatches = linkedBatchIds
+                .map((id) => {
+                    const batch = batchMap.get(id);
+                    if (batch) {
+                        return {
+                            _id: batch._id,
+                            name: batch.name,
+                            course: batch.course || ''
+                        };
+                    }
+
+                    if (exam.batchId && String(exam.batchId._id) === id) {
+                        return {
+                            _id: exam.batchId._id,
+                            name: exam.batchId.name,
+                            course: ''
+                        };
+                    }
+
+                    return null;
+                })
+                .filter(Boolean);
+
+            return {
+                ...exam,
+                linkedBatches,
+                linkedBatchNames: linkedBatches.map((batch) => batch.name)
+            };
+        });
+
+        res.json({ exams: enriched });
     } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });
     }
@@ -21,29 +102,95 @@ exports.getAllExams = async (req, res) => {
 // POST /api/exams — create a new test
 exports.createExam = async (req, res) => {
     try {
-        const { name, subject, chapter, batchId, date, totalMarks, passingMarks } = req.body;
-        if (!name || !subject || !chapter || !batchId || !totalMarks || !passingMarks) {
-            return res.status(400).json({ message: 'Name, subject, chapter, batch, totalMarks and passingMarks are required.' });
+        const { name, classLevel, subject, subjectId, chapter, batchId, date, totalMarks, passingMarks } = req.body;
+        if (!name || !chapter || !totalMarks || !passingMarks || (!subjectId && !subject)) {
+            return res.status(400).json({ message: 'Name, class level, subject, chapter, totalMarks and passingMarks are required.' });
         }
         if (parseFloat(passingMarks) > parseFloat(totalMarks)) {
             return res.status(400).json({ message: 'Passing marks cannot exceed total marks.' });
         }
-        const exam = new Exam({ name, subject, chapter, batchId, date, totalMarks, passingMarks });
+
+        let selectedSubject = null;
+
+        if (subjectId) {
+            selectedSubject = await Subject.findById(subjectId)
+                .select('name classLevel batchIds isActive')
+                .lean();
+        }
+
+        if (!selectedSubject && subject) {
+            const normalizedClassLevel = String(classLevel || '').trim();
+            const subjectQuery = {
+                name: String(subject).trim(),
+                isActive: true
+            };
+            if (normalizedClassLevel) {
+                subjectQuery.classLevel = normalizedClassLevel;
+            }
+            selectedSubject = await Subject.findOne({
+                ...subjectQuery
+            })
+                .select('name classLevel batchIds isActive')
+                .lean();
+        }
+
+        if (!selectedSubject || !selectedSubject.isActive) {
+            return res.status(400).json({ message: 'Selected subject was not found or is inactive.' });
+        }
+
+        const linkedBatchIds = Array.isArray(selectedSubject.batchIds)
+            ? selectedSubject.batchIds.map((id) => id.toString())
+            : [];
+
+        if (linkedBatchIds.length === 0) {
+            return res.status(400).json({ message: 'Selected subject is not assigned to any batch.' });
+        }
+
+        if (batchId && !linkedBatchIds.includes(String(batchId))) {
+            return res.status(400).json({ message: 'Selected subject is not assigned to the selected batch.' });
+        }
+
+        const normalizedSubjectName = selectedSubject.name;
+        const normalizedClassLevel = String(selectedSubject.classLevel || classLevel || 'General').trim() || 'General';
+        const resolvedBatchId = batchId || linkedBatchIds[0];
+        const exam = new Exam({
+            name,
+            classLevel: normalizedClassLevel,
+            subject: normalizedSubjectName,
+            subjectId: selectedSubject._id,
+            chapter,
+            batchId: resolvedBatchId,
+            linkedBatchCount: Math.max(linkedBatchIds.length, 1),
+            date,
+            totalMarks,
+            passingMarks
+        });
         await exam.save();
         await exam.populate('batchId', 'name subjects');
 
-        // Log test scheduling events for all active students in the batch.
-        const students = await Student.find({ batchId, status: 'active' }).select('name email').lean();
+        // Notify all active students across every batch linked to the selected subject.
+        const students = await Student.find({
+            batchId: { $in: linkedBatchIds },
+            status: 'active'
+        }).select('name email _id batchId').lean();
 
-        students.forEach(student => {
+        const seenStudentIds = new Set();
+        const uniqueStudents = students.filter((student) => {
+            const key = String(student._id);
+            if (seenStudentIds.has(key)) return false;
+            seenStudentIds.add(key);
+            return true;
+        });
+
+        uniqueStudents.forEach(student => {
             // Trigger Automatic Notification (Push/Email)
             triggerAutomaticNotification({
                 eventType: 'testAnnouncement',
                 studentId: student._id,
-                message: `New Test Scheduled: ${name} (${subject}) on ${date ? new Date(date).toLocaleDateString('en-IN') : 'TBD'}`,
+                message: `New Test Scheduled: ${name} (${normalizedSubjectName}) on ${date ? new Date(date).toLocaleDateString('en-IN') : 'TBD'}`,
                 data: {
                     examName: name,
-                    subject,
+                    subject: normalizedSubjectName,
                     date: date ? new Date(date).toLocaleDateString('en-IN') : 'TBD',
                     totalMarks,
                     passingMarks
@@ -58,7 +205,7 @@ exports.createExam = async (req, res) => {
                     type: 'test_scheduled',
                     data: {
                         examName: name,
-                        subject,
+                        subject: normalizedSubjectName,
                         chapter,
                         date: date ? new Date(date).toLocaleDateString('en-IN') : 'TBD',
                         totalMarks,
@@ -68,7 +215,15 @@ exports.createExam = async (req, res) => {
             }
         });
 
-        res.status(201).json({ message: 'Test created successfully', exam });
+        res.status(201).json({
+            message: 'Test created successfully',
+            exam,
+            notificationScope: {
+                subjectId: selectedSubject._id,
+                linkedBatchCount: linkedBatchIds.length,
+                notifiedStudents: uniqueStudents.length
+            }
+        });
     } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });
     }
@@ -107,14 +262,20 @@ exports.deleteExam = async (req, res) => {
     }
 };
 
-// GET /api/exams/:id/students — fetch students in the exam's batch
+// GET /api/exams/:id/students — fetch students in exam class-level scope
 exports.getExamStudents = async (req, res) => {
     try {
         const exam = await Exam.findById(req.params.id).populate('batchId', 'name');
         if (!exam) return res.status(404).json({ message: 'Exam not found' });
 
-        const students = await Student.find({ batchId: exam.batchId._id, status: 'active' })
-            .select('name rollNo _id')
+        const linkedBatchIds = await resolveExamLinkedBatchIds(exam);
+        if (linkedBatchIds.length === 0) {
+            return res.json({ exam, students: [] });
+        }
+
+        const students = await Student.find({ batchId: { $in: linkedBatchIds }, status: 'active' })
+            .select('name rollNo _id batchId')
+            .populate('batchId', 'name')
             .sort({ name: 1 })
             .lean();
 
@@ -125,6 +286,7 @@ exports.getExamStudents = async (req, res) => {
 
         const rows = students.map(s => ({
             ...s,
+            batchName: s.batchId?.name || 'Unassigned',
             result: resultMap[s._id.toString()] || null
         }));
 
@@ -141,7 +303,14 @@ exports.getExamResults = async (req, res) => {
         if (!exam) return res.status(404).json({ message: 'Exam not found' });
 
         const results = await ExamResult.find({ examId: req.params.id })
-            .populate('studentId', 'name rollNo')
+            .populate({
+                path: 'studentId',
+                select: 'name rollNo batchId',
+                populate: {
+                    path: 'batchId',
+                    select: 'name'
+                }
+            })
             .populate('uploadedBy', 'name')
             .sort({ 'studentId.name': 1 })
             .lean();
@@ -165,22 +334,46 @@ exports.saveMarks = async (req, res) => {
 
         const uploadedBy = req.teacher?.id || null; // null means admin
 
-        const ops = marks.map(({ studentId, marksObtained, remarks, isPresent }) => ({
-            updateOne: {
-                filter: { examId: exam._id, studentId },
-                update: {
-                    $set: {
-                        batchId: exam.batchId,
-                        marksObtained: parseFloat(marksObtained) || 0,
-                        isPresent: isPresent !== undefined ? isPresent : true,
-                        remarks: remarks || '',
-                        uploadedBy,
-                        uploadedAt: new Date()
-                    }
-                },
-                upsert: true
+        const linkedBatchIds = await resolveExamLinkedBatchIds(exam);
+        const studentIds = marks.map((m) => m.studentId);
+        const students = await Student.find({ _id: { $in: studentIds } })
+            .select('_id name email batchId')
+            .lean();
+
+        const studentMap = {};
+        students.forEach((student) => {
+            studentMap[String(student._id)] = student;
+        });
+
+        const ops = [];
+        for (const { studentId, marksObtained, remarks, isPresent } of marks) {
+            const student = studentMap[String(studentId)];
+            if (!student) {
+                return res.status(400).json({ message: 'One or more selected students were not found.' });
             }
-        }));
+
+            const studentBatchId = String(student.batchId || '');
+            if (linkedBatchIds.length > 0 && !linkedBatchIds.includes(studentBatchId)) {
+                return res.status(400).json({ message: `Student ${student.name} is outside the exam class-level scope.` });
+            }
+
+            ops.push({
+                updateOne: {
+                    filter: { examId: exam._id, studentId },
+                    update: {
+                        $set: {
+                            batchId: student.batchId,
+                            marksObtained: parseFloat(marksObtained) || 0,
+                            isPresent: isPresent !== undefined ? isPresent : true,
+                            remarks: remarks || '',
+                            uploadedBy,
+                            uploadedAt: new Date()
+                        }
+                    },
+                    upsert: true
+                }
+            });
+        }
 
         await ExamResult.bulkWrite(ops);
 
@@ -191,13 +384,11 @@ exports.saveMarks = async (req, res) => {
         }
 
         // Log result announcements for each student.
-        const studentIds = marks.map(m => m.studentId);
-        const students = await Student.find({ _id: { $in: studentIds } }).select('name email _id').lean();
-        const studentMap = {};
-        students.forEach(s => { studentMap[s._id.toString()] = s; });
+        const resultStudentMap = {};
+        students.forEach(s => { resultStudentMap[s._id.toString()] = s; });
 
         marks.forEach(m => {
-            const student = studentMap[m.studentId?.toString()];
+            const student = resultStudentMap[m.studentId?.toString()];
             if (student) {
                 const mo = parseFloat(m.marksObtained) || 0;
                 const pass = mo >= exam.passingMarks;

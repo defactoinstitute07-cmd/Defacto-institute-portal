@@ -1,14 +1,8 @@
 const Batch = require('../models/Batch');
 const Student = require('../models/Student');
-const Admin = require('../models/Admin');
 const Subject = require('../models/Subject');
 const mongoose = require('mongoose');
 const { syncBatchSchedule } = require('./scheduler.controller');
-const STANDARD_SUBJECTS = [
-    'Mathematics', 'Science', 'English', 'Hindi', 'Social Science',
-    'Physics', 'Chemistry', 'Biology', 'Accountancy', 'Business Studies',
-    'Economics', 'Computer Science', 'History', 'Geography', 'All Subjects'
-];
 
 const normalizeBatchDate = (value) => {
     if (!value) return null;
@@ -33,10 +27,6 @@ const normalizeBatchDate = (value) => {
     return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
-const escapeRegex = (value = '') => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-
-
 // GET /api/batches
 exports.getAllBatches = async (req, res) => {
     try {
@@ -57,15 +47,22 @@ exports.getAllBatches = async (req, res) => {
         // Student count per batch
         const batchIds = batches.map(b => b._id);
         const subjectDocs = await Subject.find({
-            batchId: { $in: batchIds },
+            batchIds: { $in: batchIds },
             isActive: true
-        }).select('_id name batchId').lean();
+        }).select('_id name batchIds').lean();
 
         const subjectMap = {};
         subjectDocs.forEach((subject) => {
-            const key = String(subject.batchId);
-            if (!subjectMap[key]) subjectMap[key] = [];
-            subjectMap[key].push({ _id: subject._id, name: subject.name });
+            const linkedBatchIds = Array.isArray(subject.batchIds)
+                ? Array.from(new Set(subject.batchIds.map((id) => String(id))))
+                : [];
+
+            linkedBatchIds.forEach((key) => {
+                if (!subjectMap[key]) subjectMap[key] = [];
+                if (!subjectMap[key].some((item) => String(item._id) === String(subject._id))) {
+                    subjectMap[key].push({ _id: subject._id, name: subject.name });
+                }
+            });
         });
 
         const counts = await Student.aggregate([
@@ -75,12 +72,16 @@ exports.getAllBatches = async (req, res) => {
         const countMap = {};
         counts.forEach(c => { countMap[c._id.toString()] = { count: c.count, earnings: c.totalFees }; });
 
-        const result = batches.map(b => ({
-            ...b,
-            subjectDetails: subjectMap[b._id.toString()] || [],
+        const result = batches.map(b => {
+            const details = subjectMap[b._id.toString()] || [];
+            return {
+                ...b,
+                subjects: details.map((subject) => subject.name),
+                subjectDetails: details,
             studentCount: countMap[b._id.toString()]?.count || 0,
             earnings: countMap[b._id.toString()]?.earnings || 0,
-        }));
+            };
+        });
 
         res.json({ batches: result, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
     } catch (err) {
@@ -190,42 +191,6 @@ exports.toggleStatus = async (req, res) => {
     }
 };
 
-// GET /api/batches/courses/:course/subjects
-exports.getSubjectsByCourse = (req, res) => {
-    const course = String(req.params.course || "").toLowerCase();
-    const classNumMatch = course.match(/\d+/);
-    const num = classNumMatch ? parseInt(classNumMatch[0]) : null;
-
-    // 1. School Level (Class 1-10) - Should check this before senior streams
-    if (num && num <= 10) {
-        if (num >= 9) {
-            return res.json({ subjects: ['Mathematics', 'Science', 'English', 'Hindi', 'Social Science', 'IT'] });
-        }
-        if (num >= 5) {
-            return res.json({ subjects: ['All Subjects', 'Mathematics', 'Science', 'English', 'Hindi', 'Social Science'] });
-        }
-        return res.json({ subjects: ['All Subjects'] });
-    }
-
-    // 2. Senior Science (Class 11, 12, or just "Science" without low class num)
-    if (course.includes('science') || course.includes('sci') || course.includes('pcb') || course.includes('pcm')) {
-        return res.json({ subjects: ['Physics', 'Chemistry', 'Biology', 'Mathematics', 'Computer Science', 'English', 'P.E.'] });
-    }
-
-    // 3. Senior Commerce
-    if (course.includes('commerce') || course.includes('com')) {
-        return res.json({ subjects: ['Accountancy', 'Business Studies', 'Economics', 'Mathematics', 'English', 'Informatics Practices'] });
-    }
-
-    // 4. Senior Arts / Humanities
-    if (course.includes('arts') || course.includes('humanities') || course.includes('art')) {
-        return res.json({ subjects: ['History', 'Geography', 'Political Science', 'Economics', 'Psychology', 'Fine Arts', 'English', 'Hindi'] });
-    }
-
-    // 5. Default Fallback
-    res.json({ subjects: STANDARD_SUBJECTS });
-};
-
 // GET /api/batches/room-occupancy?excludeBatchId=xxx
 exports.getRoomOccupancy = async (req, res) => {
     try {
@@ -265,6 +230,21 @@ exports.getBatchById = async (req, res) => {
         const batch = await Batch.findById(req.params.id).lean();
         if (!batch) return res.status(404).json({ message: 'Batch not found' });
 
+        const subjectDocs = await Subject.find({
+            isActive: true,
+            batchIds: batch._id
+        }).select('_id name').sort({ name: 1 }).lean();
+
+        const uniqueSubjects = [];
+        const seenSubjectIds = new Set();
+        subjectDocs.forEach((subject) => {
+            const key = String(subject._id);
+            if (!seenSubjectIds.has(key)) {
+                seenSubjectIds.add(key);
+                uniqueSubjects.push(subject);
+            }
+        });
+
         // Get student list and stats
         const students = await Student.find({ batchId: batch._id, isDeleted: { $ne: true } })
             .select('name rollNo feesPaid status profileImage')
@@ -277,33 +257,18 @@ exports.getBatchById = async (req, res) => {
             activeCount: students.filter(s => s.status === 'active').length
         };
 
-        res.json({ batch: { ...batch, ...stats }, students });
+        res.json({
+            batch: {
+                ...batch,
+                subjects: uniqueSubjects.map((subject) => subject.name),
+                subjectDetails: uniqueSubjects,
+                ...stats
+            },
+            students
+        });
     } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });
     }
 };
 
-// PATCH /api/batches/:id/subjects
-exports.updateBatchSubjects = async (req, res) => {
-    try {
-        const { subjectIds, subjects } = req.body;
-
-        // Ensure both arrays exist (even if empty) to prevent accidental null values
-        if (!Array.isArray(subjectIds) || !Array.isArray(subjects)) {
-            return res.status(400).json({ message: 'Invalid data format. subjectIds and subjects must be arrays.' });
-        }
-
-        const batch = await Batch.findByIdAndUpdate(
-            req.params.id,
-            { $set: { subjectIds, subjects } },
-            { returnDocument: 'after' }
-        );
-
-        if (!batch) return res.status(404).json({ message: 'Batch not found' });
-
-        res.json({ message: 'Batch subjects updated successfully', batch });
-    } catch (err) {
-        res.status(500).json({ message: 'Server error', error: err.message });
-    }
-};
 

@@ -60,10 +60,11 @@ const LoginPage = () => {
 
                 data = response.data;
                 const student = data.student || {};
+                const subjects = Array.isArray(data.subjects) ? data.subjects : [];
                 const needsSetup = student.needsSetup !== undefined
                     ? student.needsSetup
                     : ((student.portalAccess?.signupStatus || 'no') !== 'yes' || !student.profileImage);
-                setClientSession({ role: 'student', student: { ...student, needsSetup } });
+                setClientSession({ role: 'student', student: { ...student, needsSetup, subjects } });
                 navigate(needsSetup ? '/student-setup' : '/student-dashboard');
             }
         } catch (err) {

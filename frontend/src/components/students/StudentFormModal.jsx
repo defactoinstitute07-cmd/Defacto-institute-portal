@@ -27,6 +27,11 @@ const StudentFormModal = ({
     currentBatch.capacity > 0 &&
     currentBatch.enrolled >= currentBatch.capacity;
 
+  const monthlyFeeValue = Number(form.fees) || 0;
+  const registrationFeeValue = Number(form.registrationFee) || 0;
+  const discountValue = Math.max(Number(form.discount) || 0, 0);
+  const netPayableOnAdmission = Math.max(monthlyFeeValue + registrationFeeValue - discountValue, 0);
+
   const handleSubmit = (e) => {
     if (step === 2 && isBatchFull) {
       e.preventDefault();
@@ -281,6 +286,28 @@ const StudentFormModal = ({
                   <div style={{ flex: 1 }}>
                     <label style={{ fontWeight: 800, fontSize: '0.7rem', color: '#475569' }}>REGISTRATION FEE (₹ )</label>
                     <input type="number" name="registrationFee" value={form.registrationFee} onChange={handleForm} style={inputStyle} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontWeight: 800, fontSize: '0.7rem', color: '#475569' }}>DISCOUNT (₹ )</label>
+                    <input type="number" name="discount" min="0" value={form.discount || ''} onChange={handleForm} placeholder="0" style={inputStyle} />
+                  </div>
+                </div>
+
+                <div style={{
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  background: '#ffffff',
+                  padding: '12px 14px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 12
+                }} className="flex-mob-stack">
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 700, letterSpacing: '0.04em' }}>
+                    NET PAYABLE ON ADMISSION
+                  </div>
+                  <div style={{ fontSize: '1rem', color: '#0f172a', fontWeight: 800 }}>
+                    ₹ {netPayableOnAdmission.toLocaleString('en-IN')}
                   </div>
                 </div>
 

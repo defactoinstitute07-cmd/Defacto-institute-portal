@@ -93,7 +93,7 @@ const buildNotificationEmailTemplate = ({
     const portalBlock = isStudentRegistration
         ? `
             <div class="cta-wrap">
-                <a class="cta" href="${safeStudentPortal}" target="_blank" rel="noopener noreferrer">Open Student Portal</a>
+                <a class="cta" href="https://student.defactoinstitute.in" target="_blank" rel="noopener noreferrer">Open Student Portal</a>
             </div>
           `
         : `

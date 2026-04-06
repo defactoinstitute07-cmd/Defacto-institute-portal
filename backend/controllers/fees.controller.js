@@ -85,20 +85,7 @@ const createFeeReceiptPdfBuffer = ({ fee, payment, admin }) => {
                 }
             }
             
-            if (!logoAdded) {
-                // Fallback: show placeholder with border
-                doc.rect(logoX, logoY, logoSize, logoSize)
-                    .stroke(secondaryColor);
-                doc.fillColor('#ffffff')
-                    .fontSize(12)
-                    .font('Helvetica-Bold')
-                    .text('LOGO', logoX, logoY + 20, {
-                        width: logoSize,
-                        align: 'center',
-                        height: logoSize,
-                        valign: 'center'
-                    });
-            }
+            
         } catch (err) {
             console.warn('[fees.createFeeReceiptPdfBuffer] Logo image error:', err.message);
             // Fallback: show placeholder
@@ -214,7 +201,7 @@ const createFeeReceiptPdfBuffer = ({ fee, payment, admin }) => {
         // Table Rows
         const feeRows = [
             { label: `Tuition Fee (${fee.month} ${fee.year})`, value: fee.monthlyTuitionFee || 0 },
-            { label: 'Registration Fee', value: fee.registrationFee || 0 },
+            { label: 'Discount', value: fee.discount || 0, isBold: true, bgColor: '#e8f5e9' },
             { label: 'Late Fine', value: fee.fine || 0 },
             { label: 'Payment Received', value: payment.paidAmount || 0, isBold: true, bgColor: '#e0f2f1' },
             { label: 'Pending Balance', value: Math.max(Number(fee.totalFee || 0) - Number(fee.amountPaid || 0), 0), isBold: true, bgColor: '#fff3e0' }
@@ -386,8 +373,9 @@ exports.createFee = async (req, res) => {
 
         const monthlyTuitionFee = Number(amount || 0);
         const registrationFee = Number(student.registrationFee || 0);
+        const discount = Math.max(Number(student.discount || 0), 0);
         const fine = 0;
-        const totalFee = monthlyTuitionFee + registrationFee + fine;
+        const totalFee = Math.max(monthlyTuitionFee + registrationFee + fine - discount, 0);
 
         const fee = new Fee({
             studentId,
@@ -396,6 +384,7 @@ exports.createFee = async (req, res) => {
             year,
             monthlyTuitionFee,
             registrationFee,
+            discount,
             fine,
             totalFee,
             amountPaid: 0,
@@ -533,7 +522,8 @@ exports.generateFeesBulk = async (req, res) => {
 
             const baseFee = student.batchId?.fees || student.fees || 0;
             const registrationFee = Number(student.registrationFee || 0);
-            const totalFee = Number(baseFee) + registrationFee;
+            const discount = Math.max(Number(student.discount || 0), 0);
+            const totalFee = Math.max(Number(baseFee) + registrationFee - discount, 0);
 
             const fee = new Fee({
                 studentId: student._id,
@@ -542,6 +532,7 @@ exports.generateFeesBulk = async (req, res) => {
                 year,
                 monthlyTuitionFee: Number(baseFee),
                 registrationFee,
+                discount,
                 fine: 0,
                 totalFee,
                 amountPaid: 0,

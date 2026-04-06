@@ -599,7 +599,10 @@ textarea:hover {
 .sidebar {
     width: var(--sidebar-w);
     height: 100%;
-    background: var(--erp-primary);
+    background: color-mix(in srgb, var(--erp-primary) 88%, #0b1220 12%);
+    border-right: 1px solid rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     display: flex;
     flex-direction: column;
     z-index: 200;
@@ -765,7 +768,7 @@ textarea:hover {
 /* TOPBAR */
 .topbar {
     height: var(--topbar-h);
-    background: var(--erp-surface);
+    background: rgba(255, 255, 255, 0.78);
     border-bottom: 1px solid var(--erp-border);
     display: flex;
     align-items: center;
@@ -774,6 +777,8 @@ textarea:hover {
     gap: 14px;
     box-shadow: var(--shadow-sm);
     flex-shrink: 0;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
 }
 
 @media (max-width: 640px) {

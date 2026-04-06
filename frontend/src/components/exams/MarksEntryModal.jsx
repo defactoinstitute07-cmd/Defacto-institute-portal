@@ -117,7 +117,7 @@ const MarksEntryModal = ({ exam, onClose, onSave }) => {
                         <div>
                             <h2 style={{ color: '#fff', fontWeight: 800, fontSize: '1rem', margin: 0 }}>{exam.name}</h2>
                             <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.72rem', margin: 0 }}>
-                                {exam.subject} · Total: {exam.totalMarks}
+                                {exam.classLevel || 'General'} · {exam.subject} · Total: {exam.totalMarks}
                             </p>
                         </div>
                     </div>
@@ -156,6 +156,7 @@ const MarksEntryModal = ({ exam, onClose, onSave }) => {
                                     <tr>
                                         <th style={{ width: '50px' }}>#</th>
                                         <th>Student</th>
+                                        <th style={{ width: '140px' }}>Batch</th>
                                         <th style={{ width: '120px' }}>Attendance</th>
                                         <th style={{ width: '120px' }}>Marks</th>
                                         <th>Remarks</th>
@@ -166,6 +167,7 @@ const MarksEntryModal = ({ exam, onClose, onSave }) => {
                                         <tr key={row.student._id} style={getRowStyle(row.marks)}>
                                             <td>{idx + 1}</td>
                                             <td style={{ fontWeight: 700, fontSize: '0.85rem' }}>{row.student.name}</td>
+                                            <td style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569' }}>{row.student.batchName || row.student.batchId?.name || '—'}</td>
                                             <td>
                                                 <button
                                                     onClick={() => updateRow(idx, 'isPresent', !row.isPresent)}

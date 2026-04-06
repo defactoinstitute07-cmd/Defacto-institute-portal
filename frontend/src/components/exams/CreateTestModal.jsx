@@ -3,23 +3,51 @@ import { X, BookOpen, Loader2 } from 'lucide-react';
 import apiClient from '../../api/apiConfig';
 
 const CreateTestModal = ({ onClose, onSave }) => {
-    const [batches, setBatches] = useState([]);
+    const [classLevels, setClassLevels] = useState([]);
     const [subjects, setSubjects] = useState([]);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [form, setForm] = useState({
-        name: '', batchId: '', subject: '', chapter: '',
-        totalMarks: 100, passingMarks: 40, date: ''
+        name: '', classLevel: '', subject: '', subjectId: '', chapter: '',
+        totalMarks: 20, passingMarks: 15, date: ''
     });
 
     useEffect(() => {
-        apiClient.get('/batches').then(({ data }) => setBatches(data.batches || []));
+        apiClient.get('/subjects', { params: { activeOnly: true } })
+            .then(({ data }) => {
+                const levels = Array.from(new Set((data.subjects || []).map((item) => String(item.classLevel || 'General').trim() || 'General')));
+                setClassLevels(levels.sort((a, b) => a.localeCompare(b)));
+            })
+            .catch(() => setClassLevels([]));
     }, []);
 
-    const handleBatchChange = (batchId) => {
-        const batch = batches.find(b => b._id === batchId);
-        setSubjects(batch?.subjects || []);
-        setForm(f => ({ ...f, batchId, subject: '' }));
+    const handleClassLevelChange = async (classLevel) => {
+        setForm(f => ({ ...f, classLevel, subject: '', subjectId: '' }));
+        if (!classLevel) {
+            setSubjects([]);
+            return;
+        }
+
+        try {
+            const { data } = await apiClient.get('/subjects', {
+                params: {
+                    activeOnly: true,
+                    classLevel
+                }
+            });
+            setSubjects(data.subjects || []);
+        } catch (_error) {
+            setSubjects([]);
+        }
+    };
+
+    const handleSubjectChange = (subjectId) => {
+        const selected = subjects.find((item) => String(item._id) === String(subjectId));
+        setForm((prev) => ({
+            ...prev,
+            subjectId,
+            subject: selected?.name || ''
+        }));
     };
 
     const handleSubmit = async (e) => {
@@ -27,8 +55,18 @@ const CreateTestModal = ({ onClose, onSave }) => {
         setSaving(true);
         setError('');
         try {
-            await apiClient.post('/exams', form);
-            onSave();
+            if (!form.classLevel) {
+                setError('Please select class level first.');
+                return;
+            }
+
+            if (!form.subjectId || !form.subject) {
+                setError('Please select a subject for the selected class level.');
+                return;
+            }
+
+            const { data } = await apiClient.post('/exams', form);
+            onSave(data);
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to create test.');
         } finally { setSaving(false); }
@@ -143,6 +181,23 @@ const CreateTestModal = ({ onClose, onSave }) => {
                     )}
 
                     <div style={{ display: 'grid', gap: 20 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                            <div>
+                                <label style={labelStyle}>Class Level *</label>
+                                <select style={inputStyle} value={form.classLevel} onChange={e => handleClassLevelChange(e.target.value)} required>
+                                    <option value="">Select Class Level</option>
+                                    {classLevels.map(level => <option key={level} value={level}>{level}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label style={labelStyle}>Subject *</label>
+                                <select style={inputStyle} value={form.subjectId} onChange={e => handleSubjectChange(e.target.value)} required disabled={!form.classLevel}>
+                                    <option value="">Select Subject</option>
+                                    {subjects.map(s => <option key={s._id} value={s._id}>{s.name}</option>)}
+                                </select>
+                            </div>
+                        </div>
+
                         <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 16 }}>
                             <div>
                                 <label style={labelStyle}>Test Name *</label>
@@ -153,23 +208,6 @@ const CreateTestModal = ({ onClose, onSave }) => {
                                 <label style={labelStyle}>Chapter *</label>
                                 <input style={inputStyle} type="text" placeholder="e.g. Algebra" value={form.chapter}
                                     onChange={e => setForm(f => ({ ...f, chapter: e.target.value }))} required />
-                            </div>
-                        </div>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                            <div>
-                                <label style={labelStyle}>Batch *</label>
-                                <select style={inputStyle} value={form.batchId} onChange={e => handleBatchChange(e.target.value)} required>
-                                    <option value="">Select Batch</option>
-                                    {batches.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label style={labelStyle}>Subject *</label>
-                                <select style={inputStyle} value={form.subject} onChange={e => setForm(f => ({ ...f, subject: e.target.value }))} required disabled={!form.batchId}>
-                                    <option value="">Select Subject</option>
-                                    {subjects.map(s => <option key={s} value={s}>{s}</option>)}
-                                </select>
                             </div>
                         </div>
 

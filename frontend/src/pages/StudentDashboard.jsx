@@ -45,6 +45,30 @@ const StudentDashboard = () => {
         }
     }, [student._id]);
 
+    const hydrateStudentProfile = useCallback(async () => {
+        if (!student._id) return;
+        try {
+            const { data } = await apiClient.get('/student/profile');
+            const currentStored = (() => {
+                try {
+                    return JSON.parse(localStorage.getItem('student') || '{}');
+                } catch {
+                    return {};
+                }
+            })();
+
+            const nextStudent = {
+                ...currentStored,
+                ...(data?.student || {}),
+                subjects: Array.isArray(data?.subjects) ? data.subjects : (currentStored.subjects || [])
+            };
+
+            localStorage.setItem('student', JSON.stringify(nextStudent));
+        } catch (e) {
+            console.error('Failed to hydrate student profile', e);
+        }
+    }, [student._id]);
+
     const fetchAttendanceSummary = useCallback(async () => {
         if (!student._id) return;
         setAttendanceLoading(true);
@@ -72,7 +96,8 @@ const StudentDashboard = () => {
     useEffect(() => {
         fetchPerformance();
         fetchAttendanceSummary();
-    }, [fetchAttendanceSummary, fetchPerformance]);
+        hydrateStudentProfile();
+    }, [fetchAttendanceSummary, fetchPerformance, hydrateStudentProfile]);
 
     return (
         <div className="erp-shell">

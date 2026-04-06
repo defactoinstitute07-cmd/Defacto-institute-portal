@@ -5,7 +5,6 @@ const batchSchema = new mongoose.Schema({
     course: { type: String, trim: true },
     capacity: { type: Number, default: 30 },
     subjects: [{ type: String, trim: true }],
-    subjectIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Subject' }],
     classroom: { type: String, trim: true },
     // Structured schedule for conflict detection
     schedule: [{ day: String, time: String, subject: String, teacher: String, room: { type: String, trim: true } }],
@@ -20,6 +19,5 @@ const batchSchema = new mongoose.Schema({
 });
 
 batchSchema.index({ isActive: 1, name: 1 });
-batchSchema.index({ subjectIds: 1 });
 
 module.exports = mongoose.model('Batch', batchSchema);

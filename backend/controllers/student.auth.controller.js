@@ -1,6 +1,7 @@
 const Student = require('../models/Student');
 const ExamResult = require('../models/ExamResult');
 const Attendance = require('../models/Attendance');
+const Subject = require('../models/Subject');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { triggerAutomaticNotification } = require('../services/notificationService');
@@ -62,6 +63,21 @@ const getAttendanceSummary = async (studentId) => {
     const percentage = total > 0 ? Math.round((present / total) * 100) : 0;
 
     return { total, present, absent, late, percentage };
+};
+
+const getLinkedSubjectsForBatch = async (batchId, { activeOnly = true } = {}) => {
+    if (!batchId) return [];
+
+    const query = { batchIds: batchId };
+    if (activeOnly) {
+        query.isActive = true;
+    }
+
+    return Subject.find(query)
+        .select('name code classLevel teacherId batchIds chapters syllabus isActive updatedAt')
+        .populate('teacherId', 'name regNo email phone profileImage status')
+        .sort({ name: 1 })
+        .lean();
 };
 
 exports.signup = async (req, res) => {
@@ -153,6 +169,7 @@ exports.login = async (req, res) => {
         await student.save();
 
         const attendanceSummary = await getAttendanceSummary(student._id);
+        const linkedSubjects = await getLinkedSubjectsForBatch(student.batchId, { activeOnly: true });
 
         logNotificationEvent({
             recipientEmail: student.email,
@@ -166,6 +183,7 @@ exports.login = async (req, res) => {
             message: 'Login successful',
             token: createStudentToken(student._id),
             student: { ...toSafeProfile(student), needsSetup: getNeedsSetup(student), attendanceSummary },
+            subjects: linkedSubjects,
             phoneRequired: !student.contact
         });
     } catch (err) {
@@ -223,16 +241,23 @@ exports.getProfile = async (req, res) => {
     try {
         const student = await Student.findById(req.userId)
             .select('-password')
-            .populate('batchId', 'name subject');
+            .populate('batchId', 'name course subjects');
 
         if (!student) {
             return res.status(404).json({ message: 'Student not found' });
         }
 
         const attendanceSummary = await getAttendanceSummary(student._id);
+        const linkedSubjects = await getLinkedSubjectsForBatch(student.batchId?._id || student.batchId, { activeOnly: true });
+
+        // Backward compatible support for clients still reading batch.subjects.
+        if (student.batchId && typeof student.batchId === 'object') {
+            student.batchId.subjects = linkedSubjects.map((subject) => subject.name).filter(Boolean);
+        }
 
         res.json({
             student,
+            subjects: linkedSubjects,
             phoneRequired: !student.contact,
             attendanceSummary
         });

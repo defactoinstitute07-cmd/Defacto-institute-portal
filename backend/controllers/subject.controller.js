@@ -1,8 +1,8 @@
-const attendanceService = require('../services/attendance.service');
+const subjectService = require('../services/subject.service');
 
 exports.createSubject = async (req, res) => {
     try {
-        const subject = await attendanceService.createSubject(req.body);
+        const subject = await subjectService.createSubject(req.body);
         res.status(201).json({ message: 'Subject created successfully.', subject });
     } catch (error) {
         const status = error.status || (error.code === 11000 ? 400 : 500);
@@ -12,9 +12,10 @@ exports.createSubject = async (req, res) => {
 
 exports.getSubjects = async (req, res) => {
     try {
-        const subjects = await attendanceService.listSubjects({
+        const subjects = await subjectService.listSubjects({
             activeOnly: req.query.activeOnly !== 'false',
-            batchId: req.query.batchId
+            batchId: req.query.batchId,
+            classLevel: req.query.classLevel
         });
         res.json({ subjects });
     } catch (error) {
@@ -24,7 +25,7 @@ exports.getSubjects = async (req, res) => {
 
 exports.getSubjectById = async (req, res) => {
     try {
-        const subject = await attendanceService.getSubjectById({ subjectId: req.params.id });
+        const subject = await subjectService.getSubjectById({ subjectId: req.params.id });
         res.json({ subject });
     } catch (error) {
         const status = error.status || 500;
@@ -34,10 +35,12 @@ exports.getSubjectById = async (req, res) => {
 
 exports.addChapter = async (req, res) => {
     try {
-        const subject = await attendanceService.addChapterToSubject({
+        const subject = await subjectService.addChapterToSubject({
             subjectId: req.params.id,
             name: req.body?.name,
-            durationDays: req.body?.durationDays
+            durationDays: req.body?.durationDays,
+            actorRole: req.role,
+            actorId: req.userId
         });
         res.status(201).json({ message: 'Chapter added successfully.', subject });
     } catch (error) {
@@ -48,13 +51,14 @@ exports.addChapter = async (req, res) => {
 
 exports.updateChapter = async (req, res) => {
     try {
-        const subject = await attendanceService.updateChapterDetails({
+        const subject = await subjectService.updateChapterDetails({
             subjectId: req.params.id,
             chapterId: req.params.chapterId,
             name: req.body?.name,
             durationDays: req.body?.durationDays,
             status: req.body?.status,
             actorRole: req.role,
+            actorId: req.userId,
             adminOverride: Boolean(req.body?.adminOverride)
         });
         res.json({ message: 'Chapter updated successfully.', subject });
@@ -66,10 +70,12 @@ exports.updateChapter = async (req, res) => {
 
 exports.updateChapterStatus = async (req, res) => {
     try {
-        const subject = await attendanceService.updateChapterStatus({
+        const subject = await subjectService.updateChapterStatus({
             subjectId: req.params.id,
             chapterId: req.params.chapterId,
-            status: req.body?.status
+            status: req.body?.status,
+            actorRole: req.role,
+            actorId: req.userId
         });
         res.json({ message: 'Chapter status updated successfully.', subject });
     } catch (error) {
@@ -78,9 +84,22 @@ exports.updateChapterStatus = async (req, res) => {
     }
 };
 
+exports.getMySubjects = async (req, res) => {
+    try {
+        const data = await subjectService.listSubjectsForStudent({
+            studentId: req.userId,
+            activeOnly: req.query.activeOnly !== 'false'
+        });
+        res.json(data);
+    } catch (error) {
+        const status = error.status || 500;
+        res.status(status).json({ message: error.message || 'Failed to fetch student subjects.' });
+    }
+};
+
 exports.assignTeacher = async (req, res) => {
     try {
-        const subject = await attendanceService.assignTeacherToSubject({
+        const subject = await subjectService.assignTeacherToSubject({
             subjectId: req.params.id,
             teacherId: req.body?.teacherId || null
         });
@@ -88,5 +107,43 @@ exports.assignTeacher = async (req, res) => {
     } catch (error) {
         const status = error.status || 500;
         res.status(status).json({ message: error.message || 'Failed to assign teacher.' });
+    }
+};
+
+exports.assignBatches = async (req, res) => {
+    try {
+        const subject = await subjectService.assignSubjectToBatches({
+            subjectId: req.params.id,
+            batchIds: req.body?.batchIds
+        });
+        res.json({ message: 'Subject batches updated successfully.', subject });
+    } catch (error) {
+        const status = error.status || 500;
+        res.status(status).json({ message: error.message || 'Failed to update subject batches.' });
+    }
+};
+
+exports.uploadSyllabus = async (req, res) => {
+    try {
+        const subject = await subjectService.uploadSyllabusToSubject({
+            subjectId: req.params.id,
+            file: req.file,
+            actorRole: req.role,
+            actorId: req.userId
+        });
+        res.json({ message: 'Syllabus uploaded and propagated to linked batches.', subject });
+    } catch (error) {
+        const status = error.status || 500;
+        res.status(status).json({ message: error.message || 'Failed to upload syllabus.' });
+    }
+};
+
+exports.deleteSubject = async (req, res) => {
+    try {
+        const subject = await subjectService.deleteSubject({ subjectId: req.params.id });
+        res.json({ message: 'Subject deleted successfully.', subject });
+    } catch (error) {
+        const status = error.status || 500;
+        res.status(status).json({ message: error.message || 'Failed to delete subject.' });
     }
 };

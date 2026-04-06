@@ -35,6 +35,11 @@ const chapterSchema = new mongoose.Schema({
 }, { _id: true });
 
 const subjectSchema = new mongoose.Schema({
+    classLevel: {
+        type: String,
+        trim: true,
+        default: ''
+    },
     name: {
         type: String,
         required: true,
@@ -46,12 +51,11 @@ const subjectSchema = new mongoose.Schema({
         uppercase: true,
         default: null
     },
-    batchId: {
+    batchIds: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Batch',
-        required: true,
         index: true
-    },
+    }],
     teacherId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Teacher',
@@ -66,6 +70,17 @@ const subjectSchema = new mongoose.Schema({
     chapters: {
         type: [chapterSchema],
         default: []
+    },
+    syllabus: {
+        originalName: { type: String, trim: true, default: '' },
+        url: { type: String, trim: true, default: '' },
+        mimeType: { type: String, trim: true, default: '' },
+        uploadedAt: { type: Date, default: null },
+        status: {
+            type: String,
+            enum: ['pending', 'completed'],
+            default: 'pending'
+        }
     },
     isActive: {
         type: Boolean,
@@ -97,6 +112,11 @@ subjectSchema.pre('validate', function () {
 subjectSchema.pre('save', function () {
     this.updatedAt = new Date();
 
+    if (Array.isArray(this.batchIds)) {
+        const deduped = Array.from(new Set(this.batchIds.map((id) => String(id))));
+        this.batchIds = deduped.map((id) => new mongoose.Types.ObjectId(id));
+    }
+
     if (!this.code && this.name) {
         this.code = this.name
             .replace(/[^a-zA-Z0-9]+/g, '_')
@@ -104,9 +124,14 @@ subjectSchema.pre('save', function () {
             .slice(0, 24)
             .toUpperCase();
     }
+
+    if (!this.classLevel && this.name) {
+        this.classLevel = 'General';
+    }
 });
 
-subjectSchema.index({ batchId: 1, name: 1 }, { unique: true });
-subjectSchema.index({ batchId: 1, code: 1 }, { unique: true, sparse: true });
+subjectSchema.index({ classLevel: 1, name: 1 });
+subjectSchema.index({ batchIds: 1 });
+subjectSchema.index({ code: 1 }, { sparse: true });
 
 module.exports = mongoose.model('Subject', subjectSchema);

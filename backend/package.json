@@ -4,7 +4,10 @@
   "main": "index.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "migrate:remove-batch-subjectids": "node scripts/removeBatchSubjectIds.js",
+    "migrate:subjects-shared-model": "node scripts/migrateSubjectsToSharedModel.js",
+    "migrate:remove-subject-batchid": "node scripts/removeSubjectBatchIdLegacyField.js"
   },
   "keywords": [],
   "author": "",

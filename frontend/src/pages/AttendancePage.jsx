@@ -55,7 +55,7 @@ const AttendancePage = () => {
     const [loading, setLoading] = useState({ setup: true, roster: false, save: false, history: false });
 
     const [filters, setFilters] = useState({
-        batchId: '',
+        classLevel: '',
         subjectId: '',
         date: todayString()
     });
@@ -64,16 +64,16 @@ const AttendancePage = () => {
         dateTo: todayString()
     });
 
-    const selectedBatch = useMemo(
-        () => setup.batches.find((b) => b._id === filters.batchId) || null,
-        [setup.batches, filters.batchId]
+    const classLevels = useMemo(
+        () => Array.from(new Set((setup.subjects || []).map((subject) => String(subject.classLevel || 'General').trim() || 'General')))
+            .sort((a, b) => a.localeCompare(b)),
+        [setup.subjects]
     );
 
     const availableSubjects = useMemo(() => {
-        if (!selectedBatch) return [];
-        const subjectIds = new Set((selectedBatch.subjectIds || []).map(id => String(id)));
-        return setup.subjects.filter(s => subjectIds.has(String(s._id)));
-    }, [selectedBatch, setup.subjects]);
+        if (!filters.classLevel) return [];
+        return setup.subjects.filter((subject) => (String(subject.classLevel || 'General').trim() || 'General') === filters.classLevel);
+    }, [filters.classLevel, setup.subjects]);
 
     const selectedSubject = useMemo(
         () => setup.subjects.find((subject) => subject._id === filters.subjectId) || null,
@@ -92,6 +92,7 @@ const AttendancePage = () => {
                     studentId: studentKey,
                     studentName: student.name || 'Unknown Student',
                     rollNo: student.rollNo || '--',
+                    batchName: record.batchId?.name || '--',
                     present: 0,
                     absent: 0,
                     late: 0,
@@ -129,11 +130,15 @@ const AttendancePage = () => {
     };
 
     const loadRoster = async () => {
-        if (!filters.batchId || !filters.subjectId) return;
+        if (!filters.subjectId) return;
 
         try {
             setLoading(l => ({ ...l, roster: true }));
-            const response = await getAdminAttendanceRoster(filters);
+            const response = await getAdminAttendanceRoster({
+                classLevel: filters.classLevel,
+                subjectId: filters.subjectId,
+                date: filters.date
+            });
             setRoster(response.data.students || []);
             setIsMarked(response.data.isMarked || false);
         } catch (error) {
@@ -144,12 +149,11 @@ const AttendancePage = () => {
     };
 
     const loadHistory = async (nextFilters = historyFilters) => {
-        if (!filters.batchId || !filters.subjectId) return;
+        if (!filters.subjectId) return;
 
         try {
             setLoading(l => ({ ...l, history: true }));
             const response = await getAdminAttendanceReport({
-                batchId: filters.batchId,
                 subjectId: filters.subjectId,
                 dateFrom: nextFilters.dateFrom || undefined,
                 dateTo: nextFilters.dateTo || undefined,
@@ -174,7 +178,7 @@ const AttendancePage = () => {
 
     // Automatic loading when filters change
     useEffect(() => {
-        if (filters.batchId && filters.subjectId) {
+        if (filters.subjectId) {
             loadRoster();
             if (activeTab === 'history') {
                 loadHistory();
@@ -188,10 +192,10 @@ const AttendancePage = () => {
                 pagination: { page: 1, pages: 0, total: 0 }
             });
         }
-    }, [filters.batchId, filters.subjectId, filters.date]);
+    }, [filters.classLevel, filters.subjectId, filters.date]);
 
     useEffect(() => {
-        if (activeTab === 'history' && filters.batchId && filters.subjectId) {
+        if (activeTab === 'history' && filters.subjectId) {
             loadHistory();
         }
     }, [activeTab]);
@@ -206,7 +210,6 @@ const AttendancePage = () => {
         try {
             setLoading(l => ({ ...l, save: true }));
             await markAdminAttendance({
-                batchId: filters.batchId,
                 subjectId: filters.subjectId,
                 date: filters.date,
                 entries: roster.map(s => ({
@@ -260,18 +263,18 @@ const AttendancePage = () => {
 
                     <div className="space-y-2 relative">
                         <label className="text-xs sm:text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
-                            1. Select Batch
+                            1. Select Class Level
                         </label>
                         <select
                             className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base text-slate-700 font-bold focus:border-indigo-500 focus:bg-white transition-all outline-none appearance-none cursor-pointer"
-                            value={filters.batchId}
+                            value={filters.classLevel}
                             onChange={(e) => {
                                 setActiveTab('mark');
-                                setFilters(f => ({ ...f, batchId: e.target.value, subjectId: '' }));
+                                setFilters(f => ({ ...f, classLevel: e.target.value, subjectId: '' }));
                             }}
                         >
-                            <option value="">Choose a Batch...</option>
-                            {setup.batches.map(b => <option key={b._id} value={b._id}>{b.name} ({b.course})</option>)}
+                            <option value="">Choose a Class Level...</option>
+                            {classLevels.map(level => <option key={level} value={level}>{level}</option>)}
                         </select>
                     </div>
 
@@ -280,22 +283,22 @@ const AttendancePage = () => {
                             2. Select Subject
                         </label>
                         <select
-                            className={`w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base text-slate-700 font-bold focus:border-indigo-500 focus:bg-white transition-all outline-none appearance-none cursor-pointer ${!filters.batchId && 'opacity-50 cursor-not-allowed'}`}
+                            className={`w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base text-slate-700 font-bold focus:border-indigo-500 focus:bg-white transition-all outline-none appearance-none cursor-pointer ${!filters.classLevel && 'opacity-50 cursor-not-allowed'}`}
                             value={filters.subjectId}
                             onChange={(e) => {
                                 setActiveTab('mark');
                                 setFilters(f => ({ ...f, subjectId: e.target.value }));
                             }}
-                            disabled={!filters.batchId}
+                            disabled={!filters.classLevel}
                         >
-                            <option value="">{filters.batchId ? 'Choose a Subject...' : 'Please select a batch first'}</option>
+                            <option value="">{filters.classLevel ? 'Choose a Subject...' : 'Please select class level first'}</option>
                             {availableSubjects.map(s => <option key={s._id} value={s._id}>{s.name} ({s.code})</option>)}
                         </select>
                     </div>
                 </div>
 
                 {/* Main Content Area */}
-                {(filters.batchId && filters.subjectId) && (
+                {(filters.classLevel && filters.subjectId) && (
                     <div className="bg-white rounded-2xl border border-slate-200/80 p-2 sm:p-3 shadow-sm">
                         <div className="flex flex-wrap items-center gap-2">
                             <button
@@ -314,7 +317,7 @@ const AttendancePage = () => {
                             </button>
                         </div>
                         <p className="mt-2 text-xs sm:text-sm text-slate-500 font-semibold">
-                            {selectedBatch?.name || 'Selected batch'} - {selectedSubject?.name || 'Selected subject'}
+                            {filters.classLevel || 'Selected class'} - {selectedSubject?.name || 'Selected subject'}
                         </p>
                     </div>
                 )}
@@ -397,6 +400,7 @@ const AttendancePage = () => {
                                         <div className="min-w-0 flex-1">
                                             <h3 className="font-bold text-slate-800 leading-tight truncate text-base">{student.name}</h3>
                                             <p className="text-xs font-semibold text-slate-400 truncate mt-0.5">Roll: {student.rollNo || 'N/A'}</p>
+                                            <p className="text-[11px] font-semibold text-indigo-600 truncate mt-1">Batch: {student.batchName || '--'}</p>
                                         </div>
                                     </div>
 
@@ -442,15 +446,15 @@ const AttendancePage = () => {
                             </button>
                         </div>
                     </div>
-                ) : activeTab === 'mark' && (filters.batchId && filters.subjectId) ? (
+                ) : activeTab === 'mark' && (filters.classLevel && filters.subjectId) ? (
                     <div className="bg-white rounded-3xl border-2 border-dashed border-slate-200 p-12 sm:p-20 flex flex-col items-center justify-center text-center mx-4 sm:mx-0">
                         <div className="p-4 bg-slate-50 rounded-full mb-4">
                             <Users size={32} className="text-slate-300 sm:w-10 sm:h-10" />
                         </div>
                         <h3 className="text-lg sm:text-xl font-black text-slate-800">No Students Found</h3>
-                        <p className="text-sm sm:text-base text-slate-500 font-medium max-w-[300px] mt-2">There are no active students matched with this batch selection.</p>
+                        <p className="text-sm sm:text-base text-slate-500 font-medium max-w-[300px] mt-2">There are no active students matched with this subject selection.</p>
                     </div>
-                ) : activeTab === 'history' && (filters.batchId && filters.subjectId) ? (
+                ) : activeTab === 'history' && (filters.classLevel && filters.subjectId) ? (
                     <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
                         <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-sm">
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -528,6 +532,7 @@ const AttendancePage = () => {
                                                 <tr className="border-b border-slate-200 text-slate-500 uppercase tracking-wider text-xs">
                                                     <th className="text-left py-3 pr-3">Student</th>
                                                     <th className="text-left py-3 pr-3">Roll</th>
+                                                    <th className="text-left py-3 pr-3">Batch</th>
                                                     <th className="text-left py-3 pr-3">Present</th>
                                                     <th className="text-left py-3 pr-3">Absent</th>
                                                     <th className="text-left py-3 pr-3">Late</th>
@@ -543,6 +548,7 @@ const AttendancePage = () => {
                                                         <tr key={student.studentId} className="border-b border-slate-100 last:border-b-0">
                                                             <td className="py-3 pr-3 font-bold text-slate-800">{student.studentName}</td>
                                                             <td className="py-3 pr-3 text-slate-600 font-semibold">{student.rollNo}</td>
+                                                            <td className="py-3 pr-3 text-slate-600 font-semibold">{student.batchName || '--'}</td>
                                                             <td className="py-3 pr-3 text-emerald-700 font-black">{student.present}</td>
                                                             <td className="py-3 pr-3 text-rose-700 font-black">{student.absent}</td>
                                                             <td className="py-3 pr-3 text-amber-700 font-black">{student.late}</td>
@@ -566,6 +572,7 @@ const AttendancePage = () => {
                                                     <th className="text-left py-3 pr-3">Date</th>
                                                     <th className="text-left py-3 pr-3">Student</th>
                                                     <th className="text-left py-3 pr-3">Roll</th>
+                                                    <th className="text-left py-3 pr-3">Batch</th>
                                                     <th className="text-left py-3 pr-3">Status</th>
                                                     <th className="text-left py-3 pr-3">Notes</th>
                                                 </tr>
@@ -582,6 +589,7 @@ const AttendancePage = () => {
                                                             <td className="py-3 pr-3 font-semibold text-slate-700">{formatReadableDate(record.attendanceDate || record.date)}</td>
                                                             <td className="py-3 pr-3 font-bold text-slate-800">{record.studentId?.name || '--'}</td>
                                                             <td className="py-3 pr-3 text-slate-600 font-semibold">{record.studentId?.rollNo || '--'}</td>
+                                                            <td className="py-3 pr-3 text-slate-600 font-semibold">{record.batchId?.name || '--'}</td>
                                                             <td className={`py-3 pr-3 font-black ${statusClass}`}>{record.status || '--'}</td>
                                                             <td className="py-3 pr-3 text-slate-600 font-medium">{record.notes || '--'}</td>
                                                         </tr>
@@ -600,7 +608,7 @@ const AttendancePage = () => {
                             <RefreshCw size={24} className="text-indigo-400 animate-pulse sm:w-8 sm:h-8" />
                         </div>
                         <h3 className="text-base sm:text-lg font-black text-slate-900">Waiting for Selection</h3>
-                        <p className="text-sm sm:text-base text-slate-500 font-medium max-w-sm mt-2 italic">Choose a batch and subject to load the corresponding student roster and start marking attendance.</p>
+                        <p className="text-sm sm:text-base text-slate-500 font-medium max-w-sm mt-2 italic">Choose class level and subject to load all linked students and start marking attendance.</p>
                     </div>
                 )}
             </div>

@@ -211,6 +211,7 @@ const BatchRow = ({ batch, onEdit, onDelete }) => {
                 </div>
                 {batch.fees > 0 && <div className="td-sm">₹ {batch.fees.toLocaleString()}/student</div>}
             </td>
+
             <td data-label="Status">
                 <span className={`badge ${batch.isActive ? 'badge-active' : 'badge-overdue'}`}>
                     {batch.isActive ? 'Active' : 'Inactive'}
@@ -866,9 +867,9 @@ const BatchesPage = () => {
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                                                 {/* 1. Subjects available */}
                                                 <div>
-                                                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', display: 'block', marginBottom: 8, textTransform: 'uppercase' }}>Mapped Batch Subjects</label>
+                                                    <label style={{ fontSize: '0.65rem', fontWeight: 800, color: '#64748b', display: 'block', marginBottom: 8, textTransform: 'uppercase' }}>Batch Subjects</label>
                                                     <p style={{ margin: '0 0 10px 0', fontSize: '0.72rem', color: '#64748b' }}>
-                                                        Suggestions only. Showing only subjects mapped for this batch.
+                                                        Showing active subjects available for this batch.
                                                     </p>
                                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                                                         {availableSubjects.map(sub => {

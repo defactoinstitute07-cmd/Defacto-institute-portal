@@ -27,6 +27,16 @@ const getTeacherImage = (profileImage) => {
     return `${API_BASE_URL}${profileImage}`;
 };
 
+const resolveTeacherId = (teacherValue) => {
+    if (!teacherValue) return '';
+    if (typeof teacherValue === 'string') return teacherValue;
+    if (typeof teacherValue === 'object' && teacherValue._id) return String(teacherValue._id);
+
+    // Handles raw ObjectId-like objects returned from non-populated payloads.
+    const fallback = String(teacherValue);
+    return fallback && fallback !== '[object Object]' ? fallback : '';
+};
+
 export default function SubjectDetailsPage() {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -46,7 +56,10 @@ export default function SubjectDetailsPage() {
     const [selectedTeacherId, setSelectedTeacherId] = useState('');
     const [assigningTeacher, setAssigningTeacher] = useState(false);
 
-    const batchId = searchParams.get('batchId') || subject?.batchId || '';
+    const primaryBatchId = Array.isArray(subject?.batchIds) && subject.batchIds.length > 0
+        ? (subject.batchIds[0]?._id || subject.batchIds[0])
+        : '';
+    const batchId = searchParams.get('batchId') || primaryBatchId || '';
 
     const pushFlash = (type, text) => {
         setFlash({ type, text });
@@ -102,10 +115,10 @@ export default function SubjectDetailsPage() {
 
     useEffect(() => {
         if (!subject) return;
-        const currentTeacherId = typeof subject.teacherId === 'string'
-            ? subject.teacherId
-            : subject.teacherId?._id || '';
-        setSelectedTeacherId(currentTeacherId);
+        const currentTeacherId = resolveTeacherId(subject.teacherId);
+        if (currentTeacherId) {
+            setSelectedTeacherId(currentTeacherId);
+        }
     }, [subject]);
 
     const chapters = subject?.chapters || [];
@@ -133,11 +146,11 @@ export default function SubjectDetailsPage() {
 
         setSaving(true);
         try {
-            const { data } = await addSubjectChapter(id, {
+            await addSubjectChapter(id, {
                 name: chapterForm.name,
                 durationDays: duration
             });
-            setSubject(data.subject);
+            await loadSubject();
             setChapterForm({ name: '', durationDays: 1 });
             pushFlash('success', 'Chapter added successfully.');
         } catch (requestError) {
@@ -187,12 +200,12 @@ export default function SubjectDetailsPage() {
 
         setStatusUpdatingId(chapterId);
         try {
-            const { data } = await updateSubjectChapter(id, chapterId, {
+            await updateSubjectChapter(id, chapterId, {
                 name: editForm.name,
                 durationDays: duration,
                 status: editForm.status
             });
-            setSubject(data.subject);
+            await loadSubject();
             handleCancelEdit();
             pushFlash('success', 'Chapter updated successfully.');
         } catch (requestError) {
@@ -207,9 +220,10 @@ export default function SubjectDetailsPage() {
         return new Date(value).toLocaleDateString();
     };
 
-    const currentTeacher = subject?.teacherId && typeof subject.teacherId === 'object'
+    const teacherId = resolveTeacherId(subject?.teacherId);
+    const currentTeacher = (subject?.teacherId && typeof subject.teacherId === 'object' && subject.teacherId.name)
         ? subject.teacherId
-        : null;
+        : teachers.find((teacher) => String(teacher._id) === String(teacherId)) || null;
 
     const handleAssignTeacher = async () => {
         setAssigningTeacher(true);

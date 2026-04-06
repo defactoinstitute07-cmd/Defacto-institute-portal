@@ -124,6 +124,10 @@ const BatchDetailsPage = () => {
         (batchSubjects || []).map((subject) => [String(subject.name || '').toLowerCase(), subject._id])
     );
 
+    const subjectsCovered = (batchSubjects && batchSubjects.length > 0)
+        ? batchSubjects.map((subject) => subject.name)
+        : (batch.subjects || []);
+
     return (
         <ERPLayout title={`Batch: ${batch.name}`}>
             <style>{`
@@ -240,7 +244,7 @@ const BatchDetailsPage = () => {
                                     <div>
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Subjects covered</label>
                                         <div className="flex flex-wrap gap-2 mt-2">
-                                            {batch.subjects?.map(sub => {
+                                            {subjectsCovered.map(sub => {
                                                 const subjectId = subjectNameToIdMap.get(String(sub || '').toLowerCase());
                                                 if (!subjectId) {
                                                     return (

@@ -58,9 +58,10 @@ const ExamsPage = () => {
     const [scorers, setScorers] = useState([]);
     const [scorersLoading, setScorersLoading] = useState(false);
     const [leaderboardType, setLeaderboardType] = useState('improvers');
-    const [filterBatch, setFilterBatch] = useState('');
+    const [filterClassLevel, setFilterClassLevel] = useState('');
     const [filterSubject, setFilterSubject] = useState('');
     const [visibleCount, setVisibleCount] = useState(15);
+    const [creationSummary, setCreationSummary] = useState(null);
 
     const fetchExams = async () => {
         try {
@@ -120,17 +121,19 @@ const ExamsPage = () => {
     };
 
     // Derived Data for Filtering
-    const uniqueBatches = Array.from(new Set(exams.map(e => e.batchId?._id).filter(Boolean)))
-        .map(id => exams.find(e => e.batchId?._id === id).batchId);
+    const uniqueClassLevels = Array.from(
+        new Set(exams.map((exam) => String(exam.classLevel || 'General').trim() || 'General'))
+    ).sort((a, b) => a.localeCompare(b));
 
-    const availableSubjects = filterBatch
-        ? Array.from(new Set(exams.filter(e => e.batchId?._id === filterBatch).map(e => e.subject)))
+    const availableSubjects = filterClassLevel
+        ? Array.from(new Set(exams.filter(e => (String(e.classLevel || 'General').trim() || 'General') === filterClassLevel).map(e => e.subject)))
         : [];
 
     const filteredExams = exams.filter(e => {
-        const matchBatch = !filterBatch || e.batchId?._id === filterBatch;
+        const normalizedClassLevel = String(e.classLevel || 'General').trim() || 'General';
+        const matchClassLevel = !filterClassLevel || normalizedClassLevel === filterClassLevel;
         const matchSubject = !filterSubject || e.subject === filterSubject;
-        return matchBatch && matchSubject;
+        return matchClassLevel && matchSubject;
     });
 
     const displayedExams = filteredExams.slice(0, visibleCount);
@@ -177,32 +180,69 @@ const ExamsPage = () => {
                 </div>
             )}
 
+            {creationSummary && (
+                <div
+                    className="alert"
+                    style={{
+                        marginBottom: 16,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 12,
+                        background: '#ecfdf5',
+                        color: '#166534',
+                        border: '1px solid #bbf7d0'
+                    }}
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700 }}>
+                        <CheckCircle2 size={16} />
+                        <span>
+                            Test created. Subject is linked to {creationSummary.linkedBatchCount} batches and {creationSummary.notifiedStudents} students were notified.
+                        </span>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setCreationSummary(null)}
+                        style={{
+                            border: 'none',
+                            background: 'transparent',
+                            color: '#166534',
+                            cursor: 'pointer',
+                            fontWeight: 800,
+                            fontSize: '0.8rem'
+                        }}
+                    >
+                        Dismiss
+                    </button>
+                </div>
+            )}
+
             <div className="card global-filters" style={{ padding: '16px 20px', marginBottom: 24, display: 'flex', gap: 16, alignItems: 'flex-end', flexWrap: 'wrap' }}>
                 <div style={{ flex: 1, minWidth: 200 }}>
-                    <label style={{ display: 'block', fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>1. Select Batch</label>
+                    <label style={{ display: 'block', fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>1. Select Class Level</label>
                     <select
-                        value={filterBatch}
-                        onChange={e => { setFilterBatch(e.target.value); setFilterSubject(''); setSelectedExam(null); if (tab === 'leaderboard') { if (leaderboardType === 'improvers') fetchImprovers(e.target.value); else fetchScorers(e.target.value); } }}
+                        value={filterClassLevel}
+                        onChange={e => { setFilterClassLevel(e.target.value); setFilterSubject(''); setSelectedExam(null); }}
                         style={{ width: '100%', padding: '10px 12px', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: '0.9rem', fontWeight: 600, color: '#1e293b', outline: 'none' }}
                     >
-                        <option value="">All Batches</option>
-                        {uniqueBatches.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
+                        <option value="">All Class Levels</option>
+                        {uniqueClassLevels.map(level => <option key={level} value={level}>{level}</option>)}
                     </select>
                 </div>
-                <div style={{ flex: 1, minWidth: 200, opacity: filterBatch ? 1 : 0.5, pointerEvents: filterBatch ? 'all' : 'none' }}>
+                <div style={{ flex: 1, minWidth: 200, opacity: filterClassLevel ? 1 : 0.5, pointerEvents: filterClassLevel ? 'all' : 'none' }}>
                     <label style={{ display: 'block', fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>2. Select Subject</label>
                     <select
                         value={filterSubject}
                         onChange={e => { setFilterSubject(e.target.value); setSelectedExam(null); }}
                         style={{ width: '100%', padding: '10px 12px', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: '0.9rem', fontWeight: 600, color: '#1e293b', outline: 'none' }}
                     >
-                        <option value="">{filterBatch ? 'All Subjects' : 'Select Batch first...'}</option>
+                        <option value="">{filterClassLevel ? 'All Subjects' : 'Select Class Level first...'}</option>
                         {availableSubjects.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                 </div>
-                {(filterBatch || filterSubject) && (
+                {(filterClassLevel || filterSubject) && (
                     <button
-                        onClick={() => { setFilterBatch(''); setFilterSubject(''); setSelectedExam(null); }}
+                        onClick={() => { setFilterClassLevel(''); setFilterSubject(''); setSelectedExam(null); }}
                         style={{ background: '#f1f5f9', border: 'none', padding: '10px 16px', borderRadius: 6, color: '#64748b', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
                     >
                         Reset Filters
@@ -259,7 +299,30 @@ const ExamsPage = () => {
                                                     <div className="td-bold">{exam.name}</div>
                                                     <div className="td-sm" style={{ color: '#94a3b8', marginTop: 4 }}>{exam.chapter || 'General test'}</div>
                                                 </td>
-                                                <td data-label="Batch"><span style={{ background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: 6, fontSize: '0.78rem', fontWeight: 700 }}>{exam.batchId?.name || '—'}</span></td>
+                                                <td data-label="Batch">
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                                        {Array.isArray(exam.linkedBatchNames) && exam.linkedBatchNames.length > 0 && (
+                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                                                                {exam.linkedBatchNames.map((batchName, index) => (
+                                                                    <span
+                                                                        key={`${exam._id}-batch-${index}`}
+                                                                        style={{
+                                                                            background: '#e0f2fe',
+                                                                            color: '#0369a1',
+                                                                            padding: '2px 8px',
+                                                                            borderRadius: 6,
+                                                                            fontSize: '0.78rem',
+                                                                            fontWeight: 700,
+                                                                            width: 'fit-content'
+                                                                        }}
+                                                                    >
+                                                                        {batchName}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </td>
                                                 <td className="td-sm" data-label="Subject">{exam.subject}</td>
                                                 <td className="td-sm" data-label="Test Date">
                                                     <span style={{ fontWeight: 700, color: exam.date ? '#1e293b' : '#94a3b8' }}>{formatExamDate(exam.date)}</span>
@@ -326,9 +389,9 @@ const ExamsPage = () => {
                                 if (exam) fetchResults(exam);
                             }}
                             style={{ padding: '10px 12px', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: '0.9rem', fontWeight: 700, color: '#1e293b', minWidth: 260, width: '100%', outline: 'none' }}
-                            disabled={!filterBatch || !filterSubject}
+                            disabled={!filterClassLevel || !filterSubject}
                         >
-                            <option value="">{!filterBatch ? 'Choose Batch first...' : !filterSubject ? 'Choose Subject first...' : '-- Select Test --'}</option>
+                            <option value="">{!filterClassLevel ? 'Choose Class Level first...' : !filterSubject ? 'Choose Subject first...' : '-- Select Test --'}</option>
                             {filteredExams.map(e => <option key={e._id} value={e._id}>{e.name} ({formatExamDate(e.date)})</option>)}
                         </select>
                     </div>
@@ -377,6 +440,7 @@ const ExamsPage = () => {
                                                 <tr>
                                                     <th>#</th>
                                                     <th>Student</th>
+                                                    <th>Batch</th>
                                                     <th>Roll No.</th>
                                                     <th>Marks Obtained</th>
                                                     <th>Out of</th>
@@ -393,6 +457,7 @@ const ExamsPage = () => {
                                                         <tr key={r._id} style={{ ...style }}>
                                                             <td style={{ color: '#64748b', fontSize: '0.8rem' }} data-label="#">{idx + 1}</td>
                                                             <td data-label="Student"><div className="td-bold" style={{ color: style.color }}>{r.studentId?.name || '—'}</div></td>
+                                                            <td className="td-sm" data-label="Batch">{r.studentId?.batchId?.name || '—'}</td>
                                                             <td className="td-sm" data-label="Roll No.">{r.studentId?.rollNo || '—'}</td>
                                                             <td data-label="Marks Obtained"><span style={{ fontSize: '1.1rem', fontWeight: 900, color: style.color }}>{r.marksObtained}</span></td>
                                                             <td className="td-sm" data-label="Out of">{selectedExam.totalMarks}</td>
@@ -449,10 +514,10 @@ const ExamsPage = () => {
                         </button>
                     </div>
 
-                    {!filterBatch ? (
+                    {!filterClassLevel ? (
                         <div className="empty" style={{ padding: 60 }}>
                             <Trophy size={48} style={{ opacity: 0.1, marginBottom: 12 }} />
-                            <p>Select a batch and subject from the filters above to access the leaderboards.</p>
+                            <p>Select a class level and subject from the filters above to access the leaderboards.</p>
                         </div>
                     ) : leaderboardType === 'improvers' ? (
                         improversLoading ? (
@@ -568,7 +633,22 @@ const ExamsPage = () => {
                 </div>
             )}
 
-            {showCreate && <CreateTestModal onClose={() => setShowCreate(false)} onSave={() => { setShowCreate(false); fetchExams(); }} />}
+            {showCreate && (
+                <CreateTestModal
+                    onClose={() => setShowCreate(false)}
+                    onSave={(payload) => {
+                        setShowCreate(false);
+                        const scope = payload?.notificationScope;
+                        if (scope) {
+                            setCreationSummary({
+                                linkedBatchCount: scope.linkedBatchCount || 0,
+                                notifiedStudents: scope.notifiedStudents || 0
+                            });
+                        }
+                        fetchExams();
+                    }}
+                />
+            )}
             {showMarks && <MarksEntryModal exam={showMarks} onClose={() => setShowMarks(null)} onSave={() => { setShowMarks(null); fetchExams(); }} />}
         </ERPLayout>
     );

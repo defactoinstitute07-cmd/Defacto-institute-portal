@@ -172,23 +172,60 @@ exports.updateProfile = async (req, res) => {
         const {
             adminName, coachingName, email, phone, bio, adminPassword,
             roomsAvailable, registrationNumber, classesOffered,
-            instituteAddress, instituteEmail, institutePhone
+            instituteAddress, instituteEmail, institutePhone,
+            themeColors
         } = req.body;
 
         const valid = await bcrypt.compare(adminPassword, admin.password);
         if (!valid) return res.status(401).json({ message: 'Incorrect password' });
 
         let parsedClasses = admin.classesOffered;
-        try { if (classesOffered) parsedClasses = JSON.parse(classesOffered); } catch (e) { }
+        if (classesOffered !== undefined) {
+            if (Array.isArray(classesOffered)) {
+                parsedClasses = classesOffered.map((item) => String(item || '').trim()).filter(Boolean);
+            } else {
+                try {
+                    const maybeArray = JSON.parse(classesOffered);
+                    if (Array.isArray(maybeArray)) {
+                        parsedClasses = maybeArray.map((item) => String(item || '').trim()).filter(Boolean);
+                    }
+                } catch (_error) {
+                    parsedClasses = String(classesOffered)
+                        .split(',')
+                        .map((item) => item.trim())
+                        .filter(Boolean);
+                }
+            }
+        }
+
+        let parsedThemeColors = admin.themeColors;
+        if (themeColors !== undefined) {
+            try {
+                const maybeColors = JSON.parse(themeColors);
+                if (Array.isArray(maybeColors) && maybeColors.length > 0) {
+                    parsedThemeColors = maybeColors
+                        .map((color) => String(color || '').trim())
+                        .filter((color) => /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(color));
+                }
+            } catch (_error) {
+                // Ignore invalid theme colors payload and keep existing values.
+            }
+        }
 
         if (adminName) admin.adminName = adminName;
         if (coachingName) admin.coachingName = coachingName;
         if (email !== undefined) admin.email = email;
         if (phone !== undefined) admin.phone = phone;
         if (bio !== undefined) admin.bio = bio;
-        if (roomsAvailable) admin.roomsAvailable = roomsAvailable;
+        if (roomsAvailable !== undefined) {
+            const parsedRooms = Number(roomsAvailable);
+            if (Number.isFinite(parsedRooms) && parsedRooms >= 0) {
+                admin.roomsAvailable = parsedRooms;
+            }
+        }
         if (registrationNumber !== undefined) admin.registrationNumber = registrationNumber || undefined;
         admin.classesOffered = parsedClasses;
+        admin.themeColors = parsedThemeColors;
 
         if (instituteAddress !== undefined) admin.instituteAddress = instituteAddress;
         if (instituteEmail !== undefined) admin.instituteEmail = instituteEmail;

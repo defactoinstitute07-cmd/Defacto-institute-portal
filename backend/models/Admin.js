@@ -54,6 +54,10 @@ const adminSchema = new mongoose.Schema({
         type: [String],
         default: []
     },
+    themeColors: {
+        type: [String],
+        default: ['#1b3a7a', '#c53030']
+    },
     registrationNumber: {
         type: String,
         unique: true,

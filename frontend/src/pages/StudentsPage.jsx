@@ -21,7 +21,7 @@ import { hasClientSession } from '../utils/authSession';
 const EMPTY_FORM = {
     name: '', dob: '', gender: 'Male', phone: '', email: '', address: '',
     className: '', batchId: '', admissionDate: new Date().toISOString().slice(0, 10),
-    session: '2026-2027', fees: '', registrationFee: '', status: 'active', notes: '', password: '', profileImage: null,
+    session: '2026-2027', fees: '', discount: '', registrationFee: '', status: 'active', notes: '', password: '', profileImage: null,
     fatherName: '', motherName: '', parentPhone: '', currentYear: '1'
 };
 const LIVE_REFRESH_MS = 30000;
@@ -500,6 +500,7 @@ const StudentsPage = () => {
                             className: s.className || '', batchId: s.batchId?._id || '',
                             admissionDate: s.admissionDate?.slice(0, 10) || '',
                             session: s.session || '2026-2027', fees: s.fees || '',
+                            discount: s.discount ?? '',
                             registrationFee: s.registrationFee || '',
                             status: s.status || 'active', notes: s.notes || '', profileImage: null,
                             fatherName: s.fatherName || '',

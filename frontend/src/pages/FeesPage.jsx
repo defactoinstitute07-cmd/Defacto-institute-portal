@@ -158,7 +158,7 @@ const FeesPage = () => {
         const receiptNo = paymentData.receiptNo || 'N/A';
         const settings = JSON.parse(localStorage.getItem('instituteSettings') || '{}');
         const logoPath = settings.instituteLogo || admin.instituteLogo || '';
-        const logoUrl = logoPath && /^(https?:|data:|blob:)/i.test(logoPath)
+        const logoUrl = "https://res.cloudinary.com/dsks5swu1/image/upload/v1775478525/erp_uploads/pwquv8wmsbbgwmlxipxx.png"
             ? logoPath
             : (logoPath ? `${API_BASE_URL}${logoPath}` : '');
 
@@ -272,7 +272,7 @@ const FeesPage = () => {
             head: [['Fee Type', 'Amount']],
             body: [
                 [`Tuition Fee (${feeData.month} ${feeData.year})`, fmt(feeData.monthlyTuitionFee || 0)],
-                ['Registration Fee', fmt(feeData.registrationFee || 0)],
+                ['Discount', fmt(feeData.discount || 0)],
                 ['Late Fine', fmt(feeData.fine || 0)],
                 ['Payment Received', fmt(paymentAmount)],
                 ['Pending Balance', fmt(Math.max(Number(feeData.totalFee || 0) - Number(feeData.amountPaid || 0), 0))]
@@ -285,6 +285,26 @@ const FeesPage = () => {
                 textColor: BRAND_PRIMARY,
                 lineColor: [226, 232, 240],
                 lineWidth: 0.1
+            },
+            alternateRowStyles: {
+                fillColor: [248, 250, 252]
+            },
+            didParseCell: (data) => {
+                if (data.section !== 'body') return;
+
+                const label = String(data.row.raw?.[0] || '').toLowerCase();
+
+                if (label === 'discount') {
+                    data.cell.styles.fillColor = [236, 253, 245];
+                    data.cell.styles.textColor = [5, 150, 105];
+                    data.cell.styles.fontStyle = 'bold';
+                }
+
+                if (label === 'payment received') {
+                    data.cell.styles.fillColor = [239, 246, 255];
+                    data.cell.styles.textColor = [3, 105, 161];
+                    data.cell.styles.fontStyle = 'bold';
+                }
             }
         });
 

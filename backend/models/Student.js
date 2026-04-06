@@ -31,6 +31,7 @@ const studentSchema = new mongoose.Schema({
     rollNo: { type: String, unique: true },
     batchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Batch', index: true },
     fees: { type: Number, default: 0 },
+    discount: { type: Number, default: 0, min: 0 },
     registrationFee: { type: Number, default: 0 },
     feesPaid: { type: Number, default: 0 },
     contact: { type: String },

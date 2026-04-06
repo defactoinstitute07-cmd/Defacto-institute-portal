@@ -21,6 +21,7 @@ const feeSchema = new mongoose.Schema({
 
     monthlyTuitionFee: { type: Number, default: 0 },
     registrationFee: { type: Number, default: 0 },
+    discount: { type: Number, default: 0 },
     fine: { type: Number, default: 0 },
 
     totalFee: { type: Number, default: 0 },

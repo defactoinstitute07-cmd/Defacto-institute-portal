@@ -127,7 +127,8 @@ const createAdmissionFeeRecord = async ({ student, batchId, admissionDate, admin
     const batch = await Batch.findById(batchId).select('fees').lean();
     const monthlyTuitionFee = Number(batch?.fees ?? student.fees ?? 0);
     const registrationFee = Number(student.registrationFee || 0);
-    const totalFee = monthlyTuitionFee + registrationFee;
+    const discount = Math.max(Number(student.discount || 0), 0);
+    const totalFee = Math.max(monthlyTuitionFee + registrationFee - discount, 0);
 
     const dueDate = new Date(effectiveDate.getFullYear(), effectiveDate.getMonth() + 1, 0, 23, 59, 59, 999);
 
@@ -140,6 +141,7 @@ const createAdmissionFeeRecord = async ({ student, batchId, admissionDate, admin
             year,
             monthlyTuitionFee,
             registrationFee,
+            discount,
             fine: 0,
             totalFee,
             amountPaid: 0,
@@ -432,6 +434,7 @@ exports.createStudent = async (req, res) => {
             contact: data.contact || data.phone,
             portalAccess: { signupStatus: 'no' },
             fees: data.fees || 0,
+            discount: Math.max(Number(data.discount || 0), 0),
             registrationFee: data.registrationFee || 0,
             fatherName: data.fatherName,
             motherName: data.motherName,
@@ -502,6 +505,11 @@ exports.updateStudent = async (req, res) => {
             } else {
                 delete data.password;
             }
+        }
+
+        if (data.discount !== undefined) {
+            const parsedDiscount = Math.max(Number(data.discount || 0), 0);
+            data.discount = parsedDiscount;
         }
 
         if (isActivatingBatch && oldStudent.status === 'batch_pending') {
@@ -626,6 +634,7 @@ exports.bulkUpload = async (req, res) => {
                     admissionDate: parseExcelDate(getValue(['admissionDate', 'ADMISSION DATE', 'Admission Date'])) || new Date(),
                     session: String(getValue(['session', 'SESSION']) || '').trim(),
                     fees: Number(getValue(['fees', 'FEES', 'FEE'])) || 0,
+                    discount: Math.max(Number(getValue(['discount', 'DISCOUNT'])) || 0, 0),
                     status: resolvedBatchId ? 'active' : 'batch_pending',
                     fatherName: String(getValue(['fatherName', 'FATHER NAME', "FATHER'S NAME", 'Father Name']) || '').trim(),
                     motherName: String(getValue(['motherName', 'MOTHER NAME', "MOTHER'S NAME", 'Mother Name']) || '').trim(),

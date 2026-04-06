@@ -152,66 +152,168 @@ const buildSubjectProgress = (subject) => {
     };
 };
 
-const ensureSubjectLinkedToBatch = async (batch, subject) => {
-    const updates = {};
-    const hasSubjectId = (batch.subjectIds || []).some((id) => id.toString() === subject._id.toString());
-    const hasSubjectName = (batch.subjects || []).includes(subject.name);
-
-    if (!hasSubjectId) {
-        updates.$addToSet = { ...(updates.$addToSet || {}), subjectIds: subject._id };
+const normalizeBatchIds = (batchIds = []) => {
+    if (!Array.isArray(batchIds) || batchIds.length === 0) {
+        const error = new Error('At least one batch must be selected.');
+        error.status = 400;
+        throw error;
     }
 
-    if (!hasSubjectName) {
-        updates.$addToSet = { ...(updates.$addToSet || {}), subjects: subject.name };
+    const unique = Array.from(new Set(batchIds.map((id) => String(id))));
+    const invalid = unique.find((id) => !mongoose.Types.ObjectId.isValid(id));
+    if (invalid) {
+        const error = new Error('One or more batch IDs are invalid.');
+        error.status = 400;
+        throw error;
     }
 
-    if (Object.keys(updates).length > 0) {
-        await Batch.findByIdAndUpdate(batch._id, updates);
+    return unique.map((id) => new mongoose.Types.ObjectId(id));
+};
+
+const normalizeSubjectChapters = (chapters = []) => {
+    if (chapters === undefined || chapters === null) return [];
+    if (!Array.isArray(chapters)) {
+        const error = new Error('chapters must be an array.');
+        error.status = 400;
+        throw error;
+    }
+
+    return chapters.map((chapter, index) => {
+        const name = String(chapter?.name || '').trim();
+        const duration = Number(chapter?.durationDays);
+
+        if (!name) {
+            const error = new Error(`Chapter name is required at position ${index + 1}.`);
+            error.status = 400;
+            throw error;
+        }
+
+        if (!Number.isFinite(duration) || duration < 1) {
+            const error = new Error(`Chapter durationDays must be at least 1 at position ${index + 1}.`);
+            error.status = 400;
+            throw error;
+        }
+
+        return {
+            name,
+            durationDays: Math.round(duration),
+            status: 'ongoing',
+            completedAt: null,
+            projectedStartDate: null,
+            projectedCompletionDate: null
+        };
+    });
+};
+
+const isSubjectLinkedToBatch = (subject, batchId) => {
+    const target = String(batchId);
+    const inBatchIds = Array.isArray(subject.batchIds)
+        && subject.batchIds.some((id) => String(id) === target);
+
+    return inBatchIds;
+};
+
+const ensureTeacherCanManageSubject = ({ subject, actorRole, actorId }) => {
+    if (actorRole !== 'teacher') return;
+
+    if (!actorId || !subject?.teacherId || String(subject.teacherId) !== String(actorId)) {
+        const error = new Error('You can only update chapters for subjects assigned to you.');
+        error.status = 403;
+        throw error;
     }
 };
 
-exports.createSubject = async ({ name, code, batchId, totalChapters }) => {
+exports.createSubject = async ({ classLevel, name, code, batchIds = [], chapters = [], totalChapters }) => {
     if (!name || !String(name).trim()) {
         const error = new Error('Subject name is required.');
         error.status = 400;
         throw error;
     }
 
-    if (!batchId || !mongoose.Types.ObjectId.isValid(batchId)) {
-        const error = new Error('A valid batchId is required.');
-        error.status = 400;
-        throw error;
-    }
+    const normalizedName = String(name).trim();
+    const normalizedCode = code ? String(code).trim().toUpperCase() : null;
+    const normalizedClassLevel = String(classLevel || 'General').trim() || 'General';
+    const normalizedBatchIds = normalizeBatchIds(batchIds);
+    const normalizedChapters = normalizeSubjectChapters(chapters);
 
-    const batch = await Batch.findById(batchId);
-    if (!batch) {
-        const error = new Error('Batch not found.');
+    const batches = await Batch.find({ _id: { $in: normalizedBatchIds } }).select('_id').lean();
+    if (batches.length !== normalizedBatchIds.length) {
+        const error = new Error('One or more selected batches were not found.');
         error.status = 404;
         throw error;
     }
 
+    let existing = null;
+    if (normalizedCode) {
+        existing = await Subject.findOne({ code: normalizedCode, isActive: true });
+    }
+    if (!existing) {
+        existing = await Subject.findOne({
+            classLevel: normalizedClassLevel,
+            name: normalizedName,
+            isActive: true
+        });
+    }
+
+    if (existing) {
+        const current = new Set((existing.batchIds || []).map((id) => String(id)));
+        normalizedBatchIds.forEach((id) => current.add(String(id)));
+        existing.batchIds = Array.from(current).map((id) => new mongoose.Types.ObjectId(id));
+        existing.classLevel = existing.classLevel || normalizedClassLevel;
+        if (normalizedCode && !existing.code) {
+            existing.code = normalizedCode;
+        }
+
+        if (normalizedChapters.length > 0) {
+            const existingNames = new Set((existing.chapters || []).map((chapter) => String(chapter.name || '').trim().toLowerCase()));
+            normalizedChapters.forEach((chapter) => {
+                const key = String(chapter.name).trim().toLowerCase();
+                if (!existingNames.has(key)) {
+                    existing.chapters.push(chapter);
+                    existingNames.add(key);
+                }
+            });
+            recalculateChapterTimeline(existing);
+            existing.totalChapters = existing.chapters.length;
+        }
+
+        await existing.save();
+        return existing.toObject();
+    }
+
     const subject = new Subject({
-        name: String(name).trim(),
-        code: code ? String(code).trim().toUpperCase() : undefined,
-        batchId: new mongoose.Types.ObjectId(batchId),
-        totalChapters: Number.isFinite(Number(totalChapters)) ? Math.max(0, Number(totalChapters)) : null
+        classLevel: normalizedClassLevel,
+        name: normalizedName,
+        code: normalizedCode || undefined,
+        batchIds: normalizedBatchIds,
+        chapters: normalizedChapters,
+        totalChapters: normalizedChapters.length > 0
+            ? normalizedChapters.length
+            : (Number.isFinite(Number(totalChapters)) ? Math.max(0, Number(totalChapters)) : null)
     });
 
-    await subject.save();
+    if (normalizedChapters.length > 0) {
+        recalculateChapterTimeline(subject);
+        subject.totalChapters = subject.chapters.length;
+    }
 
-    // Automatically add this new subject to the batch's subject lists
-    await ensureSubjectLinkedToBatch(batch, subject);
+    await subject.save();
 
     return subject.toObject();
 };
 
-exports.listSubjects = async ({ activeOnly = true, batchId } = {}) => {
+exports.listSubjects = async ({ activeOnly = true, batchId, classLevel } = {}) => {
     const query = activeOnly ? { isActive: true } : {};
     if (batchId) {
-        query.batchId = asObjectId(batchId, 'Batch');
+        const batchObjectId = asObjectId(batchId, 'Batch');
+        query.batchIds = batchObjectId;
+    }
+    if (classLevel) {
+        query.classLevel = String(classLevel).trim();
     }
     return Subject.find(query)
         .populate('teacherId', 'name regNo email phone gender profileImage status')
+        .populate('batchIds', 'name course')
         .sort({ name: 1 })
         .lean();
 };
@@ -220,6 +322,7 @@ exports.getSubjectById = async ({ subjectId }) => {
     const objectId = asObjectId(subjectId, 'Subject');
     const subject = await Subject.findById(objectId)
         .populate('teacherId', 'name regNo email phone gender profileImage status')
+        .populate('batchIds', 'name course')
         .lean();
 
     if (!subject) {
@@ -234,6 +337,50 @@ exports.getSubjectById = async ({ subjectId }) => {
         ...subject,
         totalChapters: progress.totalChapters,
         progress
+    };
+};
+
+exports.listSubjectsForStudent = async ({ studentId, activeOnly = true } = {}) => {
+    const studentObjectId = asObjectId(studentId, 'Student');
+    const student = await Student.findById(studentObjectId).select('batchId status').lean();
+
+    if (!student) {
+        const error = new Error('Student not found.');
+        error.status = 404;
+        throw error;
+    }
+
+    if (!student.batchId) {
+        return {
+            batchId: null,
+            subjects: []
+        };
+    }
+
+    const query = {
+        batchIds: student.batchId
+    };
+
+    if (activeOnly) {
+        query.isActive = true;
+    }
+
+    const subjects = await Subject.find(query)
+        .populate('teacherId', 'name regNo email phone profileImage status')
+        .populate('batchIds', 'name course')
+        .sort({ name: 1 })
+        .lean();
+
+    return {
+        batchId: student.batchId,
+        subjects: subjects.map((subject) => {
+            const progress = buildSubjectProgress(subject);
+            return {
+                ...subject,
+                totalChapters: progress.totalChapters,
+                progress
+            };
+        })
     };
 };
 
@@ -295,7 +442,7 @@ exports.assignTeacherToSubject = async ({ subjectId, teacherId }) => {
     };
 };
 
-exports.addChapterToSubject = async ({ subjectId, name, durationDays }) => {
+exports.addChapterToSubject = async ({ subjectId, name, durationDays, actorRole = 'admin', actorId = null }) => {
     const objectId = asObjectId(subjectId, 'Subject');
 
     if (!name || !String(name).trim()) {
@@ -317,6 +464,8 @@ exports.addChapterToSubject = async ({ subjectId, name, durationDays }) => {
         error.status = 404;
         throw error;
     }
+
+    ensureTeacherCanManageSubject({ subject, actorRole, actorId });
 
     subject.chapters.push({
         name: String(name).trim(),
@@ -340,7 +489,7 @@ exports.addChapterToSubject = async ({ subjectId, name, durationDays }) => {
     };
 };
 
-exports.updateChapterDetails = async ({ subjectId, chapterId, name, durationDays, status, actorRole, adminOverride = false }) => {
+exports.updateChapterDetails = async ({ subjectId, chapterId, name, durationDays, status, actorRole, actorId = null, adminOverride = false }) => {
     const subjectObjectId = asObjectId(subjectId, 'Subject');
 
     if (!chapterId || !mongoose.Types.ObjectId.isValid(chapterId)) {
@@ -355,6 +504,8 @@ exports.updateChapterDetails = async ({ subjectId, chapterId, name, durationDays
         error.status = 404;
         throw error;
     }
+
+    ensureTeacherCanManageSubject({ subject, actorRole, actorId });
 
     const chapter = subject.chapters.id(chapterId);
     if (!chapter) {
@@ -413,7 +564,7 @@ exports.updateChapterDetails = async ({ subjectId, chapterId, name, durationDays
     };
 };
 
-exports.updateChapterStatus = async ({ subjectId, chapterId, status }) => {
+exports.updateChapterStatus = async ({ subjectId, chapterId, status, actorRole = 'admin', actorId = null }) => {
     const subjectObjectId = asObjectId(subjectId, 'Subject');
     const normalizedStatus = normalizeChapterStatus(status);
 
@@ -429,6 +580,8 @@ exports.updateChapterStatus = async ({ subjectId, chapterId, status }) => {
         error.status = 404;
         throw error;
     }
+
+    ensureTeacherCanManageSubject({ subject, actorRole, actorId });
 
     const chapter = subject.chapters.id(chapterId);
     if (!chapter) {
@@ -455,43 +608,67 @@ exports.updateChapterStatus = async ({ subjectId, chapterId, status }) => {
 
 exports.getAdminSetupData = async () => {
     const [batches, subjects] = await Promise.all([
-        Batch.find({ isActive: true }).select('name course subjects subjectIds').sort({ name: 1 }).lean(),
-        Subject.find({ isActive: true }).select('name code').sort({ name: 1 }).lean()
+        Batch.find({ isActive: true }).select('name course subjects').sort({ name: 1 }).lean(),
+        Subject.find({ isActive: true }).select('name code batchIds classLevel syllabus').sort({ name: 1 }).lean()
     ]);
 
     return { batches, subjects };
 };
 
 exports.getAttendanceRoster = async ({ actorRole, actorId, batchId, subjectId, date }) => {
-    const batchObjectId = asObjectId(batchId, 'Batch');
     const subjectObjectId = asObjectId(subjectId, 'Subject');
     const attendanceDate = normalizeAttendanceDate(date || new Date());
 
-    const [batch, subject, students, existingAttendance] = await Promise.all([
-        Batch.findById(batchObjectId).select('name course subjects subjectIds').lean(),
-        Subject.findById(subjectObjectId).select('name code').lean(),
-        Student.find({ batchId: batchObjectId, status: 'active' })
-            .select('name rollNo profileImage contact')
-            .sort({ name: 1 })
-            .lean(),
-        Attendance.find({
-            batchId: batchObjectId,
-            subjectId: subjectObjectId,
-            attendanceDate
-        }).select('studentId status notes').lean()
-    ]);
+    const requestedBatchObjectId = batchId ? asObjectId(batchId, 'Batch') : null;
 
-    if (!batch) {
-        const error = new Error('Batch not found.');
-        error.status = 404;
-        throw error;
-    }
-
+    const subject = await Subject.findById(subjectObjectId).select('name code batchIds classLevel').lean();
     if (!subject) {
         const error = new Error('Subject not found.');
         error.status = 404;
         throw error;
     }
+
+    const linkedBatchIds = Array.isArray(subject.batchIds)
+        ? subject.batchIds.map((id) => new mongoose.Types.ObjectId(id))
+        : [];
+
+    if (linkedBatchIds.length === 0) {
+        return {
+            subject,
+            date: attendanceDate,
+            isMarked: false,
+            scope: {
+                classLevel: subject.classLevel || 'General',
+                linkedBatchCount: 0
+            },
+            students: []
+        };
+    }
+
+    let scopedBatchIds = linkedBatchIds;
+
+    if (requestedBatchObjectId) {
+        const exists = linkedBatchIds.some((id) => String(id) === String(requestedBatchObjectId));
+        if (!exists) {
+            const error = new Error('Selected subject is not linked to the selected batch.');
+            error.status = 400;
+            throw error;
+        }
+        scopedBatchIds = [requestedBatchObjectId];
+    }
+
+    const [students, existingAttendance] = await Promise.all([
+        Student.find({ batchId: { $in: scopedBatchIds }, status: 'active' })
+            .select('name rollNo profileImage contact')
+            .populate('batchId', 'name course')
+            .sort({ name: 1 })
+            .lean(),
+        Attendance.find({
+            batchId: { $in: scopedBatchIds },
+            subjectId: subjectObjectId,
+            attendanceDate
+        }).select('studentId status notes').lean()
+    ]);
 
     const attendanceMap = new Map(
         existingAttendance.map((record) => [
@@ -504,12 +681,16 @@ exports.getAttendanceRoster = async ({ actorRole, actorId, batchId, subjectId, d
     );
 
     return {
-        batch,
         subject,
         date: attendanceDate,
         isMarked: existingAttendance.length > 0,
+        scope: {
+            classLevel: subject.classLevel || 'General',
+            linkedBatchCount: linkedBatchIds.length
+        },
         students: students.map((student) => ({
             ...student,
+            batchName: student.batchId?.name || 'Unassigned',
             attendanceStatus: attendanceMap.get(student._id.toString())?.status || 'Present',
             attendanceNotes: attendanceMap.get(student._id.toString())?.notes || ''
         }))
@@ -517,9 +698,9 @@ exports.getAttendanceRoster = async ({ actorRole, actorId, batchId, subjectId, d
 };
 
 exports.markAttendance = async ({ actorRole, actorId, batchId, subjectId, date, entries }) => {
-    const batchObjectId = asObjectId(batchId, 'Batch');
     const subjectObjectId = asObjectId(subjectId, 'Subject');
     const attendanceDate = normalizeAttendanceDate(date);
+    const requestedBatchObjectId = batchId ? asObjectId(batchId, 'Batch') : null;
 
     if (!Array.isArray(entries) || entries.length === 0) {
         const error = new Error('Attendance entries are required.');
@@ -527,21 +708,33 @@ exports.markAttendance = async ({ actorRole, actorId, batchId, subjectId, date, 
         throw error;
     }
 
-    const [batch, subject] = await Promise.all([
-        Batch.findById(batchObjectId).select('name course').lean(),
-        Subject.findById(subjectObjectId).select('name code').lean()
-    ]);
-
-    if (!batch) {
-        const error = new Error('Batch not found.');
-        error.status = 404;
-        throw error;
-    }
+    const subject = await Subject.findById(subjectObjectId).select('name code batchIds classLevel').lean();
 
     if (!subject) {
         const error = new Error('Subject not found.');
         error.status = 404;
         throw error;
+    }
+
+    const linkedBatchIds = Array.isArray(subject.batchIds)
+        ? subject.batchIds.map((id) => new mongoose.Types.ObjectId(id))
+        : [];
+
+    if (linkedBatchIds.length === 0) {
+        const error = new Error('Selected subject is not linked to any batch.');
+        error.status = 400;
+        throw error;
+    }
+
+    let scopedBatchIds = linkedBatchIds;
+    if (requestedBatchObjectId) {
+        const exists = linkedBatchIds.some((id) => String(id) === String(requestedBatchObjectId));
+        if (!exists) {
+            const error = new Error('Selected subject is not linked to the selected batch.');
+            error.status = 400;
+            throw error;
+        }
+        scopedBatchIds = [requestedBatchObjectId];
     }
 
     const dedupedEntries = new Map();
@@ -564,12 +757,12 @@ exports.markAttendance = async ({ actorRole, actorId, batchId, subjectId, date, 
 
     const students = await Student.find({
         _id: { $in: studentIds },
-        batchId: batchObjectId,
+        batchId: { $in: scopedBatchIds },
         status: 'active'
-    }).select('name rollNo').lean();
+    }).select('name rollNo batchId').lean();
 
     if (students.length !== studentIds.length) {
-        const error = new Error('One or more students do not belong to the selected active batch.');
+        const error = new Error('One or more students do not belong to the selected subject scope.');
         error.status = 400;
         throw error;
     }
@@ -580,14 +773,14 @@ exports.markAttendance = async ({ actorRole, actorId, batchId, subjectId, date, 
             updateOne: {
                 filter: {
                     studentId: student._id,
-                    batchId: batchObjectId,
+                    batchId: student.batchId,
                     subjectId: subjectObjectId,
                     attendanceDate
                 },
                 update: {
                     $set: {
                         studentId: student._id,
-                        batchId: batchObjectId,
+                        batchId: student.batchId,
                         subjectId: subjectObjectId,
                         date: attendanceDate,
                         attendanceDate,
@@ -621,15 +814,52 @@ exports.markAttendance = async ({ actorRole, actorId, batchId, subjectId, date, 
     });
 
     return {
-        batch,
         subject,
         date: attendanceDate,
+        scope: {
+            classLevel: subject.classLevel || 'General',
+            linkedBatchCount: linkedBatchIds.length
+        },
         totals: {
             processed: students.length,
             present: statusSummary.Present,
             absent: statusSummary.Absent,
             late: statusSummary.Late
         }
+    };
+};
+
+exports.assignSubjectToBatches = async ({ subjectId, batchIds = [] }) => {
+    const subjectObjectId = asObjectId(subjectId, 'Subject');
+    const normalizedBatchIds = normalizeBatchIds(batchIds);
+
+    const batches = await Batch.find({ _id: { $in: normalizedBatchIds } }).select('_id').lean();
+    if (batches.length !== normalizedBatchIds.length) {
+        const error = new Error('One or more selected batches were not found.');
+        error.status = 404;
+        throw error;
+    }
+
+    const subject = await Subject.findById(subjectObjectId);
+    if (!subject) {
+        const error = new Error('Subject not found.');
+        error.status = 404;
+        throw error;
+    }
+
+    subject.batchIds = normalizedBatchIds;
+    await subject.save();
+
+    const populated = await Subject.findById(subject._id)
+        .populate('teacherId', 'name regNo email phone gender profileImage status')
+        .populate('batchIds', 'name course')
+        .lean();
+    const progress = buildSubjectProgress(populated);
+
+    return {
+        ...populated,
+        totalChapters: progress.totalChapters,
+        progress
     };
 };
 
