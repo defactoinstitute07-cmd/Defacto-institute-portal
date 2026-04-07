@@ -1,23 +1,60 @@
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const multer = require('multer');
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const cloudinary = require('cloudinary').v2;
 
-const syllabusUploadDir = path.join(__dirname, '..', 'uploads', 'syllabus');
+const hasCloudinaryConfig = Boolean(
+    process.env.CLOUDINARY_CLOUD_NAME
+    && process.env.CLOUDINARY_API_KEY
+    && process.env.CLOUDINARY_API_SECRET
+);
 
-if (!fs.existsSync(syllabusUploadDir)) {
-    fs.mkdirSync(syllabusUploadDir, { recursive: true });
+if (hasCloudinaryConfig) {
+    cloudinary.config({
+        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+        api_key: process.env.CLOUDINARY_API_KEY,
+        api_secret: process.env.CLOUDINARY_API_SECRET
+    });
 }
 
-const storage = multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, syllabusUploadDir),
-    filename: (_req, file, cb) => {
-        const extension = path.extname(file.originalname || '').toLowerCase();
-        const safeBase = String(path.basename(file.originalname || 'syllabus', extension))
-            .replace(/[^a-zA-Z0-9_-]+/g, '_')
-            .slice(0, 60) || 'syllabus';
-        cb(null, `${Date.now()}_${safeBase}${extension}`);
+const syllabusUploadDir = process.env.VERCEL
+    ? path.join(os.tmpdir(), 'erp_uploads', 'syllabus')
+    : path.join(__dirname, '..', 'uploads', 'syllabus');
+
+const ensureUploadDir = () => {
+    if (!fs.existsSync(syllabusUploadDir)) {
+        fs.mkdirSync(syllabusUploadDir, { recursive: true });
     }
-});
+};
+
+const storage = hasCloudinaryConfig
+    ? new CloudinaryStorage({
+        cloudinary,
+        params: (_req, file) => {
+            const extension = path.extname(file.originalname || '').toLowerCase().replace(/^\./, '') || 'bin';
+
+            return {
+                folder: 'erp_syllabus',
+                resource_type: 'raw',
+                format: extension
+            };
+        }
+    })
+    : multer.diskStorage({
+        destination: (_req, _file, cb) => {
+            ensureUploadDir();
+            cb(null, syllabusUploadDir);
+        },
+        filename: (_req, file, cb) => {
+            const extension = path.extname(file.originalname || '').toLowerCase();
+            const safeBase = String(path.basename(file.originalname || 'syllabus', extension))
+                .replace(/[^a-zA-Z0-9_-]+/g, '_')
+                .slice(0, 60) || 'syllabus';
+            cb(null, `${Date.now()}_${safeBase}${extension}`);
+        }
+    });
 
 const allowedMimeTypes = new Set([
     'application/pdf',

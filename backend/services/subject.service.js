@@ -14,6 +14,11 @@ const asObjectId = (value, label) => {
 
 const buildSyllabusPublicPath = (filePath = '') => {
     const normalized = String(filePath).replace(/\\+/g, '/');
+
+    if (/^https?:\/\//i.test(normalized)) {
+        return normalized;
+    }
+
     const withoutDrive = normalized.replace(/^[A-Za-z]:\//, '');
     const uploadsIndex = withoutDrive.toLowerCase().indexOf('uploads/');
     const fromUploads = uploadsIndex >= 0 ? withoutDrive.slice(uploadsIndex) : withoutDrive;
