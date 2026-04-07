@@ -162,7 +162,7 @@ module.exports = {
 
 </html>`,
     subjectPush: 'Fee Overdue Alert',
-    bodyPush: 'Fee of Rs {{pendingAmount}} for {{month}} {{year}} is overdue. Please pay by {{deadline}}.',
+    bodyPush: 'Fee of Rs {{pendingAmount}} for {{month}} {{year}} is overdue.',
     placeholders: ['studentName', 'pendingAmount', 'month', 'year', 'deadline', 'dueDate', 'instituteName', 'portalUrl'],
     legacyBodies: [legacyBody]
 };

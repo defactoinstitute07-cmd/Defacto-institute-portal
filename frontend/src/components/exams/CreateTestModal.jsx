@@ -2,9 +2,34 @@ import React, { useState, useEffect } from 'react';
 import { X, BookOpen, Loader2 } from 'lucide-react';
 import apiClient from '../../api/apiConfig';
 
+const getChapterSuggestions = (subject) => {
+    const chapters = Array.isArray(subject?.chapters) ? subject.chapters : [];
+    const seen = new Set();
+
+    return chapters
+        .filter((chapter) => String(chapter?.name || '').trim())
+        .map((chapter) => ({
+            name: String(chapter.name).trim(),
+            status: String(chapter?.status || 'ongoing').trim().toLowerCase()
+        }))
+        .filter((chapter) => {
+            const key = chapter.name.toLowerCase();
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        })
+        .sort((left, right) => {
+            const leftWeight = left.status === 'ongoing' ? 0 : 1;
+            const rightWeight = right.status === 'ongoing' ? 0 : 1;
+            if (leftWeight !== rightWeight) return leftWeight - rightWeight;
+            return left.name.localeCompare(right.name);
+        });
+};
+
 const CreateTestModal = ({ onClose, onSave }) => {
     const [classLevels, setClassLevels] = useState([]);
     const [subjects, setSubjects] = useState([]);
+    const [chapterSuggestions, setChapterSuggestions] = useState([]);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [form, setForm] = useState({
@@ -22,7 +47,8 @@ const CreateTestModal = ({ onClose, onSave }) => {
     }, []);
 
     const handleClassLevelChange = async (classLevel) => {
-        setForm(f => ({ ...f, classLevel, subject: '', subjectId: '' }));
+        setForm(f => ({ ...f, classLevel, subject: '', subjectId: '', chapter: '' }));
+        setChapterSuggestions([]);
         if (!classLevel) {
             setSubjects([]);
             return;
@@ -43,10 +69,13 @@ const CreateTestModal = ({ onClose, onSave }) => {
 
     const handleSubjectChange = (subjectId) => {
         const selected = subjects.find((item) => String(item._id) === String(subjectId));
+        const nextSuggestions = getChapterSuggestions(selected);
+        setChapterSuggestions(nextSuggestions);
         setForm((prev) => ({
             ...prev,
             subjectId,
-            subject: selected?.name || ''
+            subject: selected?.name || '',
+            chapter: nextSuggestions.some((chapter) => chapter.name === prev.chapter) ? prev.chapter : ''
         }));
     };
 
@@ -206,8 +235,50 @@ const CreateTestModal = ({ onClose, onSave }) => {
                             </div>
                             <div>
                                 <label style={labelStyle}>Chapter *</label>
-                                <input style={inputStyle} type="text" placeholder="e.g. Algebra" value={form.chapter}
+                                <input
+                                    style={inputStyle}
+                                    type="text"
+                                    list="subject-chapter-options"
+                                    placeholder={chapterSuggestions.length > 0 ? 'Select or type a chapter' : 'e.g. Algebra'}
+                                    value={form.chapter}
                                     onChange={e => setForm(f => ({ ...f, chapter: e.target.value }))} required />
+                                {chapterSuggestions.length > 0 && (
+                                    <>
+                                        <datalist id="subject-chapter-options">
+                                            {chapterSuggestions.map((chapter) => (
+                                                <option
+                                                    key={`${chapter.name}-${chapter.status}`}
+                                                    value={chapter.name}
+                                                    label={`${chapter.name} (${chapter.status})`}
+                                                />
+                                            ))}
+                                        </datalist>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+                                            {chapterSuggestions.map((chapter) => {
+                                                const isOngoing = chapter.status === 'ongoing';
+                                                return (
+                                                    <button
+                                                        key={`${chapter.name}-${chapter.status}-chip`}
+                                                        type="button"
+                                                        onClick={() => setForm((prev) => ({ ...prev, chapter: chapter.name }))}
+                                                        style={{
+                                                            border: `1px solid ${isOngoing ? '#fde68a' : '#bfdbfe'}`,
+                                                            background: isOngoing ? '#fffbeb' : '#eff6ff',
+                                                            color: isOngoing ? '#92400e' : '#1d4ed8',
+                                                            borderRadius: 999,
+                                                            padding: '6px 10px',
+                                                            fontSize: '0.72rem',
+                                                            fontWeight: 700,
+                                                            cursor: 'pointer'
+                                                        }}
+                                                    >
+                                                        {chapter.name} ({isOngoing ? 'Ongoing' : 'Completed'})
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </div>
 

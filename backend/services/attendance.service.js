@@ -386,6 +386,7 @@ exports.listSubjectsForStudent = async ({ studentId, activeOnly = true } = {}) =
 
 exports.assignTeacherToSubject = async ({ subjectId, teacherId }) => {
     const subjectObjectId = asObjectId(subjectId, 'Subject');
+    const normalizedTeacherId = typeof teacherId === 'string' ? teacherId.trim() : teacherId;
 
     const subject = await Subject.findById(subjectObjectId);
     if (!subject) {
@@ -394,7 +395,13 @@ exports.assignTeacherToSubject = async ({ subjectId, teacherId }) => {
         throw error;
     }
 
-    if (!teacherId) {
+    if (normalizedTeacherId === undefined) {
+        const error = new Error('teacherId is required. Pass null to unassign the teacher.');
+        error.status = 400;
+        throw error;
+    }
+
+    if (normalizedTeacherId === null || normalizedTeacherId === '') {
         subject.teacherId = null;
         await subject.save();
         const populated = await Subject.findById(subject._id)
@@ -408,13 +415,13 @@ exports.assignTeacherToSubject = async ({ subjectId, teacherId }) => {
         };
     }
 
-    if (!mongoose.Types.ObjectId.isValid(teacherId)) {
+    if (!mongoose.Types.ObjectId.isValid(normalizedTeacherId)) {
         const error = new Error('A valid teacherId is required.');
         error.status = 400;
         throw error;
     }
 
-    const teacher = await Teacher.findById(teacherId).select('_id status').lean();
+    const teacher = await Teacher.findById(normalizedTeacherId).select('_id status').lean();
     if (!teacher) {
         const error = new Error('Teacher not found.');
         error.status = 404;

@@ -232,8 +232,8 @@ module.exports = {
 </body>
 
 </html>`,
-    subjectPush: 'New Test Scheduled',
-    bodyPush: '{{examName}} for {{subject}} is scheduled on {{date}}. Total: {{totalMarks}}, Passing: {{passingMarks}}.',
+     subjectPush: 'A new test has been announced: {{examName}}',
+    bodyPush: 'Check your Defacto ERP app for details.',
     placeholders: ['studentName', 'examName', 'subject', 'date', 'totalMarks', 'passingMarks', 'instituteName', 'portalUrl'],
     legacyBodies: [legacyBody]
 };

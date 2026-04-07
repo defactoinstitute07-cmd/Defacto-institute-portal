@@ -12,7 +12,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { SkeletonTable } from '../components/common/SkeletonLoaders';
 
-// ── API helper ───────────────────────────────────────────────
+// â”€â”€ API helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 import apiClient from '../api/apiConfig';
 import { getSubjects } from '../api/subjectApi';
 import { hasClientSession } from '../utils/authSession';
@@ -31,8 +31,10 @@ const getDynamicClasses = () => {
 
 const EMPTY_FORM = {
     name: '', course: '', capacity: 30, subjects: [],
-    classroom: '', schedule: [], fees: '',
+    fees: '',
     startDate: '', endDate: '',
+    classroom: '',
+    schedule: [],
     schedulerConfig: { daysCount: 6, timings: ['09:00', '10:00', '11:00'] }
 };
 
@@ -46,9 +48,9 @@ const toDateInputValue = (value) => {
     return `${year}-${month}-${day}`;
 };
 
-// ══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // TimetableGrid Component
-// ══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 const TimetableGrid = ({ days, timeSlots, classroom, occupancy, selected, onToggle }) => {
     const getOccupant = (day, time) => occupancy?.[classroom]?.[day]?.[time] || null;
     const getSelectedSlot = (day, time) => selected.find(s => s.day === day && s.time === time);
@@ -149,9 +151,15 @@ const TimetableGrid = ({ days, timeSlots, classroom, occupancy, selected, onTogg
     );
 };
 
-// ══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// Utility Functions
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+const fmt = (n) => (n || 0).toLocaleString('en-IN');
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'â€”';
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // Batch Row
-// ══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 const BatchRow = ({ batch, onEdit, onDelete }) => {
     const navigate = useNavigate();
     const scheduleArray = Array.isArray(batch.schedule) ? batch.schedule : [];
@@ -171,7 +179,7 @@ const BatchRow = ({ batch, onEdit, onDelete }) => {
         <tr>
             <td data-label="Batch">
                 <div className="td-bold">{batch.name}</div>
-                <div className="td-sm">{batch.course || '—'}</div>
+                <div className="td-sm">{batch.course || 'â€”'}</div>
             </td>
             <td data-label="Subjects">
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
@@ -179,54 +187,33 @@ const BatchRow = ({ batch, onEdit, onDelete }) => {
                         ? batch.subjects.map(s => (
                             <span key={s} className="chip" style={{ fontSize: '0.68rem' }}>{s}</span>
                         ))
-                        : <span className="td-sm">—</span>
+                        : <span className="td-sm">â€”</span>
                     }
                 </div>
             </td>
-            <td data-label="Schedule">
-                {scheduleArray.length || legacySlots.length
-                    ? (
-                        <div>
-                            {schedDays || '—'}
-                            <div className="td-sm">
-                                {(scheduleArray.length || legacySlots.length)} slot{(scheduleArray.length || legacySlots.length) !== 1 ? 's' : ''}/week
-                            </div>
-                        </div>
-                    )
-                    : <span className="td-sm">—</span>}
-            </td>
+
             <td data-label="Enrollment">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <Users size={13} color="var(--erp-muted2)" />
-                    <span className="td-bold">{batch.studentCount || 0}</span>
-                    {batch.capacity && <span className="td-sm">/ {batch.capacity}</span>}
+                <div className="td-bold">{batch.studentCount || 0} / {batch.capacity || 30}</div>
+                <div className="progress-bar-container" style={{ width: 60, height: 4, background: '#e2e8f0', borderRadius: 2, marginTop: 4 }}>
+                    <div style={{ width: `${Math.min((batch.studentCount / (batch.capacity || 30)) * 100, 100)}%`, height: '100%', background: 'var(--erp-primary)', borderRadius: 2 }}></div>
                 </div>
-            </td>
-            <td data-label="Earnings">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <IndianRupee size={12} color="var(--erp-success)" />
-                    <span className="td-bold" style={{ color: 'var(--erp-success)' }}>
-                        {(batch.earnings || 0).toLocaleString('en-IN')}
-                    </span>
-                </div>
-                {batch.fees > 0 && <div className="td-sm">₹ {batch.fees.toLocaleString()}/student</div>}
             </td>
 
             <td data-label="Status">
-                <span className={`badge ${batch.isActive ? 'badge-active' : 'badge-overdue'}`}>
+                <span className={`badge ${batch.isActive ? 'badge-active' : 'badge-inactive'}`}>
                     {batch.isActive ? 'Active' : 'Inactive'}
                 </span>
             </td>
             <td data-label="Actions">
-                <div className="flex gap-2">
-                    <button className="btn btn-outline btn-sm" onClick={() => navigate(`/batches/${batch._id}`)} title="View batch details">
-                        <Eye size={13} />
+                <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="btn-icon" onClick={() => navigate(`/batches/${batch._id}`)} title="View Details">
+                        <Eye size={14} />
                     </button>
-                    <button className="btn btn-outline btn-sm" onClick={() => onEdit(batch)} title="Edit batch">
-                        <Pencil size={13} />
+                    <button className="btn-icon" onClick={() => onEdit(batch)} title="Edit">
+                        <Pencil size={14} />
                     </button>
-                    <button className="btn btn-outline btn-sm !text-red-600 border-red-600 hover:bg-red-600 hover:text-white" onClick={() => onDelete(batch)} title="Delete batch">
-                        <Trash2 size={13} />
+                    <button className="btn-icon text-red-500" onClick={() => onDelete(batch)} title="Delete">
+                        <Trash2 size={14} />
                     </button>
                 </div>
             </td>
@@ -234,55 +221,51 @@ const BatchRow = ({ batch, onEdit, onDelete }) => {
     );
 };
 
-// ══════════════════════════════════════════════════════════════
-// Main Page
-// ══════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// Main BatchesPage Component
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 const BatchesPage = () => {
     const navigate = useNavigate();
     const { toasts, toast, removeToast } = useToast();
 
-    // ── Data state ──────────────────────────────────────────
     const [batches, setBatches] = useState([]);
-    const [config, setConfig] = useState({ days: [], timeSlots: [], classrooms: [] });
-    const [subjects, setSubjects] = useState([]);
-    const [occupancy, setOccupancy] = useState({});
-    const [total, setTotal] = useState(0);
-
-    // ── UI state ─────────────────────────────────────────────
     const [loading, setLoading] = useState(true);
-    const [filterCourse, setFilterCourse] = useState('');
-    const [search, setSearch] = useState('');
-    const [page, setPage] = useState(1);
+    const [total, setTotal] = useState(0);
     const [totalPages, setTotalPages] = useState(1);
+    const [page, setPage] = useState(1);
+    const [search, setSearch] = useState('');
+    const [filterCourse, setFilterCourse] = useState('');
 
-    // ── Modal state ──────────────────────────────────────────
     const [showModal, setShowModal] = useState(false);
     const [modalMode, setModalMode] = useState('create');
     const [editingBatch, setEditingBatch] = useState(null);
-    const [formSaving, setFormSaving] = useState(false);
+    const [form, setForm] = useState({
+        ...EMPTY_FORM,
+        classroom: '',
+        schedule: [],
+        schedulerConfig: { daysCount: 6, timings: ['09:00', '10:00', '11:00'] }
+    });
+
+    const [subjects, setSubjects] = useState([]);
+    const availableSubjects = subjects;
     const [subjLoading, setSubjLoading] = useState(false);
-    const [occLoading, setOccLoading] = useState(false);
-    const [isAutoScheduling, setIsAutoScheduling] = useState(false);
     const [activeSubject, setActiveSubject] = useState(null);
 
-    // ── Form state ───────────────────────────────────────────
-    const [form, setForm] = useState(EMPTY_FORM);
+    const [occupancy, setOccupancy] = useState({});
+    const [occLoading, setOccLoading] = useState(false);
+    const [config, setConfig] = useState({ classrooms: [], days: [], timeSlots: [] });
+    const [formSaving, setFormSaving] = useState(false);
 
-    const availableSubjects = [...new Set([...(subjects || []), ...(form.subjects || [])])];
-
-    // ── Password modal (for updates) ─────────────────────────
     const [showPwdModal, setShowPwdModal] = useState(false);
     const [pwdLoading, setPwdLoading] = useState(false);
     const [pwdError, setPwdError] = useState('');
     const pendingFormRef = useRef(null);
 
-    // ── Delete modal ─────────────────────────────────────────
     const [showDelModal, setShowDelModal] = useState(false);
     const [delBatch, setDelBatch] = useState(null);
     const [delLoading, setDelLoading] = useState(false);
     const [delError, setDelError] = useState('');
 
-    // ── Load batches ─────────────────────────────────────────
     const loadBatches = useCallback(async () => {
         if (!hasClientSession(['admin'])) { navigate('/login'); return; }
 
@@ -315,9 +298,9 @@ const BatchesPage = () => {
             if (e.response?.status === 401) navigate('/login');
             else toast.error('Failed to load batches');
         } finally { setLoading(false); }
-    }, [filterCourse, search, page, navigate]);
+    }, [filterCourse, search, page, navigate, toast]);
 
-    // ── Load scheduler config ────────────────────────────────
+    // â”€â”€ Load scheduler config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     useEffect(() => {
         apiClient.get('/scheduler/config')
             .then(({ data }) => setConfig(data))
@@ -330,7 +313,7 @@ const BatchesPage = () => {
     useEffect(() => { const t = setTimeout(() => { setPage(1); loadBatches(); }, 400); return () => clearTimeout(t); }, [search]);
     useEffect(() => { setPage(1); }, [filterCourse]);
 
-    // ── Load only subjects mapped for the selected batch ────
+    // â”€â”€ Load only subjects mapped for the selected batch â”€â”€â”€â”€
     useEffect(() => {
         if (!editingBatch?._id) {
             setSubjects([]);
@@ -348,7 +331,7 @@ const BatchesPage = () => {
             .finally(() => setSubjLoading(false));
     }, [editingBatch?._id]);
 
-    // ── Load occupancy when classroom changes ────────────────
+    // â”€â”€ Load occupancy when classroom changes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     useEffect(() => {
         if (!form.classroom) { setOccupancy({}); return; }
         setOccLoading(true);
@@ -359,7 +342,7 @@ const BatchesPage = () => {
             .finally(() => setOccLoading(false));
     }, [form.classroom, editingBatch]);
 
-    // ── Open modals ───────────────────────────────────────────
+    // â”€â”€ Open modals â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const openCreate = () => {
         setForm(EMPTY_FORM);
         setEditingBatch(null);
@@ -396,7 +379,7 @@ const BatchesPage = () => {
 
     const closeModal = () => { setShowModal(false); setEditingBatch(null); };
 
-    // ── Subject toggle ────────────────────────────────────────
+    // â”€â”€ Subject toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const toggleSubject = (sub) => {
         setForm(f => ({
             ...f,
@@ -406,7 +389,7 @@ const BatchesPage = () => {
         }));
     };
 
-    // ── Slot toggle ───────────────────────────────────────────
+    // â”€â”€ Slot toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const toggleSlot = (day, time) => {
         if (!activeSubject) return toast.error('Please select a subject from the list first');
         setForm(f => {
@@ -420,7 +403,7 @@ const BatchesPage = () => {
         });
     };
 
-    // ── Save (CREATE) ─────────────────────────────────────────
+    // â”€â”€ Save (CREATE) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const handleCreate = async () => {
         setFormSaving(true);
         try {
@@ -439,7 +422,7 @@ const BatchesPage = () => {
         } finally { setFormSaving(false); }
     };
 
-    // ── Save (UPDATE) — open password modal first ─────────────
+    // â”€â”€ Save (UPDATE) â€” open password modal first â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const handleUpdateIntent = () => {
         const { schedulerConfig, ...rawPayload } = form;
         const payload = {
@@ -465,7 +448,7 @@ const BatchesPage = () => {
         } finally { setPwdLoading(false); }
     };
 
-    // ── Submit handler ────────────────────────────────────────
+    // â”€â”€ Submit handler â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const handleSubmit = (e) => {
         e.preventDefault();
         if (!form.name.trim()) return toast.error('Batch name is required');
@@ -473,7 +456,7 @@ const BatchesPage = () => {
         else handleUpdateIntent();
     };
 
-    // ── Delete flow ───────────────────────────────────────────
+    // â”€â”€ Delete flow â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const openDelete = (batch) => {
         setDelBatch(batch);
         setDelError('');
@@ -520,7 +503,7 @@ const BatchesPage = () => {
             const row = [time];
             config.days.forEach(day => {
                 const slot = form.schedule.find(s => s.day === day && s.time === time);
-                row.push(slot ? `${slot.subject}\n(${slot.room})` : '—');
+                row.push(slot ? `${slot.subject}\n(${slot.room})` : 'â€”');
             });
             return row;
         });
@@ -537,7 +520,7 @@ const BatchesPage = () => {
         });
 
         doc.save(`Timetable_${form.name || 'Batch'}_${new Date().toISOString().slice(0, 10)}.pdf`);
-        toast.success('Timetable downloaded! 📅');
+        toast.success('Timetable downloaded! ðŸ“…');
     };
 
     const exportData = () => {
@@ -559,10 +542,10 @@ const BatchesPage = () => {
         doc.text(`Total Batches: ${total}`, 14, 33);
 
         const tableBody = batches.map(b => [
-            b.name || '—',
-            b.course || '—',
-            (b.subjects || []).join(', ') || '—',
-            `${b.studentCount || 0} / ${b.capacity || '—'}`,
+            b.name || 'â€”',
+            b.course || 'â€”',
+            (b.subjects || []).join(', ') || 'â€”',
+            `${b.studentCount || 0} / ${b.capacity || 'â€”'}`,
             `INR ${(b.earnings || 0).toLocaleString('en-IN')}`,
             b.isActive ? 'Active' : 'Inactive'
         ]);
@@ -578,12 +561,12 @@ const BatchesPage = () => {
         });
 
         doc.save(`Batches_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
-        toast.success('PDF report exported! 📄');
+        toast.success('PDF report exported! ðŸ“„');
     };
 
-    // ═══════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     // RENDER
-    // ═══════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     return (
         <ERPLayout title="Batch Management">
             <style>{`
@@ -595,7 +578,7 @@ const BatchesPage = () => {
                     .batches-tb .tb-search-wrap { width: 100% !important; }
                     .batches-tb select { width: 100% !important; min-width: 100% !important; }
                     .batches-tb button { width: 100% !important; }
-                    
+
                     .b-modal-header { padding: 16px 20px !important; }
                     .b-modal-body { padding: 20px !important; }
                     .b-grid-2 { flex-direction: column !important; gap: 16px !important; }
@@ -605,7 +588,7 @@ const BatchesPage = () => {
             `}</style>
             <ToastContainer toasts={toasts} onRemove={removeToast} />
 
-            {/* ── Page Header ─────────────────────────────── */}
+            {/* â”€â”€ Page Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             <div className="page-hdr batches-hdr">
                 <div>
                     <h1>Batch Management</h1>
@@ -625,11 +608,11 @@ const BatchesPage = () => {
                 </div>
             </div>
 
-            {/* ── Filter Bar ──────────────────────────────── */}
+            {/* â”€â”€ Filter Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             <div className="card toolbar rounded-xl batches-tb" style={{ marginBottom: 20 }}>
                 <div className="tb-search-wrap">
                     <Search size={15} />
-                    <input className="tb-search" placeholder="Search batch name or course…"
+                    <input className="tb-search" placeholder="Search batch name or courseâ€¦"
                         value={search} onChange={e => setSearch(e.target.value)} />
                 </div>
                 <select className="tb-select" style={{ minWidth: 180 }}
@@ -645,7 +628,7 @@ const BatchesPage = () => {
                 )}
             </div>
 
-            {/* ── Batch Table ──────────────────────────────── */}
+            {/* â”€â”€ Batch Table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             <div className="card">
                 {loading && page === 1 ? (
                     <SkeletonTable rows={8} />
@@ -669,9 +652,9 @@ const BatchesPage = () => {
                                     <tr>
                                         <th>Batch</th>
                                         <th>Subjects</th>
-                                        <th>Schedule</th>
+
                                         <th>Enrollment</th>
-                                        <th>Earnings</th>
+
                                         <th>Status</th>
                                         <th>Actions</th>
                                     </tr>
@@ -697,9 +680,9 @@ const BatchesPage = () => {
                 )}
             </div>
 
-            {/* ═══════════════════════════════════════════════
+            {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
                 CREATE / EDIT MODAL
-            ═══════════════════════════════════════════════ */}
+            â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
             {
                 showModal && (
                     <div className="modal-overlay" style={{
@@ -767,7 +750,7 @@ const BatchesPage = () => {
                             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
                                 <div className="modal-body b-modal-body" style={{ flex: 1, overflowY: 'auto', padding: '32px' }}>
 
-                                    {/* ── Basic Info Section ── */}
+                                    {/* â”€â”€ Basic Info Section â”€â”€ */}
                                     <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
                                         Basic Information
                                         <div style={{ flex: 1, height: '1px', background: '#f1f5f9' }}></div>
@@ -792,7 +775,7 @@ const BatchesPage = () => {
                                                 value={form.course}
                                                 onChange={e => setForm(f => ({ ...f, course: e.target.value, subjects: [] }))}
                                             >
-                                                <option value="">Select course…</option>
+                                                <option value="">Select courseâ€¦</option>
                                                 {getDynamicClasses().map(c => <option key={c} value={c}>{c}</option>)}
                                             </select>
                                         </div>
@@ -800,7 +783,7 @@ const BatchesPage = () => {
 
                                     <div className="b-grid-2" style={{ display: 'flex', gap: 20, marginBottom: 20 }}>
                                         <div style={{ flex: 1 }}>
-                                            <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Fees (₹  / Month)</label>
+                                            <label style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Fees (â‚¹  / Month)</label>
                                             <input
                                                 type="number"
                                                 style={{ width: '100%', padding: '12px 16px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.95rem', marginTop: 6 }}
@@ -848,7 +831,7 @@ const BatchesPage = () => {
 
 
 
-                                    {/* ── Subject Selection ── */}
+                                    {/* â”€â”€ Subject Selection â”€â”€ */}
                                     <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
                                         Subject Assignment
                                         <div style={{ flex: 1, height: '1px', background: '#f1f5f9' }}></div>
@@ -857,7 +840,7 @@ const BatchesPage = () => {
                                     <div style={{ marginBottom: 30 }}>
                                         {subjLoading ? (
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#64748b', fontSize: '0.85rem' }}>
-                                                <Loader2 size={16} className="spin" /> Loading subjects…
+                                                <Loader2 size={16} className="spin" /> Loading subjectsâ€¦
                                             </div>
                                         ) : availableSubjects.length === 0 ? (
                                             <div style={{ fontSize: '0.85rem', color: '#94a3b8', padding: '16px', background: '#f8fafc', borderRadius: 6, textAlign: 'center' }}>
@@ -918,7 +901,7 @@ const BatchesPage = () => {
                                     </div>
 
 
-                                    {/* ── Classroom & Timetable Section ── */}
+                                    {/* â”€â”€ Classroom & Timetable Section â”€â”€ */}
                                     <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
                                         Classroom & Timetable
                                         <div style={{ flex: 1, height: '1px', background: '#f1f5f9' }}></div>
@@ -976,7 +959,7 @@ const BatchesPage = () => {
                                         <div style={{ animation: 'fadeIn 0.3s ease' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                                                 <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>
-                                                    Current Timetable Preview — <strong>{form.schedule.length}</strong> slots active
+                                                    Current Timetable Preview â€” <strong>{form.schedule.length}</strong> slots active
                                                 </p>
                                                 <button type="button" onClick={generateTimetablePDF} className="btn btn-outline btn-sm" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                                     <FileDown size={14} /> Download Timetable PDF
@@ -1011,9 +994,9 @@ const BatchesPage = () => {
                 )
             }
 
-            {/* ═══════════════════════════════════════════════
+            {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
                 PASSWORD MODAL (for update)
-            ═══════════════════════════════════════════════ */}
+            â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
             <ActionModal
                 isOpen={showPwdModal}
                 onClose={() => setShowPwdModal(false)}
@@ -1025,9 +1008,9 @@ const BatchesPage = () => {
                 error={pwdError}
             />
 
-            {/* ═══════════════════════════════════════════════
+            {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
                 DELETE MODAL
-            ═══════════════════════════════════════════════ */}
+            â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
             {
                 showDelModal && delBatch && (
                     <ActionModal

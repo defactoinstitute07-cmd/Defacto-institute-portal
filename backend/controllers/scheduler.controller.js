@@ -1,58 +1,55 @@
-const Batch = require('../models/Batch');
-const Admin = require('../models/Admin');
 const Schedule = require('../models/Schedule');
+const Admin = require('../models/Admin');
+const Batch = require('../models/Batch');
+const Teacher = require('../models/Teacher');
 
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 const buildTimeSlots = () => {
     const slots = [];
-    for (let h = 8; h <= 20; h++) {
-        slots.push(`${h.toString().padStart(2, '0')}:00`);
+    for (let h = 9; h < 20; h++) {
+        const HH = String(h).padStart(2, '0');
+        slots.push(`${HH}:00`);
     }
     return slots;
 };
 
-const deriveScheduledTeacher = (teacherName, subject) => {
-    const normalized = String(teacherName || '').trim();
-    return normalized || `Faculty Pending - ${subject}`;
+const hasConcreteTeacher = (name) => name && name !== 'Faculty Pending' && name !== 'TBD';
+
+const deriveScheduledTeacher = (defaultTeacher, subject) => {
+    return defaultTeacher || 'Faculty Pending';
 };
 
-const hasConcreteTeacher = (teacherName) => !String(teacherName || '').startsWith('Faculty Pending - ');
-
-// POST /api/scheduler/auto
-// Heuristic "AI" scheduler: Generates a weekly schedule based on required subjects
-// and checks classroom availability to prevent conflicts.
-exports.autoSchedule = async (req, res) => {
+// GET /api/scheduler/config
+exports.getConfig = async (req, res) => {
     try {
-        const { classroom, subjects, excludeBatchId } = req.body;
+        const admin = await Admin.findOne().select('roomsAvailable');
+        const roomCount = parseInt(admin?.roomsAvailable) || 5;
+        const classrooms = Array.from({ length: roomCount }, (_, i) => `Room ${i + 1}`);
 
-        if (!classroom) {
-            return res.status(400).json({ message: 'Classroom is required to auto-schedule.' });
-        }
-
-        // 1. Fetch current room occupancy
-        const allSchedules = await Schedule.find({
-            roomAllotted: classroom,
-            batchId: { $ne: excludeBatchId }
+        res.json({
+            classrooms,
+            days: DAYS,
+            timeSlots: buildTimeSlots()
         });
-        const occupied = new Set();
+    } catch (err) {
+        res.status(500).json({ message: 'Server error fetching scheduler config', error: err.message });
+    }
+};
 
-        allSchedules.forEach(s => {
-            occupied.add(`${s.day}-${s.timeSlot}`);
-        });
-
-        // 2. Determine number of slots needed
-        // Usually 1 slot per subject per week. If no subjects picked, default to 5 slots.
-        const slotsNeeded = subjects && subjects.length > 0 ? subjects.length : 5;
-
+exports.autoAllocateSlots = async (req, res) => {
+    try {
+        const { classroom, slotsNeeded } = req.body;
         const timeSlots = buildTimeSlots();
-        const availableSlots = [];
 
-        // 3. Find all available slots for this room
-        // Preferred days: Monday to Friday
+        // Fetch current schedules to find available slots
+        const allSchedules = await Schedule.find({ roomAllotted: classroom });
+        const occupiedKeys = new Set(allSchedules.map(s => `${s.day}-${s.timeSlot}`));
+
+        const availableSlots = [];
         for (const day of DAYS) {
             for (const time of timeSlots) {
-                if (!occupied.has(`${day}-${time}`)) {
+                if (!occupiedKeys.has(`${day}-${time}`)) {
                     availableSlots.push({ day, time });
                 }
             }

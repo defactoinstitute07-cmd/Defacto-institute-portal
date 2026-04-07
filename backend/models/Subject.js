@@ -53,8 +53,7 @@ const subjectSchema = new mongoose.Schema({
     },
     batchIds: [{
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Batch',
-        index: true
+        ref: 'Batch'
     }],
     teacherId: {
         type: mongoose.Schema.Types.ObjectId,

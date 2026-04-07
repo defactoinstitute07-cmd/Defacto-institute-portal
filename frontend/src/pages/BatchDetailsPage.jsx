@@ -43,11 +43,6 @@ const BatchDetailsPage = () => {
 
     useEffect(() => { loadBatch(); }, [loadBatch]);
 
-    useEffect(() => {
-        apiClient.get('/scheduler/config')
-            .then(({ data }) => setConfig(data))
-            .catch(() => console.error('Failed to load scheduler config'));
-    }, []);
 
     useEffect(() => {
         if (!id) return;
@@ -64,56 +59,6 @@ const BatchDetailsPage = () => {
         s.rollNo.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const generateTimetablePDF = (isPreview = true) => {
-        if (!batch.schedule || batch.schedule.length === 0) {
-            alert('No schedule slots to export');
-            return;
-        }
-        if (!config) return;
-
-        const doc = new jsPDF('landscape');
-
-        // Header
-        doc.setFontSize(22);
-        doc.setTextColor(15, 23, 42);
-        doc.text(`Timetable: ${batch.name}`, 14, 22);
-
-        doc.setFontSize(10);
-        doc.setTextColor(100);
-        doc.text(`Course: ${batch.course || 'N/A'}`, 14, 28);
-        doc.text(`Classroom: ${batch.classroom || 'N/A'}`, 14, 33);
-        doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 38);
-
-        // Prepare table data
-        const head = ['TIME', ...config.days];
-        const body = config.timeSlots.map(time => {
-            const row = [time];
-            config.days.forEach(day => {
-                const slot = (batch.schedule || []).find(s => s.day === day && s.time === time);
-                row.push(slot ? `${slot.subject}\n(${slot.room})` : '—');
-            });
-            return row;
-        });
-
-        autoTable(doc, {
-            startY: 45,
-            head: [head],
-            body: body,
-            headStyles: { fillColor: [15, 23, 42], fontSize: 9, fontStyle: 'bold', halign: 'center' },
-            styles: { fontSize: 8, cellPadding: 3, halign: 'center', valign: 'middle', overflow: 'linebreak' },
-            alternateRowStyles: { fillColor: [248, 250, 252] },
-            margin: { top: 40 },
-            theme: 'grid'
-        });
-
-        if (isPreview) {
-            const blob = doc.output('bloburl');
-            setPdfUrl(blob);
-            setShowPreview(true);
-        } else {
-            doc.save(`Timetable_${batch.name}_${new Date().toISOString().slice(0, 10)}.pdf`);
-        }
-    };
 
     const uniqueRooms = [...new Set(
         (batch.schedule || []).map(s => s.room || batch.classroom).filter(Boolean)

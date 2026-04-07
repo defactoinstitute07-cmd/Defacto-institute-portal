@@ -160,7 +160,7 @@ module.exports = {
 
 </html>`,
     subjectPush: 'New Fee Generated',
-    bodyPush: 'Fee of Rs {{amount}} generated for {{month}} {{year}}. Due date: {{dueDate}}.',
+    bodyPush: 'Fee generated for {{month}} {{year}}.',
     placeholders: ['studentName', 'amount', 'month', 'year', 'dueDate', 'instituteName', 'portalUrl'],
     legacyBodies: [legacyBody]
 };

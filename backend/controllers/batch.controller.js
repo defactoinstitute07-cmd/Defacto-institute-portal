@@ -2,7 +2,6 @@ const Batch = require('../models/Batch');
 const Student = require('../models/Student');
 const Subject = require('../models/Subject');
 const mongoose = require('mongoose');
-const { syncBatchSchedule } = require('./scheduler.controller');
 
 const normalizeBatchDate = (value) => {
     if (!value) return null;
@@ -97,34 +96,26 @@ exports.createBatch = async (req, res) => {
             course,
             capacity,
             subjects,
-            classroom,
-            schedule,
             fees,
             startDate,
-            endDate
+            endDate,
+            classroom,
+            schedule
         } = req.body;
         if (!name) return res.status(400).json({ message: 'Batch name is required' });
-
-        // Build display timeSlots from structured schedule
-        const timeSlots = (schedule || []).map(s => `${s.day} ${s.time}`);
 
         const batch = new Batch({
             name,
             course,
             capacity,
             subjects,
-            classroom,
-            schedule,
-            timeSlots,
             fees,
             startDate: normalizeBatchDate(startDate),
-            endDate: normalizeBatchDate(endDate)
+            endDate: normalizeBatchDate(endDate),
+            classroom,
+            schedule
         });
         await batch.save();
-
-        // CENTRALIZED SYNC
-        await syncBatchSchedule(batch._id, batch.course, schedule);
-
         res.status(201).json({ message: 'Batch created', batch });
     } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });
@@ -143,18 +134,10 @@ exports.updateBatch = async (req, res) => {
             updateData.endDate = normalizeBatchDate(updateData.endDate);
         }
 
-        // Rebuild display slots if schedule updated
-        if (updateData.schedule) {
-            updateData.timeSlots = updateData.schedule.map(s => `${s.day} ${s.time}`);
-        }
 
         const batch = await Batch.findByIdAndUpdate(req.params.id, updateData, { returnDocument: 'after' });
         if (!batch) return res.status(404).json({ message: 'Batch not found' });
 
-        // CENTRALIZED SYNC
-        if (updateData.schedule || updateData.course) {
-            await syncBatchSchedule(batch._id, batch.course, batch.schedule);
-        }
 
         res.json({ message: 'Batch updated', batch });
     } catch (err) {
@@ -168,9 +151,6 @@ exports.deleteBatch = async (req, res) => {
         const batch = await Batch.findByIdAndDelete(req.params.id);
         if (!batch) return res.status(404).json({ message: 'Batch not found' });
 
-        // CENTRALIZED SYNC
-        const Schedule = require('../models/Schedule');
-        await Schedule.deleteMany({ batchId: req.params.id });
 
         res.json({ message: 'Batch deleted' });
     } catch (err) {
@@ -191,28 +171,6 @@ exports.toggleStatus = async (req, res) => {
     }
 };
 
-// GET /api/batches/room-occupancy?excludeBatchId=xxx
-exports.getRoomOccupancy = async (req, res) => {
-    try {
-        const { excludeBatchId } = req.query;
-        const Schedule = require('../models/Schedule');
-        const schedules = await Schedule.find();
-
-        const occupancy = {};
-        schedules.forEach(s => {
-            if (excludeBatchId && s.batchId.toString() === excludeBatchId) return;
-
-            const room = s.roomAllotted;
-            if (!occupancy[room]) occupancy[room] = {};
-            if (!occupancy[room][s.day]) occupancy[room][s.day] = {};
-            occupancy[room][s.day][s.timeSlot] = s.course + " (" + s.subject + ")";
-        });
-
-        res.json({ occupancy });
-    } catch (err) {
-        res.status(500).json({ message: 'Server error', error: err.message });
-    }
-};
 
 // GET /api/batches/export
 exports.exportBatches = async (req, res) => {
@@ -266,6 +224,44 @@ exports.getBatchById = async (req, res) => {
             },
             students
         });
+    } catch (err) {
+        res.status(500).json({ message: 'Server error', error: err.message });
+    }
+};
+
+// GET /api/batches/room-occupancy
+exports.getRoomOccupancy = async (req, res) => {
+    try {
+        const { excludeBatchId } = req.query;
+        const query = { isActive: true };
+        if (excludeBatchId) {
+            query._id = { $ne: excludeBatchId };
+        }
+
+        const batches = await Batch.find(query).select('name schedule').lean();
+
+        const occupancy = {};
+        batches.forEach(batch => {
+            if (!batch.schedule) return;
+            batch.schedule.forEach(slot => {
+                if (!slot.room || !slot.day || !slot.time) return;
+
+                const room = slot.room;
+                const day = slot.day;
+                const time = slot.time;
+
+                if (!occupancy[room]) occupancy[room] = {};
+                if (!occupancy[room][day]) occupancy[room][day] = {};
+
+                if (!occupancy[room][day][time]) {
+                    occupancy[room][day][time] = batch.name;
+                } else {
+                    occupancy[room][day][time] += `, ${batch.name}`;
+                }
+            });
+        });
+
+        res.json({ occupancy });
     } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });
     }

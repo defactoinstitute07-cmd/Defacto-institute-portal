@@ -25,7 +25,7 @@ const SubjectsPage = () => {
         name: '',
         code: '',
         batchIds: [],
-        chapters: [{ name: 'Chapter 1', durationDays: 1 }]
+        chapters: []
     });
     const [draftBatchLinks, setDraftBatchLinks] = useState({});
     const [savingBatchLinksBySubjectId, setSavingBatchLinksBySubjectId] = useState({});
@@ -102,29 +102,6 @@ const SubjectsPage = () => {
         });
     };
 
-    const addChapterRow = () => {
-        setNewSubject((prev) => ({
-            ...prev,
-            chapters: [...(prev.chapters || []), { name: `Chapter ${(prev.chapters?.length || 0) + 1}`, durationDays: 1 }]
-        }));
-    };
-
-    const updateChapterRow = (index, key, value) => {
-        setNewSubject((prev) => ({
-            ...prev,
-            chapters: (prev.chapters || []).map((chapter, chapterIndex) => (
-                chapterIndex === index ? { ...chapter, [key]: value } : chapter
-            ))
-        }));
-    };
-
-    const removeChapterRow = (index) => {
-        setNewSubject((prev) => ({
-            ...prev,
-            chapters: (prev.chapters || []).filter((_, chapterIndex) => chapterIndex !== index)
-        }));
-    };
-
     const handleCreateSubject = async (e) => {
         e.preventDefault();
 
@@ -172,7 +149,7 @@ const SubjectsPage = () => {
                 name: '',
                 code: '',
                 batchIds: [],
-                chapters: [{ name: 'Chapter 1', durationDays: 1 }]
+                chapters: []
             });
             await loadData();
         } catch (error) {
@@ -416,49 +393,7 @@ const SubjectsPage = () => {
                                         <p className="mt-1 text-[11px] font-medium text-slate-400">Select one or more batches for this subject.</p>
                                     </div>
 
-                                    <div>
-                                        <div className="mb-1 flex items-center justify-between gap-2">
-                                            <label className="block text-xs font-bold text-slate-700">Manual Chapters (Optional)</label>
-                                            <button
-                                                type="button"
-                                                className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-50"
-                                                onClick={addChapterRow}
-                                            >
-                                                <Plus size={12} /> Add Chapter
-                                            </button>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            {(newSubject.chapters || []).map((chapter, index) => (
-                                                <div key={`chapter-${index}`} className="grid grid-cols-[1fr_110px_36px] gap-2 items-center">
-                                                    <input
-                                                        className={fieldClass}
-                                                        placeholder={`Chapter ${index + 1}`}
-                                                        value={chapter.name}
-                                                        onChange={(e) => updateChapterRow(index, 'name', e.target.value)}
-                                                    />
-                                                    <input
-                                                        type="number"
-                                                        min={1}
-                                                        className={fieldClass}
-                                                        value={chapter.durationDays}
-                                                        onChange={(e) => updateChapterRow(index, 'durationDays', e.target.value)}
-                                                        placeholder="Days"
-                                                    />
-                                                    <button
-                                                        type="button"
-                                                        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-rose-200 text-rose-600 hover:bg-rose-50"
-                                                        onClick={() => removeChapterRow(index)}
-                                                        disabled={(newSubject.chapters || []).length <= 1}
-                                                        title="Remove chapter"
-                                                    >
-                                                        <Trash2 size={14} />
-                                                    </button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <p className="mt-1 text-[11px] font-medium text-slate-400">Example: Chapter 1 - 5 days. These chapters are shared across all linked batches.</p>
-                                    </div>
+                                    {/* Manual Chapters (Optional) section removed as per requirements */}
 
                                     <button
                                         type="submit"

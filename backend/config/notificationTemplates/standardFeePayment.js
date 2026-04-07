@@ -151,7 +151,7 @@ module.exports = {
 
 </html>`,
     subjectPush: 'Fee Payment Received',
-    bodyPush: 'Payment of Rs {{amountPaid}} received. Receipt: {{receiptNo}}.',
+    bodyPush: 'We have received the payment..',
     placeholders: ['studentName', 'amountPaid', 'receiptNo', 'instituteName'],
     legacyBodies: [legacyBody]
 };

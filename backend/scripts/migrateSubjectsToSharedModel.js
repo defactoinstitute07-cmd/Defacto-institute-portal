@@ -1,6 +1,16 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 
+const getDocTimestamp = (doc) => new Date(doc?.updatedAt || doc?.createdAt || 0).getTime();
+
+const pickLatestAssignedTeacherId = (docs = []) => {
+    const latestAssigned = docs
+        .filter((doc) => doc?.teacherId)
+        .sort((left, right) => getDocTimestamp(right) - getDocTimestamp(left))[0];
+
+    return latestAssigned?.teacherId || null;
+};
+
 const run = async () => {
     const uri = process.env.MONGODB_URI;
     if (!uri) throw new Error('MONGODB_URI is missing in environment variables.');
@@ -53,7 +63,7 @@ const run = async () => {
             subject.batchIds.forEach((id) => group.batchIds.add(String(id)));
         }
 
-        if (new Date(subject.updatedAt || subject.createdAt || 0).getTime() > new Date(group.latest.updatedAt || group.latest.createdAt || 0).getTime()) {
+        if (getDocTimestamp(subject) > getDocTimestamp(group.latest)) {
             group.latest = subject;
         }
     });
@@ -65,6 +75,7 @@ const run = async () => {
     for (const [, group] of groups.entries()) {
         const keep = group.latest;
         const keepId = keep._id;
+        const teacherIdToKeep = pickLatestAssignedTeacherId(group.docs);
         const normalizedBatchIds = Array.from(group.batchIds)
             .filter((id) => mongoose.Types.ObjectId.isValid(id))
             .map((id) => new mongoose.Types.ObjectId(id));
@@ -77,6 +88,7 @@ const run = async () => {
                     code: group.code || keep.code || null,
                     batchIds: normalizedBatchIds,
                     batchId: normalizedBatchIds[0] || keep.batchId || null,
+                    teacherId: teacherIdToKeep,
                     updatedAt: new Date()
                 }
             }

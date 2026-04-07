@@ -5,7 +5,7 @@ const Admin = require('../models/Admin');
 const PDFDocument = require('pdfkit');
 const path = require('path');
 const fs = require('fs');
-const { triggerAutomaticNotification } = require('../services/notificationService');
+const { triggerAutomaticNotification, resolveNotificationTemplate } = require('../services/notificationService');
 const { sendEmail } = require('../services/emailService');
 
 // Helper to recalc pending & status
@@ -470,6 +470,22 @@ exports.recordPayment = async (req, res) => {
                         payment: latestPayment,
                         admin
                     });
+                    const { subjectEmail, bodyEmail } = await resolveNotificationTemplate({
+                        eventType: 'feePayment',
+                        recipient: {
+                            name: fee.studentId?.name,
+                            email: recipientEmail,
+                            rollNo: fee.studentId?.rollNo || ''
+                        },
+                        recipientType: 'student',
+                        admin,
+                        fallbackMessage: `We have successfully received your payment of ${formatCurrency(latestPayment.paidAmount)}. Your receipt ${latestPayment.receiptNo} is attached with this email.`,
+                        fallbackSubjectEmail: `Fee Payment Received - Receipt ${latestPayment.receiptNo}`,
+                        data: {
+                            amountPaid: latestPayment.paidAmount,
+                            receiptNo: latestPayment.receiptNo
+                        }
+                    });
 
                     await sendEmail({
                         student: {
@@ -477,8 +493,8 @@ exports.recordPayment = async (req, res) => {
                             email: recipientEmail
                         },
                         admin,
-                        subjectOverride: `Fee Payment Received - Receipt ${latestPayment.receiptNo}`,
-                        message: `We have successfully received your payment of ${formatCurrency(latestPayment.paidAmount)}. Your receipt ${latestPayment.receiptNo} is attached with this email.`,
+                        subjectOverride: subjectEmail,
+                        message: bodyEmail,
                         messageType: 'success',
                         eventType: 'feePayment',
                         recipientRole: 'student',

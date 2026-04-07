@@ -5,9 +5,6 @@ const batchSchema = new mongoose.Schema({
     course: { type: String, trim: true },
     capacity: { type: Number, default: 30 },
     subjects: [{ type: String, trim: true }],
-    classroom: { type: String, trim: true },
-    // Structured schedule for conflict detection
-    schedule: [{ day: String, time: String, subject: String, teacher: String, room: { type: String, trim: true } }],
     // Legacy freeform display slots (kept for backward compat)
     timeSlots: [{ type: String, trim: true }],
     fees: { type: Number, default: 0 },
@@ -15,6 +12,14 @@ const batchSchema = new mongoose.Schema({
     startDate: { type: Date },
     endDate: { type: Date },
     isActive: { type: Boolean, default: true },
+    classroom: { type: String, trim: true },
+    schedule: [{
+        day: { type: String, required: true },
+        time: { type: String, required: true },
+        subject: { type: String, required: true },
+        room: { type: String },
+        isMerged: { type: Boolean, default: false }
+    }],
     createdAt: { type: Date, default: Date.now }
 });
 

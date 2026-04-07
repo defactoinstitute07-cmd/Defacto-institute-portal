@@ -9,8 +9,8 @@ const examSchema = new mongoose.Schema({
     batchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Batch', required: true },
     linkedBatchCount: { type: Number, default: 1, min: 1 },
     date: { type: Date },
-    totalMarks: { type: Number, required: true, default: 100 },
-    passingMarks: { type: Number, required: true, default: 40 },
+    totalMarks: { type: Number, required: true, default: 20 },
+    passingMarks: { type: Number, required: true, default: 15 },
     uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Teacher', default: null },
     status: { type: String, enum: ['scheduled', 'completed', 'cancelled'], default: 'scheduled' }
 }, { timestamps: true });

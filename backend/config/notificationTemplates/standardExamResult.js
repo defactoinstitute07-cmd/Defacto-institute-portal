@@ -190,8 +190,8 @@ module.exports = {
 </body>
 
 </html>`,
-    subjectPush: 'Exam Result Published',
-    bodyPush: '{{examName}} result is out. Score: {{score}}/{{totalMarks}}. Status: {{passStatus}}.',
+    subjectPush: 'Exam Result are OUT ! ',
+    bodyPush: '{{examName}} result is out—you can check your score.',
     placeholders: ['studentName', 'examName', 'examDate', 'score', 'totalMarks', 'passStatus', 'instituteName', 'portalUrl'],
     legacyBodies: [legacyBody]
 };
