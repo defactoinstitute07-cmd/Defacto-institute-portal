@@ -5,6 +5,10 @@ const Fee = require('../models/Fee');
 const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
 const { triggerAutomaticNotification } = require('../services/notificationService');
+const { buildStudentRegistrationAttachments } = require('../services/studentProfileSetupPdf.service');
+
+const getStudentPortalUrl = () =>
+    process.env.STUDENT_PORTAL_URL || `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login`;
 
 const getActivityConfig = () => ({
     onlineMinutes: Math.max(parseInt(process.env.ACTIVITY_ONLINE_MINUTES || '5', 10) || 5, 1),
@@ -457,6 +461,9 @@ exports.createStudent = async (req, res) => {
 
         // Send onboarding notification
         if (student) {
+            const portalUrl = getStudentPortalUrl();
+            const attachments = await buildStudentRegistrationAttachments({ portalUrl });
+
             await triggerAutomaticNotification({
                 studentId: student._id,
                 message: `Welcome ${student.name}! Your registration is successful. Roll No: ${student.rollNo}, Password: ${req.body.password || 'student@123'}. Please login to your portal to complete your profile.`,
@@ -464,8 +471,9 @@ exports.createStudent = async (req, res) => {
                 adminId: req.admin?.id,
                 data: {
                     password: req.body.password || 'student@123',
-                    portalUrl: process.env.STUDENT_PORTAL_URL || `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login`
-                }
+                    portalUrl
+                },
+                attachments
             });
         }
 
@@ -582,6 +590,8 @@ exports.bulkUpload = async (req, res) => {
         let successCount = 0;
         let failedCount = 0;
         const errors = [];
+        const portalUrl = getStudentPortalUrl();
+        const registrationAttachments = await buildStudentRegistrationAttachments({ portalUrl });
 
         // Pre-fetch all active batches to build a fast memory map for name resolution
         const allBatches = await Batch.find({ isActive: true }).select('_id name');
@@ -662,8 +672,10 @@ exports.bulkUpload = async (req, res) => {
                         eventType: 'studentRegistration',
                         adminId: req.admin?.id,
                         data: {
-                            password: 'student@123'
-                        }
+                            password: 'student@123',
+                            portalUrl
+                        },
+                        attachments: registrationAttachments.map((attachment) => ({ ...attachment }))
                     });
                 }
 

@@ -5,9 +5,12 @@ const Subject = require('../models/Subject');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { triggerAutomaticNotification } = require('../services/notificationService');
+const { buildStudentRegistrationAttachments } = require('../services/studentProfileSetupPdf.service');
 const { JWT_SECRET } = require('../middleware/auth.middleware');
 
 const createStudentToken = (studentId) => jwt.sign({ id: studentId, role: 'student' }, JWT_SECRET, { expiresIn: '2h' });
+const getStudentPortalUrl = () =>
+    process.env.STUDENT_PORTAL_URL || `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login`;
 
 const getPortalAccessState = (student) => ({
     signupStatus: student.portalAccess?.signupStatus || 'no',
@@ -123,14 +126,18 @@ exports.signup = async (req, res) => {
 
         await student.save();
 
+        const portalUrl = getStudentPortalUrl();
+        const attachments = await buildStudentRegistrationAttachments({ portalUrl });
+
         await triggerAutomaticNotification({
             studentId: student._id,
             eventType: 'studentRegistration',
             message: `Hello ${student.name}, your portal account has been activated successfully. Roll No: ${student.rollNo}`,
             data: {
                 rollNo: student.rollNo,
-                portalUrl: process.env.STUDENT_PORTAL_URL || `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login`
-            }
+                portalUrl
+            },
+            attachments
         });
 
         res.status(201).json({

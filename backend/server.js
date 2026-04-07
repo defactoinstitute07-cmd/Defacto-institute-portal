@@ -14,7 +14,6 @@ const rateLimit = require('express-rate-limit');
 const adminRoutes = require('./routes/adminRoutes');
 const studentRoutes = require('./routes/student.routes');
 const batchRoutes = require('./routes/batch.routes');
-const schedulerRoutes = require('./routes/scheduler.routes');
 const settingsRoutes = require('./routes/settings.routes');
 const teacherRoutes = require('./routes/teacher.routes');
 const feesRoutes = require('./routes/fees.routes');
@@ -23,10 +22,9 @@ const examRoutes = require('./routes/exam.routes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const attendanceRoutes = require('./routes/attendance.routes');
 const subjectRoutes = require('./routes/subject.routes');
-const templateRoutes = require('./routes/templateRoutes');
 const dashboardRoutes = require('./routes/dashboard.routes');
+const schedulerRoutes = require('./routes/scheduler.routes');
 
-const { initScheduler } = require('./utils/scheduler');
 // Portal auth routes
 const studentAuthRoutes = require('./routes/student.auth.routes');
 const teacherAuthRoutes = require('./routes/teacher.auth.routes');
@@ -38,7 +36,6 @@ const app = express();
 app.set('trust proxy', 1);
 
 if (process.env.NODE_ENV !== 'production') {
-    initScheduler();
 }
 
 // Middleware
@@ -121,7 +118,6 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/admin', adminRoutes); // Auth & basic profile
 app.use('/api/students', studentRoutes);
 app.use('/api/batches', batchRoutes);
-app.use('/api/scheduler', schedulerRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/teachers', teacherRoutes);
 app.use('/api/events', eventRoutes);
@@ -129,8 +125,8 @@ app.use('/api/exams', examRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/subjects', subjectRoutes);
-app.use('/api/templates', templateRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/scheduler', schedulerRoutes);
 
 app.use('/api/fees', adminAuth, feesRoutes);
 
@@ -152,10 +148,6 @@ app.get('/api/health', (req, res) => {
 
 // Database connection bootstrap (MongoDB only)
 connectDB()
-    .then(() => {
-        // Seed templates if needed
-        require('./controllers/template.controller').seedDefaults();
-    })
     .catch((error) => {
         console.error('CRITICAL: MongoDB initialization failed');
     });

@@ -2,7 +2,7 @@ const Notification = require('../models/Notification');
 const Student = require('../models/Student');
 const Teacher = require('../models/Teacher');
 const Admin = require('../models/Admin');
-const NotificationTemplate = require('../models/NotificationTemplate');
+const { getNotificationTemplateDefinition } = require('../config/notificationTemplates');
 const { sendPushNotification } = require('./pushNotificationService');
 const { sendEmail } = require('./emailService');
 
@@ -304,7 +304,83 @@ const getNotificationHistory = async ({ page = 1, limit = 5, status = '', delive
     };
 };
 
-const triggerAutomaticNotification = async ({ eventType, studentId, teacherId, message: fallbackMessage, adminId = null, data = {} }) => {
+const escapeHtml = (value) => String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+const processTemplateText = (text, tokens, { escapeValues = false } = {}) => {
+    let result = text || '';
+
+    Object.keys(tokens).forEach((key) => {
+        const regex = new RegExp(`{{${key}}}`, 'g');
+        const rawValue = tokens[key] !== undefined && tokens[key] !== null ? String(tokens[key]) : '';
+        const value = escapeValues ? escapeHtml(rawValue) : rawValue;
+        result = result.replace(regex, value);
+    });
+
+    return result;
+};
+
+const buildTemplateTokens = ({ recipient, recipientType, admin, data = {} }) => {
+    const defaultPortalUrl = process.env.STUDENT_PORTAL_URL || `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login`;
+    const defaultTeacherPortalUrl = process.env.TEACHER_PORTAL_URL || `${process.env.FRONTEND_URL || 'http://localhost:5173'}/login`;
+
+    return {
+        studentName: recipientType === 'student' ? recipient?.name || '' : '',
+        teacherName: recipientType === 'teacher' ? recipient?.name || '' : '',
+        rollNo: recipientType === 'student' ? (recipient?.rollNo || '') : '',
+        email: recipient?.email || '',
+        instituteName: admin?.coachingName || 'The Institute',
+        instituteLogo: admin?.instituteLogo || '',
+        portalUrl: data.portalUrl || defaultPortalUrl,
+        teacherPortalUrl: data.teacherPortalUrl || defaultTeacherPortalUrl,
+        ...data
+    };
+};
+
+const resolveNotificationTemplate = async ({
+    eventType,
+    recipient,
+    recipientType,
+    admin,
+    fallbackMessage = '',
+    fallbackSubjectEmail = 'Institute Notification',
+    fallbackSubjectPush = 'ERP Notification',
+    data = {}
+}) => {
+    const template = getNotificationTemplateDefinition(eventType);
+
+    if (!template) {
+        return {
+            subjectEmail: fallbackSubjectEmail,
+            bodyEmail: fallbackMessage,
+            subjectPush: fallbackSubjectPush,
+            bodyPush: fallbackMessage
+        };
+    }
+
+    const tokens = buildTemplateTokens({ recipient, recipientType, admin, data });
+
+    return {
+        subjectEmail: processTemplateText(template.subject || fallbackSubjectEmail, tokens),
+        bodyEmail: processTemplateText(template.body || fallbackMessage, tokens, { escapeValues: true }),
+        subjectPush: processTemplateText(template.subjectPush || template.subject || fallbackSubjectPush, tokens),
+        bodyPush: processTemplateText(template.bodyPush || template.body || fallbackMessage, tokens)
+    };
+};
+
+const triggerAutomaticNotification = async ({
+    eventType,
+    studentId,
+    teacherId,
+    message: fallbackMessage,
+    adminId = null,
+    data = {},
+    attachments = []
+}) => {
     try {
         let recipient = null;
         let recipientType = 'student';
@@ -338,42 +414,21 @@ const triggerAutomaticNotification = async ({ eventType, studentId, teacherId, m
             return;
         }
 
-        // Fetch custom template
-        const template = await NotificationTemplate.findOne({ eventType, isActive: true }).lean();
-
-        let subjectEmail = 'Institute Notification';
-        let bodyEmail = fallbackMessage;
-        let subjectPush = 'ERP Notification';
-        let bodyPush = fallbackMessage;
-
-        if (template) {
-            // Prepare replacement tokens
-            const tokens = {
-                studentName: recipientType === 'student' ? recipient.name : '',
-                teacherName: recipientType === 'teacher' ? recipient.name : '',
-                rollNo: recipientType === 'student' ? (recipient.rollNo || '') : '',
-                email: recipient.email || '',
-                instituteName: admin.coachingName || 'The Institute',
-                ...data
-            };
-
-            const processText = (text, pairTokens) => {
-                let result = text || '';
-                Object.keys(pairTokens).forEach(key => {
-                    const regex = new RegExp(`{{${key}}}`, 'g');
-                    const val = pairTokens[key] !== undefined && pairTokens[key] !== null ? String(pairTokens[key]) : '';
-                    result = result.replace(regex, val);
-                });
-                return result;
-            };
-
-            subjectEmail = processText(template.subject, tokens);
-            bodyEmail = processText(template.body, tokens);
-            
-            // Use push-specific templates if available, otherwise fallback to main ones
-            subjectPush = processText(template.subjectPush || template.subject, tokens);
-            bodyPush = processText(template.bodyPush || template.body, tokens);
-        }
+        const {
+            subjectEmail,
+            bodyEmail,
+            subjectPush,
+            bodyPush
+        } = await resolveNotificationTemplate({
+            eventType,
+            recipient,
+            recipientType,
+            admin,
+            fallbackMessage,
+            fallbackSubjectEmail: 'Institute Notification',
+            fallbackSubjectPush: 'ERP Notification',
+            data
+        });
 
         const methods = [];
         if (recipient.email && isEmailEnabled) methods.push('email');
@@ -393,11 +448,7 @@ const triggerAutomaticNotification = async ({ eventType, studentId, teacherId, m
                 message: bodyEmail,
                 admin,
                 subjectOverride: subjectEmail,
-                messageType: eventType,
-                eventType,
-                recipientRole: recipientType,
-                portalUrl: data?.portalUrl,
-                teacherPortalUrl: data?.teacherPortalUrl
+                attachments
             });
         }
 
@@ -463,5 +514,6 @@ module.exports = {
     getRecipients,
     getNotificationHistory,
     triggerAutomaticNotification,
-    cleanupOldNotifications
+    cleanupOldNotifications,
+    resolveNotificationTemplate
 };

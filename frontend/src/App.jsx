@@ -17,7 +17,6 @@ import AttendancePage from './pages/AttendancePage';
 import SubjectsPage from './pages/SubjectsPage';
 import SubjectDetailsPage from './pages/SubjectDetailsPage';
 import SignupPage from './pages/SignupPage';
-import EmailTemplatesPage from './pages/EmailTemplatesPage';
 import DashboardPage from './pages/DashboardPage';
 import { checkAdminExists } from './api/adminApi';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -108,7 +107,6 @@ function App() {
                 <Route path="/subjects" element={<ProtectedRoute allowedRoles={['admin']}><SubjectsPage /></ProtectedRoute>} />
                 <Route path="/subjects/:id" element={<ProtectedRoute allowedRoles={['admin']}><SubjectDetailsPage /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute allowedRoles={['admin']}><SettingsPage /></ProtectedRoute>} />
-                <Route path="/templates" element={<ProtectedRoute allowedRoles={['admin']}><EmailTemplatesPage /></ProtectedRoute>} />
                 <Route path="/exams" element={<ProtectedRoute allowedRoles={['admin']}><ExamsPage /></ProtectedRoute>} />
 
                 {/* Disabled Teacher / Student Portal Routes */}
