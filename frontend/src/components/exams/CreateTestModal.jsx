@@ -5,12 +5,17 @@ import apiClient from '../../api/apiConfig';
 const getChapterSuggestions = (subject) => {
     const chapters = Array.isArray(subject?.chapters) ? subject.chapters : [];
     const seen = new Set();
+    const statusWeight = {
+        ongoing: 0,
+        upcoming: 1,
+        completed: 2
+    };
 
     return chapters
         .filter((chapter) => String(chapter?.name || '').trim())
         .map((chapter) => ({
             name: String(chapter.name).trim(),
-            status: String(chapter?.status || 'ongoing').trim().toLowerCase()
+            status: String(chapter?.status || 'upcoming').trim().toLowerCase()
         }))
         .filter((chapter) => {
             const key = chapter.name.toLowerCase();
@@ -19,8 +24,8 @@ const getChapterSuggestions = (subject) => {
             return true;
         })
         .sort((left, right) => {
-            const leftWeight = left.status === 'ongoing' ? 0 : 1;
-            const rightWeight = right.status === 'ongoing' ? 0 : 1;
+            const leftWeight = statusWeight[left.status] ?? 99;
+            const rightWeight = statusWeight[right.status] ?? 99;
             if (leftWeight !== rightWeight) return leftWeight - rightWeight;
             return left.name.localeCompare(right.name);
         });
@@ -233,53 +238,38 @@ const CreateTestModal = ({ onClose, onSave }) => {
                                 <input style={inputStyle} type="text" placeholder="e.g. Unit Test 1" value={form.name}
                                     onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
                             </div>
-                            <div>
-                                <label style={labelStyle}>Chapter *</label>
-                                <input
-                                    style={inputStyle}
-                                    type="text"
-                                    list="subject-chapter-options"
-                                    placeholder={chapterSuggestions.length > 0 ? 'Select or type a chapter' : 'e.g. Algebra'}
-                                    value={form.chapter}
-                                    onChange={e => setForm(f => ({ ...f, chapter: e.target.value }))} required />
-                                {chapterSuggestions.length > 0 && (
-                                    <>
-                                        <datalist id="subject-chapter-options">
-                                            {chapterSuggestions.map((chapter) => (
-                                                <option
-                                                    key={`${chapter.name}-${chapter.status}`}
-                                                    value={chapter.name}
-                                                    label={`${chapter.name} (${chapter.status})`}
-                                                />
-                                            ))}
-                                        </datalist>
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
-                                            {chapterSuggestions.map((chapter) => {
-                                                const isOngoing = chapter.status === 'ongoing';
-                                                return (
-                                                    <button
-                                                        key={`${chapter.name}-${chapter.status}-chip`}
-                                                        type="button"
-                                                        onClick={() => setForm((prev) => ({ ...prev, chapter: chapter.name }))}
-                                                        style={{
-                                                            border: `1px solid ${isOngoing ? '#fde68a' : '#bfdbfe'}`,
-                                                            background: isOngoing ? '#fffbeb' : '#eff6ff',
-                                                            color: isOngoing ? '#92400e' : '#1d4ed8',
-                                                            borderRadius: 999,
-                                                            padding: '6px 10px',
-                                                            fontSize: '0.72rem',
-                                                            fontWeight: 700,
-                                                            cursor: 'pointer'
-                                                        }}
-                                                    >
-                                                        {chapter.name} ({isOngoing ? 'Ongoing' : 'Completed'})
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </>
-                                )}
-                            </div>
+<div>
+    <label style={labelStyle}>Chapter *</label>
+    <select
+        style={inputStyle}
+        value={form.chapter}
+        onChange={e => setForm(f => ({ ...f, chapter: e.target.value }))}
+        required
+    >
+        {/* Default Placeholder Option */}
+        <option value="" disabled>
+            {chapterSuggestions.length > 0 ? 'Select a chapter' : 'No chapters available'}
+        </option>
+
+        {/* Mapped Dropdown Options */}
+        {chapterSuggestions.map((chapter) => {
+            const statusLabel = chapter.status === 'ongoing' 
+                ? 'Ongoing' 
+                : chapter.status === 'upcoming' 
+                    ? 'Upcoming' 
+                    : 'Completed';
+
+            return (
+                <option 
+                    key={`${chapter.name}-${chapter.status}`} 
+                    value={chapter.name}
+                >
+                    {chapter.name} - {statusLabel}
+                </option>
+            );
+        })}
+    </select>
+</div>
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>

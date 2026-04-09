@@ -102,7 +102,8 @@ exports.assignTeacher = async (req, res) => {
         const hasTeacherId = Object.prototype.hasOwnProperty.call(req.body || {}, 'teacherId');
         const subject = await subjectService.assignTeacherToSubject({
             subjectId: req.params.id,
-            teacherId: hasTeacherId ? req.body.teacherId : undefined
+            teacherId: hasTeacherId ? req.body.teacherId : undefined,
+            allowUnassign: Boolean(req.body?.allowUnassign)
         });
         res.json({ message: 'Teacher assignment updated successfully.', subject });
     } catch (error) {

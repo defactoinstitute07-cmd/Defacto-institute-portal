@@ -5,8 +5,8 @@ export const getMyStudentSubjects = (params) => apiClient.get('/subjects/student
 export const createSubject = (data) => apiClient.post('/subjects', data);
 export const deleteSubject = (id) => apiClient.delete(`/subjects/${id}`);
 export const getSubjectById = (id) => apiClient.get(`/subjects/${id}`);
-export const assignSubjectTeacher = (id, teacherId) =>
-	apiClient.patch(`/subjects/${id}/teacher`, { teacherId });
+export const assignSubjectTeacher = (id, teacherId, options = {}) =>
+	apiClient.patch(`/subjects/${id}/teacher`, { teacherId, ...options });
 export const assignSubjectBatches = (id, batchIds) =>
 	apiClient.patch(`/subjects/${id}/batches`, { batchIds });
 export const uploadSubjectSyllabus = (id, file) => {

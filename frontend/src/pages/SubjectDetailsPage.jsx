@@ -9,7 +9,6 @@ import {
     Loader2,
     Timer,
     Target,
-    Lock,
     Pencil,
     Save,
     X,
@@ -20,6 +19,40 @@ import apiClient, { API_BASE_URL } from '../api/apiConfig';
 import { addSubjectChapter, assignSubjectTeacher, getSubjectById, updateSubjectChapter, updateSubjectChapterStatus } from '../api/subjectApi';
 
 const inputClass = 'w-full rounded-md border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 outline-none transition focus:border-indigo-400';
+const chapterStatusOptions = [
+    { value: 'upcoming', label: 'Upcoming' },
+    { value: 'ongoing', label: 'Ongoing' },
+    { value: 'completed', label: 'Completed' }
+];
+
+const getChapterStatusMeta = (status) => {
+    const normalizedStatus = String(status || 'upcoming').trim().toLowerCase();
+
+    if (normalizedStatus === 'completed') {
+        return {
+            label: 'Completed',
+            pillClass: 'bg-emerald-50 text-emerald-700',
+            borderClass: 'border-emerald-100 bg-emerald-50 text-emerald-700',
+            icon: CheckCircle2
+        };
+    }
+
+    if (normalizedStatus === 'upcoming') {
+        return {
+            label: 'Upcoming',
+            pillClass: 'bg-sky-50 text-sky-700',
+            borderClass: 'border-sky-100 bg-sky-50 text-sky-700',
+            icon: Timer
+        };
+    }
+
+    return {
+        label: 'Ongoing',
+        pillClass: 'bg-amber-50 text-amber-700',
+        borderClass: 'border-amber-100 bg-amber-50 text-amber-700',
+        icon: CircleDashed
+    };
+};
 
 const getTeacherImage = (profileImage) => {
     if (!profileImage) return null;
@@ -48,9 +81,10 @@ export default function SubjectDetailsPage() {
     const [statusUpdatingId, setStatusUpdatingId] = useState('');
     const [error, setError] = useState('');
     const [flash, setFlash] = useState(null);
-    const [chapterForm, setChapterForm] = useState({ name: '', durationDays: 1 });
+    const [chapterForm, setChapterForm] = useState({ name: '', durationDays: 1, status: 'upcoming' });
     const [editingChapterId, setEditingChapterId] = useState('');
-    const [editForm, setEditForm] = useState({ name: '', durationDays: 1, status: 'ongoing' });
+    const [editForm, setEditForm] = useState({ name: '', durationDays: 1, status: 'upcoming' });
+    const [chapterStatusFilter, setChapterStatusFilter] = useState('all');
     const [teachers, setTeachers] = useState([]);
     const [loadingTeachers, setLoadingTeachers] = useState(true);
     const [selectedTeacherId, setSelectedTeacherId] = useState('');
@@ -116,12 +150,24 @@ export default function SubjectDetailsPage() {
     useEffect(() => {
         if (!subject) return;
         const currentTeacherId = resolveTeacherId(subject.teacherId);
-        if (currentTeacherId) {
-            setSelectedTeacherId(currentTeacherId);
-        }
+        setSelectedTeacherId(currentTeacherId || '');
     }, [subject]);
 
     const chapters = subject?.chapters || [];
+    const chapterCounts = chapters.reduce((acc, chapter) => {
+        const normalizedStatus = String(chapter?.status || 'upcoming').trim().toLowerCase();
+        if (normalizedStatus === 'completed') {
+            acc.completed += 1;
+        } else if (normalizedStatus === 'upcoming') {
+            acc.upcoming += 1;
+        } else {
+            acc.ongoing += 1;
+        }
+        return acc;
+    }, { upcoming: 0, ongoing: 0, completed: 0 });
+    const filteredChapters = chapters
+        .map((chapter, index) => ({ chapter, chapterNumber: index + 1 }))
+        .filter(({ chapter }) => chapterStatusFilter === 'all' || chapter.status === chapterStatusFilter);
     const progress = subject?.progress || {
         totalChapters: chapters.length,
         completedChapters: 0,
@@ -145,16 +191,35 @@ export default function SubjectDetailsPage() {
         }
 
         setSaving(true);
+        let chapterCreated = false;
         try {
-            await addSubjectChapter(id, {
+            const requestedStatus = chapterForm.status;
+            const { data } = await addSubjectChapter(id, {
                 name: chapterForm.name,
                 durationDays: duration
             });
+            chapterCreated = true;
+
+            const addedChapter = Array.isArray(data?.subject?.chapters)
+                ? data.subject.chapters[data.subject.chapters.length - 1]
+                : null;
+
+            if (requestedStatus !== 'upcoming' && addedChapter?._id) {
+                await updateSubjectChapterStatus(id, addedChapter._id, requestedStatus);
+            }
+
             await loadSubject();
-            setChapterForm({ name: '', durationDays: 1 });
-            pushFlash('success', 'Chapter added successfully.');
+            setChapterForm({ name: '', durationDays: 1, status: 'upcoming' });
+            pushFlash('success', requestedStatus === 'upcoming'
+                ? 'Chapter added successfully.'
+                : `Chapter added and marked ${requestedStatus}.`);
         } catch (requestError) {
-            pushFlash('error', requestError?.response?.data?.message || 'Failed to add chapter.');
+            if (chapterCreated) {
+                await loadSubject();
+                pushFlash('error', requestError?.response?.data?.message || 'Chapter was added, but its status could not be updated.');
+            } else {
+                pushFlash('error', requestError?.response?.data?.message || 'Failed to add chapter.');
+            }
         } finally {
             setSaving(false);
         }
@@ -178,16 +243,16 @@ export default function SubjectDetailsPage() {
         setEditForm({
             name: chapter.name,
             durationDays: chapter.durationDays,
-            status: 'ongoing'
+            status: chapter.status || 'upcoming'
         });
     };
 
     const handleCancelEdit = () => {
         setEditingChapterId('');
-        setEditForm({ name: '', durationDays: 1, status: 'ongoing' });
+        setEditForm({ name: '', durationDays: 1, status: 'upcoming' });
     };
 
-    const handleSaveEdit = async (chapterId) => {
+    const handleSaveEdit = async (chapter) => {
         const duration = Number(editForm.durationDays);
         if (!editForm.name.trim()) {
             pushFlash('error', 'Chapter name cannot be empty.');
@@ -198,18 +263,30 @@ export default function SubjectDetailsPage() {
             return;
         }
 
-        setStatusUpdatingId(chapterId);
+        setStatusUpdatingId(chapter._id);
+        let chapterUpdated = false;
         try {
-            await updateSubjectChapter(id, chapterId, {
+            await updateSubjectChapter(id, chapter._id, {
                 name: editForm.name,
                 durationDays: duration,
-                status: editForm.status
+                adminOverride: true
             });
+            chapterUpdated = true;
+
+            if (editForm.status !== chapter.status) {
+                await updateSubjectChapterStatus(id, chapter._id, editForm.status);
+            }
+
             await loadSubject();
             handleCancelEdit();
             pushFlash('success', 'Chapter updated successfully.');
         } catch (requestError) {
-            pushFlash('error', requestError?.response?.data?.message || 'Failed to update chapter.');
+            if (chapterUpdated) {
+                await loadSubject();
+                pushFlash('error', requestError?.response?.data?.message || 'Chapter details were saved, but the status could not be updated.');
+            } else {
+                pushFlash('error', requestError?.response?.data?.message || 'Failed to update chapter.');
+            }
         } finally {
             setStatusUpdatingId('');
         }
@@ -224,16 +301,44 @@ export default function SubjectDetailsPage() {
     const currentTeacher = (subject?.teacherId && typeof subject.teacherId === 'object' && subject.teacherId.name)
         ? subject.teacherId
         : teachers.find((teacher) => String(teacher._id) === String(teacherId)) || null;
+    const teacherOptions = currentTeacher && !teachers.some((teacher) => String(teacher._id) === String(teacherId))
+        ? [currentTeacher, ...teachers]
+        : teachers;
+    const hasTeacherSelection = Boolean(selectedTeacherId);
+    const teacherAssignmentChanged = String(selectedTeacherId || '') !== String(teacherId || '');
 
     const handleAssignTeacher = async () => {
+        if (!selectedTeacherId) {
+            pushFlash('error', 'Please select a teacher to assign.');
+            return;
+        }
+
         setAssigningTeacher(true);
         try {
-            const payloadTeacherId = selectedTeacherId || null;
-            const { data } = await assignSubjectTeacher(id, payloadTeacherId);
+            const { data } = await assignSubjectTeacher(id, selectedTeacherId);
             setSubject(data.subject);
             pushFlash('success', data?.message || 'Teacher assignment updated.');
         } catch (requestError) {
             pushFlash('error', requestError?.response?.data?.message || 'Failed to update teacher assignment.');
+        } finally {
+            setAssigningTeacher(false);
+        }
+    };
+
+    const handleUnassignTeacher = async () => {
+        if (!currentTeacher) return;
+
+        const confirmed = window.confirm(`Unassign ${currentTeacher.name} from this subject?`);
+        if (!confirmed) return;
+
+        setAssigningTeacher(true);
+        try {
+            const { data } = await assignSubjectTeacher(id, null, { allowUnassign: true });
+            setSubject(data.subject);
+            setSelectedTeacherId('');
+            pushFlash('success', 'Teacher unassigned successfully.');
+        } catch (requestError) {
+            pushFlash('error', requestError?.response?.data?.message || 'Failed to unassign teacher.');
         } finally {
             setAssigningTeacher(false);
         }
@@ -316,12 +421,23 @@ export default function SubjectDetailsPage() {
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Next Chapter Prediction</p>
                 {progress.nextChapter ? (
                     <div className="mt-3 flex flex-wrap items-center gap-3 text-sm font-semibold text-slate-700">
+                        {(() => {
+                            const nextChapterStatusMeta = getChapterStatusMeta(progress.nextChapter.status);
+                            const NextChapterStatusIcon = nextChapterStatusMeta.icon;
+                            return (
+                                <>
                         <span className="inline-flex items-center gap-2 rounded-full border border-cyan-100 bg-cyan-50 px-3 py-1 text-cyan-700">
                             <Target size={14} /> {progress.nextChapter.name}
                         </span>
-                        <span className="inline-flex items-center gap-2 rounded-full border border-slate-100 bg-slate-50 px-3 py-1 text-slate-600">
-                            <Timer size={14} /> Complete in {progress.nextChapter.dueInDays} day{progress.nextChapter.dueInDays > 1 ? 's' : ''}
+                        <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 ${nextChapterStatusMeta.borderClass}`}>
+                            <NextChapterStatusIcon size={14} /> {nextChapterStatusMeta.label}
                         </span>
+                        <span className="inline-flex items-center gap-2 rounded-full border border-slate-100 bg-slate-50 px-3 py-1 text-slate-600">
+                            <Timer size={14} /> {progress.nextChapter.status === 'upcoming' ? 'Planned for' : 'Complete in'} {progress.nextChapter.dueInDays} day{progress.nextChapter.dueInDays > 1 ? 's' : ''}
+                        </span>
+                                </>
+                            );
+                        })()}
                     </div>
                 ) : (
                     <p className="mt-3 text-sm font-semibold text-emerald-700">All chapters are completed.</p>
@@ -375,22 +491,38 @@ export default function SubjectDetailsPage() {
                                 onChange={(event) => setSelectedTeacherId(event.target.value)}
                                 disabled={loadingTeachers || assigningTeacher}
                             >
-                                <option value="">{loadingTeachers ? 'Loading teachers...' : 'Unassigned'}</option>
-                                {teachers.map((teacher) => (
+                                <option value="">{loadingTeachers ? 'Loading teachers...' : 'Select teacher'}</option>
+                                {teacherOptions.map((teacher) => (
                                     <option key={teacher._id} value={teacher._id}>
-                                        {teacher.name} {teacher.regNo ? `(${teacher.regNo})` : ''}
+                                        {teacher.name} {teacher.regNo ? `(${teacher.regNo})` : ''}{teacher.status && teacher.status !== 'active' ? ` - ${teacher.status}` : ''}
                                     </option>
                                 ))}
                             </select>
-                            <button
-                                type="button"
-                                disabled={assigningTeacher || loadingTeachers}
-                                onClick={handleAssignTeacher}
-                                className="inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-70"
-                            >
-                                {assigningTeacher ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                                Save Assignment
-                            </button>
+                            <div className="flex flex-wrap gap-3">
+                                <button
+                                    type="button"
+                                    disabled={assigningTeacher || loadingTeachers || !hasTeacherSelection || !teacherAssignmentChanged}
+                                    onClick={handleAssignTeacher}
+                                    className="inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-70"
+                                >
+                                    {assigningTeacher ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                                    Save Assignment
+                                </button>
+                                {currentTeacher && (
+                                    <button
+                                        type="button"
+                                        disabled={assigningTeacher}
+                                        onClick={handleUnassignTeacher}
+                                        className="inline-flex items-center justify-center gap-2 rounded-md border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-bold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-70"
+                                    >
+                                        {assigningTeacher ? <Loader2 size={16} className="animate-spin" /> : <X size={16} />}
+                                        Unassign Teacher
+                                    </button>
+                                )}
+                            </div>
+                            <p className="text-xs font-semibold text-slate-500">
+                                Saving only assigns the selected teacher. Removing a teacher now needs the separate unassign action.
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -420,6 +552,18 @@ export default function SubjectDetailsPage() {
                                 onChange={(event) => setChapterForm((prev) => ({ ...prev, durationDays: event.target.value }))}
                             />
                         </div>
+                        <div>
+                            <label className="mb-1 block text-xs font-black uppercase tracking-wide text-slate-400">Status</label>
+                            <select
+                                className={inputClass}
+                                value={chapterForm.status}
+                                onChange={(event) => setChapterForm((prev) => ({ ...prev, status: event.target.value }))}
+                            >
+                                {chapterStatusOptions.map((option) => (
+                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                ))}
+                            </select>
+                        </div>
                         <button
                             type="submit"
                             disabled={saving}
@@ -433,19 +577,50 @@ export default function SubjectDetailsPage() {
 
                 <div className="rounded-md border border-slate-100 bg-white shadow-sm lg:col-span-2">
                     <div className="border-b border-slate-100 px-6 py-4">
-                        <h2 className="text-base font-black uppercase tracking-wide text-slate-800">Chapter List</h2>
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <h2 className="text-base font-black uppercase tracking-wide text-slate-800">Chapter List</h2>
+                            <div className="flex flex-wrap items-center gap-2">
+                                {[
+                                    { value: 'all', label: 'All', count: chapters.length },
+                                    { value: 'upcoming', label: 'Upcoming', count: chapterCounts.upcoming },
+                                    { value: 'ongoing', label: 'Ongoing', count: chapterCounts.ongoing },
+                                    { value: 'completed', label: 'Completed', count: chapterCounts.completed }
+                                ].map((option) => (
+                                    <button
+                                        key={option.value}
+                                        type="button"
+                                        onClick={() => setChapterStatusFilter(option.value)}
+                                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold transition ${chapterStatusFilter === option.value
+                                            ? 'border-indigo-200 bg-indigo-50 text-indigo-700'
+                                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                            }`}
+                                    >
+                                        {option.label}
+                                        <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] text-current">
+                                            {option.count}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                     </div>
 
                     {chapters.length === 0 ? (
                         <div className="px-6 py-12 text-center text-sm font-semibold text-slate-400">
                             No chapters added yet.
                         </div>
+                    ) : filteredChapters.length === 0 ? (
+                        <div className="px-6 py-12 text-center text-sm font-semibold text-slate-400">
+                            No {chapterStatusFilter} chapters found.
+                        </div>
                     ) : (
                         <div className="divide-y divide-slate-100">
-                            {chapters.map((chapter, index) => {
+                            {filteredChapters.map(({ chapter, chapterNumber }) => {
+                                const chapterStatusMeta = getChapterStatusMeta(chapter.status);
                                 const isCompleted = chapter.status === 'completed';
                                 const isUpdating = statusUpdatingId === chapter._id;
                                 const isEditing = editingChapterId === chapter._id;
+                                const ChapterStatusIcon = chapterStatusMeta.icon;
 
                                 return (
                                     <div key={chapter._id} className="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
@@ -471,13 +646,15 @@ export default function SubjectDetailsPage() {
                                                             value={editForm.status}
                                                             onChange={(event) => setEditForm((prev) => ({ ...prev, status: event.target.value }))}
                                                         >
-                                                            <option value="ongoing">Ongoing</option>
+                                                            {chapterStatusOptions.map((option) => (
+                                                                <option key={option.value} value={option.value}>{option.label}</option>
+                                                            ))}
                                                         </select>
                                                     </div>
                                                 </div>
                                             ) : (
                                                 <>
-                                                    <p className="text-sm font-bold text-slate-800">{index + 1}. {chapter.name}</p>
+                                                    <p className="text-sm font-bold text-slate-800">{chapterNumber}. {chapter.name}</p>
                                                     <p className="mt-1 text-xs font-semibold text-slate-500">
                                                         Duration: {chapter.durationDays} day{chapter.durationDays > 1 ? 's' : ''}
                                                     </p>
@@ -486,26 +663,19 @@ export default function SubjectDetailsPage() {
                                             <p className="mt-1 text-xs font-semibold text-slate-500">
                                                 {isCompleted
                                                     ? `Completed on: ${formatDate(chapter.completedAt)}`
-                                                    : `Expected completion: ${formatDate(chapter.projectedCompletionDate)}`}
+                                                    : chapter.status === 'upcoming'
+                                                        ? `Planned completion: ${formatDate(chapter.projectedCompletionDate)}`
+                                                        : `Expected completion: ${formatDate(chapter.projectedCompletionDate)}`}
                                             </p>
                                         </div>
 
                                         <div className="flex items-center gap-2">
-                                            <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold uppercase ${isCompleted ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : 'border-amber-100 bg-amber-50 text-amber-700'}`}>
-                                                {isCompleted ? <CheckCircle2 size={13} /> : <CircleDashed size={13} />}
-                                                {chapter.status}
-                                            </span>
-
-                                            {isCompleted ? (
-                                                <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-bold text-slate-600">
-                                                    <Lock size={12} /> Locked
-                                                </span>
-                                            ) : isEditing ? (
+                                            {isEditing ? (
                                                 <>
                                                     <button
                                                         type="button"
                                                         disabled={isUpdating}
-                                                        onClick={() => handleSaveEdit(chapter._id)}
+                                                        onClick={() => handleSaveEdit(chapter)}
                                                         className="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-70"
                                                     >
                                                         <Save size={12} /> Save
@@ -521,20 +691,29 @@ export default function SubjectDetailsPage() {
                                                 </>
                                             ) : (
                                                 <>
+                                                    <label className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700">
+                                                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 uppercase ${chapterStatusMeta.pillClass}`}>
+                                                            <ChapterStatusIcon size={12} />
+                                                            {chapterStatusMeta.label}
+                                                        </span>
+                                                        <select
+                                                            className="bg-transparent text-xs font-bold uppercase text-slate-700 outline-none"
+                                                            value={chapter.status}
+                                                            onChange={(event) => handleStatusUpdate(chapter._id, event.target.value)}
+                                                            disabled={isUpdating}
+                                                        >
+                                                            {chapterStatusOptions.map((option) => (
+                                                                <option key={option.value} value={option.value}>{option.label}</option>
+                                                            ))}
+                                                        </select>
+                                                    </label>
                                                     <button
                                                         type="button"
+                                                        disabled={isUpdating}
                                                         onClick={() => handleStartEdit(chapter)}
                                                         className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
                                                     >
                                                         <Pencil size={12} /> Edit
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        disabled={isUpdating}
-                                                        onClick={() => handleStatusUpdate(chapter._id, 'completed')}
-                                                        className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-70"
-                                                    >
-                                                        <CheckCircle2 size={12} /> Mark Completed
                                                     </button>
                                                 </>
                                             )}

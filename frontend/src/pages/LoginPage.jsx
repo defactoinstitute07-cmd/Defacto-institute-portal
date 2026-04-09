@@ -46,7 +46,7 @@ const LoginPage = () => {
             if (role === 'teacher') {
                 const response = await authApi.teacherLogin({ regNo: form.identifier, password: form.password });
                 data = response.data;
-                setClientSession({ role: 'teacher', teacher: data.teacher });
+                setClientSession({ role: 'teacher', teacher: data.teacher, token: data.token });
                 navigate('/teacher-dashboard');
             } else {
                 const response = studentMode === 'signup'
@@ -64,7 +64,7 @@ const LoginPage = () => {
                 const needsSetup = student.needsSetup !== undefined
                     ? student.needsSetup
                     : ((student.portalAccess?.signupStatus || 'no') !== 'yes' || !student.profileImage);
-                setClientSession({ role: 'student', student: { ...student, needsSetup, subjects } });
+                setClientSession({ role: 'student', student: { ...student, needsSetup, subjects }, token: data.token });
                 navigate(needsSetup ? '/student-setup' : '/student-dashboard');
             }
         } catch (err) {
@@ -116,7 +116,7 @@ const LoginPage = () => {
 
     const renderLoginIdentifier = () => (
         <div className="input-group">
-            <label className="input-label">{role === 'student' ? 'Email Address' : 'Email / Username'}</label>
+            <label className="input-label">{role === 'student' ? 'Email Address' : 'Employee ID'}</label>
             <div style={{ position: 'relative' }}>
                 <span className="input-icon">
                     <Mail size={18} />
@@ -125,7 +125,7 @@ const LoginPage = () => {
                     name="identifier"
                     type="text"
                     className="styled-input"
-                    placeholder={role === 'student' ? 'Enter your email address' : 'Enter email or username'}
+                    placeholder={role === 'student' ? 'Enter your email address' : 'Enter your employee ID'}
                     value={form.identifier}
                     onChange={handle}
                     required

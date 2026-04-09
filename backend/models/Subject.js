@@ -13,8 +13,8 @@ const chapterSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['ongoing', 'completed'],
-        default: 'ongoing'
+        enum: ['upcoming', 'ongoing', 'completed'],
+        default: 'upcoming'
     },
     createdAt: {
         type: Date,
@@ -102,7 +102,7 @@ subjectSchema.pre('validate', function () {
     this.chapters.forEach((chapter) => {
         if (!chapter || typeof chapter.status !== 'string') return;
         const normalized = chapter.status.trim().toLowerCase();
-        if (normalized === 'completed' || normalized === 'ongoing') {
+        if (normalized === 'completed' || normalized === 'ongoing' || normalized === 'upcoming') {
             chapter.status = normalized;
         }
     });

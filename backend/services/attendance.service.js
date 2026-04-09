@@ -77,8 +77,8 @@ const normalizeStatus = (value) => {
 
 const normalizeChapterStatus = (value) => {
     const normalized = String(value || '').trim().toLowerCase();
-    if (!['ongoing', 'completed'].includes(normalized)) {
-        const error = new Error('Chapter status must be ongoing or completed.');
+    if (!['upcoming', 'ongoing', 'completed'].includes(normalized)) {
+        const error = new Error('Chapter status must be upcoming, ongoing, or completed.');
         error.status = 400;
         throw error;
     }
@@ -124,7 +124,9 @@ const buildSubjectProgress = (subject) => {
         ? 0
         : Math.round((completedCount / totalChapters) * 100);
 
-    const nextChapter = chapters.find((chapter) => chapter.status !== 'completed') || null;
+    const nextChapter = chapters.find((chapter) => chapter.status === 'ongoing')
+        || chapters.find((chapter) => chapter.status === 'upcoming')
+        || null;
 
     let dueInDays = null;
     if (nextChapter?.projectedCompletionDate) {
@@ -144,6 +146,7 @@ const buildSubjectProgress = (subject) => {
             ? {
                 id: nextChapter._id,
                 name: nextChapter.name,
+                status: nextChapter.status,
                 durationDays: nextChapter.durationDays,
                 dueInDays: dueInDays === null ? nextChapter.durationDays : dueInDays,
                 projectedCompletionDate: nextChapter.projectedCompletionDate || null
@@ -181,6 +184,9 @@ const normalizeSubjectChapters = (chapters = []) => {
     return chapters.map((chapter, index) => {
         const name = String(chapter?.name || '').trim();
         const duration = Number(chapter?.durationDays);
+        const status = chapter?.status === undefined
+            ? 'upcoming'
+            : normalizeChapterStatus(chapter.status);
 
         if (!name) {
             const error = new Error(`Chapter name is required at position ${index + 1}.`);
@@ -197,8 +203,8 @@ const normalizeSubjectChapters = (chapters = []) => {
         return {
             name,
             durationDays: Math.round(duration),
-            status: 'ongoing',
-            completedAt: null,
+            status,
+            completedAt: status === 'completed' ? new Date() : null,
             projectedStartDate: null,
             projectedCompletionDate: null
         };
@@ -384,7 +390,7 @@ exports.listSubjectsForStudent = async ({ studentId, activeOnly = true } = {}) =
     };
 };
 
-exports.assignTeacherToSubject = async ({ subjectId, teacherId }) => {
+exports.assignTeacherToSubject = async ({ subjectId, teacherId, allowUnassign = false }) => {
     const subjectObjectId = asObjectId(subjectId, 'Subject');
     const normalizedTeacherId = typeof teacherId === 'string' ? teacherId.trim() : teacherId;
 
@@ -402,6 +408,11 @@ exports.assignTeacherToSubject = async ({ subjectId, teacherId }) => {
     }
 
     if (normalizedTeacherId === null || normalizedTeacherId === '') {
+        if (!allowUnassign) {
+            const error = new Error('Use the explicit unassign action to remove the teacher from this subject.');
+            error.status = 400;
+            throw error;
+        }
         subject.teacherId = null;
         await subject.save();
         const populated = await Subject.findById(subject._id)
@@ -477,7 +488,7 @@ exports.addChapterToSubject = async ({ subjectId, name, durationDays, actorRole 
     subject.chapters.push({
         name: String(name).trim(),
         durationDays: Math.round(parsedDuration),
-        status: 'ongoing',
+        status: 'upcoming',
         completedAt: null,
         projectedStartDate: null,
         projectedCompletionDate: null
@@ -548,12 +559,12 @@ exports.updateChapterDetails = async ({ subjectId, chapterId, name, durationDays
 
     if (status !== undefined) {
         const normalizedStatus = normalizeChapterStatus(status);
-        if (normalizedStatus !== 'ongoing') {
-            const error = new Error('Only ongoing status can be updated here. Use status endpoint for completion.');
+        if (normalizedStatus === 'completed') {
+            const error = new Error('Use the status endpoint to mark a chapter completed.');
             error.status = 400;
             throw error;
         }
-        chapter.status = 'ongoing';
+        chapter.status = normalizedStatus;
         chapter.completedAt = null;
     }
 

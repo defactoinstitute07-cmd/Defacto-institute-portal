@@ -18,6 +18,7 @@ import SubjectsPage from './pages/SubjectsPage';
 import SubjectDetailsPage from './pages/SubjectDetailsPage';
 import SignupPage from './pages/SignupPage';
 import DashboardPage from './pages/DashboardPage';
+import TeacherDashboard from './pages/TeacherDashboard';
 import { checkAdminExists } from './api/adminApi';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -109,8 +110,8 @@ function App() {
                 <Route path="/settings" element={<ProtectedRoute allowedRoles={['admin']}><SettingsPage /></ProtectedRoute>} />
                 <Route path="/exams" element={<ProtectedRoute allowedRoles={['admin']}><ExamsPage /></ProtectedRoute>} />
 
-                {/* Disabled Teacher / Student Portal Routes */}
-                <Route path="/teacher-dashboard" element={<Navigate to="/login" replace />} />
+                {/* Teacher / Student Portal Routes */}
+                <Route path="/teacher-dashboard" element={<ProtectedRoute allowedRoles={['teacher']}><TeacherDashboard /></ProtectedRoute>} />
                 <Route path="/student-dashboard" element={<Navigate to="/login" replace />} />
                 <Route path="/student-setup" element={<Navigate to="/login" replace />} />
 

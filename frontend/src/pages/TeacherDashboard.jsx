@@ -4,7 +4,15 @@ import axios from 'axios';
 import authApi from '../api/authApi';
 import { clearClientSession } from '../utils/authSession';
 import { Bell, LayoutDashboard, LogOut, Menu, Search, X, CheckCircle2 } from 'lucide-react';
-import { TEACHER_API_BASE_URL } from '../api/apiConfig';
+import { TEACHER_API_BASE_URL, attachAuthToken } from '../api/apiConfig';
+
+const teacherApiClient = attachAuthToken(axios.create({
+    baseURL: `${TEACHER_API_BASE_URL}/api`,
+    withCredentials: true,
+    headers: {
+        'Content-Type': 'application/json'
+    }
+}));
 
 const TeacherDashboard = () => {
     const navigate = useNavigate();
@@ -17,7 +25,7 @@ const TeacherDashboard = () => {
     useEffect(() => {
         const fetchProfile = async () => {
             try {
-                const profileRes = await axios.get(`${TEACHER_API_BASE_URL}/api/teacher/profile`, { withCredentials: true });
+                const profileRes = await teacherApiClient.get('/teacher/profile');
                 setProfileData(profileRes.data);
             } catch (err) {
                 console.error(err);

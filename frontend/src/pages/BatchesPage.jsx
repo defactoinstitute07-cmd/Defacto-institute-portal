@@ -155,7 +155,7 @@ const TimetableGrid = ({ days, timeSlots, classroom, occupancy, selected, onTogg
 // Utility Functions
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 const fmt = (n) => (n || 0).toLocaleString('en-IN');
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'â€”';
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
 
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // Batch Row
@@ -179,7 +179,7 @@ const BatchRow = ({ batch, onEdit, onDelete }) => {
         <tr>
             <td data-label="Batch">
                 <div className="td-bold">{batch.name}</div>
-                <div className="td-sm">{batch.course || 'â€”'}</div>
+                <div className="td-sm">{batch.course || '-'}</div>
             </td>
             <td data-label="Subjects">
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
@@ -187,7 +187,7 @@ const BatchRow = ({ batch, onEdit, onDelete }) => {
                         ? batch.subjects.map(s => (
                             <span key={s} className="chip" style={{ fontSize: '0.68rem' }}>{s}</span>
                         ))
-                        : <span className="td-sm">â€”</span>
+                        : <span className="td-sm">-</span>
                     }
                 </div>
             </td>
@@ -422,7 +422,7 @@ const BatchesPage = () => {
         } finally { setFormSaving(false); }
     };
 
-    // â”€â”€ Save (UPDATE) â€” open password modal first â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // â”€â”€ Save (UPDATE) - open password modal first â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const handleUpdateIntent = () => {
         const { schedulerConfig, ...rawPayload } = form;
         const payload = {
@@ -503,7 +503,7 @@ const BatchesPage = () => {
             const row = [time];
             config.days.forEach(day => {
                 const slot = form.schedule.find(s => s.day === day && s.time === time);
-                row.push(slot ? `${slot.subject}\n(${slot.room})` : 'â€”');
+                row.push(slot ? `${slot.subject}\n(${slot.room})` : '-');
             });
             return row;
         });
@@ -542,10 +542,10 @@ const BatchesPage = () => {
         doc.text(`Total Batches: ${total}`, 14, 33);
 
         const tableBody = batches.map(b => [
-            b.name || 'â€”',
-            b.course || 'â€”',
-            (b.subjects || []).join(', ') || 'â€”',
-            `${b.studentCount || 0} / ${b.capacity || 'â€”'}`,
+            b.name || '-',
+            b.course || '-',
+            (b.subjects || []).join(', ') || '-',
+            `${b.studentCount || 0} / ${b.capacity || '-'}`,
             `INR ${(b.earnings || 0).toLocaleString('en-IN')}`,
             b.isActive ? 'Active' : 'Inactive'
         ]);
@@ -959,7 +959,7 @@ const BatchesPage = () => {
                                         <div style={{ animation: 'fadeIn 0.3s ease' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                                                 <p style={{ fontSize: '0.85rem', color: '#64748b', margin: 0 }}>
-                                                    Current Timetable Preview â€” <strong>{form.schedule.length}</strong> slots active
+                                                    Current Timetable Preview - <strong>{form.schedule.length}</strong> slots active
                                                 </p>
                                                 <button type="button" onClick={generateTimetablePDF} className="btn btn-outline btn-sm" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                                     <FileDown size={14} /> Download Timetable PDF

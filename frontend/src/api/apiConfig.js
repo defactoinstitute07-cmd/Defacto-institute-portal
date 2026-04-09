@@ -47,8 +47,16 @@ apiClient.interceptors.response.use(
         const url = String(error.config?.url || '');
         const isAuthRequest = /\/(login|signup|logout)$/.test(url);
 
-        if (status === 401 && !isAuthRequest && typeof window !== 'undefined') {
-            const role = localStorage.getItem('role');
+        // Only auto-logout on 401 if it's a real JWT/token failure.
+        // Do NOT logout if it's just an admin password verification failure
+        // (verifyAdminPassword middleware also returns 401 with "Incorrect admin password").
+        const errorMessage = String(error.response?.data?.message || '');
+        const isAdminPasswordFailure =
+            errorMessage.toLowerCase().includes('incorrect admin password') ||
+            errorMessage.toLowerCase().includes('admin password is required') ||
+            errorMessage.toLowerCase().includes('password verification failed');
+
+        if (status === 401 && !isAuthRequest && !isAdminPasswordFailure && typeof window !== 'undefined') {
             const currentPath = window.location.pathname;
             clearClientSession();
 

@@ -140,7 +140,7 @@ module.exports = {
         <div class="hero">
             <div class="logo-box">
                 <img
-                    src="https://res.cloudinary.com/dsks5swu1/image/upload/v1775542094/erp_uploads/w2nxiqtmiugmebfaag3k.png" />
+                    src="https://res.cloudinary.com/dmswb6fya/image/upload/f_auto,q_auto,c_limit,w_240/v1775635083/erp_uploads/fwp2aeerokjfljm2aw2a.png" />
             </div>
             <h1 class="title">Fee Overdue Reminder</h1>
             <p class="subtitle">{{month}} {{year}}</p>
