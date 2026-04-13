@@ -24,6 +24,8 @@ const attendanceRoutes = require('./routes/attendance.routes');
 const subjectRoutes = require('./routes/subject.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
 const schedulerRoutes = require('./routes/scheduler.routes');
+const apkRoutes = require('./routes/apk.routes.js');
+const pdfRoutes = require('./routes/pdf.routes.js');
 
 // Portal auth routes
 const studentAuthRoutes = require('./routes/student.auth.routes');
@@ -127,6 +129,8 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/subjects', subjectRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/scheduler', schedulerRoutes);
+app.use('/api/apks', apkRoutes);
+app.use('/api/pdfs', pdfRoutes);
 
 app.use('/api/fees', adminAuth, feesRoutes);
 

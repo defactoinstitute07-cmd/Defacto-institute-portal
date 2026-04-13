@@ -8,6 +8,7 @@ import {
     BookOpen,
     Building2,
     ClipboardCheck,
+    Download,
     GraduationCap,
     LogOut,
     Menu,
@@ -49,6 +50,7 @@ const NAV_ITEMS = [
             { to: '/profile', icon: UserCircle, label: 'Institute Profile' },
             // { to: '/templates', icon: Mail, label: 'Email Templates' },
             { to: '/notifications', icon: Bell, label: 'Notifications' },
+            { to: '/apk-management', icon: Download, label: 'App Management' },
             { to: '/settings', icon: Settings, label: 'Settings' }
         ]
     }
