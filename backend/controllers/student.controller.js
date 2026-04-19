@@ -344,7 +344,7 @@ exports.getStudentActivity = async (req, res) => {
 // GET /api/students
 exports.getAllStudents = async (req, res) => {
     try {
-        const { search = '', batch = '', status = '', className = '', page = 1, limit = 20 } = req.query;
+        const { search = '', batch = '', status = '', className = '', signupStatus = '', page = 1, limit = 20 } = req.query;
 
         const query = {};
         if (search) query.$or = [
@@ -355,6 +355,7 @@ exports.getAllStudents = async (req, res) => {
         if (batch && mongoose.Types.ObjectId.isValid(batch)) query.batchId = batch;
         if (status) query.status = status;
         if (className) query.className = className;
+        if (signupStatus) query['portalAccess.signupStatus'] = signupStatus;
 
         const skip = (parseInt(page) - 1) * parseInt(limit);
         const total = await Student.countDocuments(query);

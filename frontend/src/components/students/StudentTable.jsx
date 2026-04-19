@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, Eye, Pencil, Search, UserCheck, UserX, Loader2 } from 'lucide-react';
+import { User, Eye, Pencil, Search, UserCheck, UserX, Loader2, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { SkeletonTable } from '../common/SkeletonLoaders';
 
@@ -20,10 +20,13 @@ const StudentTable = ({
     loading,
     onEdit,
     onToggleStatus,
+    onDelete,
     page,
     setPage,
     totalPages,
-    total
+    total,
+    onLoadAllBatches,
+    isBatchLoading
 }) => {
     const navigate = useNavigate();
 
@@ -155,6 +158,11 @@ const StudentTable = ({
                                         onClick={() => onToggleStatus(s)}>
                                         {s.status === 'active' ? <UserX size={15} /> : <UserCheck size={15} />}
                                     </button>
+                                    <button className="btn btn-ghost btn-outline btn-sm !text-red-600 hover:bg-red-50"
+                                        title="Delete Student"
+                                        onClick={() => onDelete(s)}>
+                                        <Trash2 size={15} />
+                                    </button>
                                 </div>
                             </td>
                         </tr>
@@ -167,9 +175,14 @@ const StudentTable = ({
                 <div style={{ marginTop: 20, marginBottom: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
                     <div className="text-sm text-slate-500 font-medium">Showing {students.length} of {total} records</div>
                     {page < totalPages && (
-                        <button className="btn btn-outline" disabled={loading} onClick={() => setPage(p => p + 1)}>
-                            {loading ? <><Loader2 size={16} className="spin" /> Loading...</> : 'Load More'}
-                        </button>
+                        <div className="flex gap-3">
+                            <button className="btn btn-outline" disabled={loading || isBatchLoading} onClick={() => setPage(p => p + 1)}>
+                                {loading && !isBatchLoading ? <><Loader2 size={16} className="spin" /> Loading...</> : 'Load More'}
+                            </button>
+                            <button className="btn btn-primary" disabled={loading || isBatchLoading} onClick={onLoadAllBatches}>
+                                {isBatchLoading ? <><Loader2 size={16} className="spin" /> Loading All...</> : 'Load All (Batch by Batch)'}
+                            </button>
+                        </div>
                     )}
                 </div>
             )}

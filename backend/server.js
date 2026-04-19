@@ -142,8 +142,8 @@ app.use('/api/demo', demoRoutes);
 // Health check route
 app.get('/api/health', (req, res) => {
     const mongoStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
-    res.status(200).json({ 
-        status: 'ok', 
+    res.status(200).json({
+        status: 'ok',
         database: mongoStatus,
         timestamp: new Date().toISOString(),
         env: process.env.NODE_ENV

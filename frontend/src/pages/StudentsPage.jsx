@@ -33,7 +33,7 @@ const StudentsPage = () => {
     const [stats, setStats] = useState({ total: 0, active: 0, feePending: 0, attendanceAvg: 0, newAdmissions: 0 });
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
-    const [filters, setFilters] = useState({ batch: '', status: '', className: '' });
+    const [filters, setFilters] = useState({ batch: '', status: '', className: '', signupStatus: '' });
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
@@ -51,6 +51,7 @@ const StudentsPage = () => {
     const [bulkResults, setBulkResults] = useState(null);
     const [err, setErr] = useState('');
     const [toasts, setToasts] = useState([]);
+    const [isBatchLoading, setIsBatchLoading] = useState(false);
 
     // Action Modal States
     const [actionState, setActionState] = useState({
@@ -78,10 +79,10 @@ const StudentsPage = () => {
             const apiStatus = isAllRecords ? '' : filters.status;
 
             // Check if user is searching/filtering
-            const isDefaultLoad = !search && !filters.batch && !filters.status && !filters.className && !isAllRecords;
+            const isDefaultLoad = !search && !filters.batch && !filters.status && !filters.className && !filters.signupStatus && !isAllRecords;
             const limit = isDefaultLoad ? 5 : 10;
 
-            const params = { page, search, batch: filters.batch, status: apiStatus, className: filters.className, limit };
+            const params = { page, search, batch: filters.batch, status: apiStatus, className: filters.className, signupStatus: filters.signupStatus, limit };
 
             let stuReq = apiClient.get('/students', { params });
 
@@ -111,6 +112,59 @@ const StudentsPage = () => {
             if (!silent) setLoading(false);
         }
     }, [search, filters, page, navigate]);
+
+    const loadAllInBatches = async () => {
+        if (isBatchLoading) return;
+        setIsBatchLoading(true);
+        setLoading(true);
+
+        try {
+            let currentPage = 1;
+            let fetchedStudents = [];
+            let totalPagesForBatch = 1;
+
+            const apiStatus = filters.status === 'all' ? '' : filters.status;
+
+            do {
+                const params = { 
+                    page: currentPage, 
+                    search, 
+                    batch: filters.batch, 
+                    status: apiStatus, 
+                    className: filters.className, 
+                    signupStatus: filters.signupStatus, 
+                    limit: 20 
+                };
+
+                const res = await apiClient.get('/students', { params });
+                const newStudents = res.data.students || [];
+
+                fetchedStudents = [...fetchedStudents, ...newStudents];
+
+                const existingIds = new Set();
+                const uniqueStudents = fetchedStudents.filter(s => {
+                    if (existingIds.has(s._id)) return false;
+                    existingIds.add(s._id);
+                    return true;
+                });
+
+                setStudents(uniqueStudents);
+
+                totalPagesForBatch = res.data.pages || 1;
+                setTotalPages(totalPagesForBatch);
+                setTotal(res.data.total || 0);
+
+                currentPage++;
+            } while (currentPage <= totalPagesForBatch);
+
+            addToast('All students loaded successfully');
+        } catch (e) {
+            addToast('Failed to load all students in batches', 'error');
+        } finally {
+            setIsBatchLoading(false);
+            setLoading(false);
+        }
+    };
 
     useEffect(() => { loadData(); }, [page, loadData]);
 
@@ -239,6 +293,30 @@ const StudentsPage = () => {
             loadData();
         } catch (e) {
             setActionState(prev => ({ ...prev, loading: false, error: e.response?.data?.message || 'Authorization failed' }));
+        }
+    };
+
+    const deleteStudent = (s) => {
+        setActionState({
+            isOpen: true,
+            type: 'danger',
+            title: 'Delete Student',
+            desc: `Are you sure you want to permanently delete "${s.name}" (${s.rollNo})? This action cannot be undone. Enter admin password to confirm.`,
+            onConfirm: (pwd) => confirmDeleteStudent(s._id, pwd),
+            loading: false,
+            error: ''
+        });
+    };
+
+    const confirmDeleteStudent = async (studentId, pwd) => {
+        setActionState(prev => ({ ...prev, loading: true, error: '' }));
+        try {
+            await apiClient.delete(`/students/${studentId}`, { data: { adminPassword: pwd } });
+            addToast('Student deleted successfully');
+            setActionState(prev => ({ ...prev, isOpen: false }));
+            loadData();
+        } catch (e) {
+            setActionState(prev => ({ ...prev, loading: false, error: e.response?.data?.message || 'Delete failed' }));
         }
     };
 
@@ -511,9 +589,12 @@ const StudentsPage = () => {
                         setStep(1); setModal('admission');
                     }}
                     onToggleStatus={toggleStudentStatus}
+                    onDelete={deleteStudent}
                     page={page} setPage={setPage}
                     totalPages={totalPages}
                     total={total}
+                    onLoadAllBatches={loadAllInBatches}
+                    isBatchLoading={isBatchLoading}
                 />
             </div>
 

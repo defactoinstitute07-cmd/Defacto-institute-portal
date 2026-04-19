@@ -9,6 +9,7 @@ router.post('/signup', ctrl.signup);
 router.post('/login', ctrl.login);
 
 // Protected (student JWT required)
+router.get('/me', verifyStudent, ctrl.getProfile);
 router.get('/profile', verifyStudent, ctrl.getProfile);
 router.patch('/phone', verifyStudent, ctrl.updatePhone);
 router.get('/performance', verifyStudent, ctrl.getPerformance);

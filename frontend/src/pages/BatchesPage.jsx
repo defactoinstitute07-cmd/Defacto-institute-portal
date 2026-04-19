@@ -613,7 +613,7 @@ const BatchesPage = () => {
                 <div className="tb-search-wrap">
                     <Search size={15} />
                     <input className="tb-search" placeholder="Search batch name or courseâ€¦"
-                        value={search} onChange={e => setSearch(e.target.value)} />
+                        value={search} onChange={e => setSearch(e.target.value)} autoComplete="new-password" />
                 </div>
                 <select className="tb-select" style={{ minWidth: 180 }}
                     value={filterCourse} onChange={e => setFilterCourse(e.target.value)}>

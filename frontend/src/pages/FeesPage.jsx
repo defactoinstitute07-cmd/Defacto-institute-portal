@@ -481,7 +481,7 @@ const FeesPage = () => {
                         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                             <div className="tb-search-wrap" style={{ flex: 1, minWidth: 220 }}>
                                 <Search size={15} />
-                                <input className="tb-search" placeholder="Search students..." value={search} onChange={(e) => setSearch(e.target.value)} />
+                                <input className="tb-search" placeholder="Search students..." value={search} onChange={(e) => setSearch(e.target.value)} autoComplete="new-password" />
                             </div>
                             <select className="tb-select" value={month} onChange={(e) => setMonth(e.target.value)}>
                                 <option value="">Month</option>
@@ -503,7 +503,7 @@ const FeesPage = () => {
                                 <option value="">Batch</option>
                                 {batches.map((batch) => <option key={batch._id} value={batch._id}>{batch.name}</option>)}
                             </select>
-                            <input className="tb-search" style={{ minWidth: 180 }} placeholder="Course" value={course} onChange={(e) => setCourse(e.target.value)} />
+                            <input className="tb-search" style={{ minWidth: 180 }} placeholder="Course" value={course} onChange={(e) => setCourse(e.target.value)} autoComplete="new-password" />
                         </div>
                     </div>
 

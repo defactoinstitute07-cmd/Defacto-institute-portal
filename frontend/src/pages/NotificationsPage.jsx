@@ -518,6 +518,7 @@ const NotificationsPage = () => {
                   onChange={(e) => setStudentSearch(e.target.value)}
                   placeholder="Search by name, roll no..."
                   className="w-full outline-none text-sm"
+                  autoComplete="new-password"
                 />
               </div>
 

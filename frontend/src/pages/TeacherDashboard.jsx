@@ -88,7 +88,7 @@ const TeacherDashboard = () => {
                     <div className="flex items-center gap-4">
                         <div className="hidden md:flex items-center bg-gray-100 px-3 py-1 rounded-lg">
                             <Search size={16} className="text-gray-500" />
-                            <input className="bg-transparent outline-none ml-2 text-sm" placeholder="Search" />
+                            <input className="bg-transparent outline-none ml-2 text-sm" placeholder="Search" autoComplete="new-password" />
                         </div>
 
                         <Bell size={20} className="text-gray-600" />

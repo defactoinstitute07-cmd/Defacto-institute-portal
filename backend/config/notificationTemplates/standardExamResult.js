@@ -141,35 +141,68 @@ module.exports = {
             color: #64748b;
         }
 
-        .logo-box {
+               .logo-container {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background: #000;
+    padding: 20px 30px;
+}
 
-            /* border-white/10 */
-            padding: 4px;
-            /* p-1 */
-            border-radius: 6px;
-            /* rounded-md */
-            margin-bottom: 16px;
+/* Logo Box Styling */
+.logo-box {
+    width: 90px;
+    height: 90px;
+    background: linear-gradient(145deg, #0a0f2c, #000);
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 
+        0 0 15px rgba(255, 215, 0, 0.4),
+        inset 0 0 10px rgba(255, 215, 0, 0.2);
+    border: 2px solid rgba(255, 215, 0, 0.5);
+}
 
-            /* shadow-md */
-            display: inline-block;
-        }
+.logo-box img {
+    width: 100%;
+    height: auto;
+     border-radius: 20px;
+    object-fit: contain;
+}
 
-        .logo-box img {
-            height: 56px;
-            /* h-14 */
-            width: auto;
-            object-fit: contain;
-        }
+/* Text Styling */
+.logo-text h1 {
+    font-size: 48px;
+    font-weight: bold;
+    margin: 0;
+    background: linear-gradient(90deg, #FFD700, #FFA500);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.logo-text p {
+    margin: 0;
+    font-size: 20px;
+    color: #ddd;
+    letter-spacing: 1px;
+}
     </style>
 </head>
 
 <body>
     <div class="card">
         <div class="hero">
-            <div class="logo-box">
-                <img
-                    src="https://res.cloudinary.com/dmswb6fya/image/upload/f_auto,q_auto,c_limit,w_240/v1775635083/erp_uploads/fwp2aeerokjfljm2aw2a.png" />
-            </div>
+                       <div class="logo-container">
+  
+  <div class="logo-box">
+        <img src="https://res.cloudinary.com/dmswb6fya/image/upload/v1775799826/teacher_profiles/gxiptwcbpk2aaclrufol.png" alt="Logo">
+    </div>
+    <div class="logo-text">
+        <h1>Defacto</h1>
+        <p>Institute | BHANIYAWALA</p>
+    </div>
+</div>
             <div class="eyebrow">Exam Result</div>
             <h1 class="title">{{examName}}</h1>
             <p class="subtitle">Published on {{examDate}}</p>

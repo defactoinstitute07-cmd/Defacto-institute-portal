@@ -158,36 +158,82 @@ module.exports = {
             color: #a1a1aa;
         }
 
-        .logo-box {
-            padding: 4px;
-            border-radius: 6px;
-            margin-bottom: 16px;
-            display: inline-block;
-        }
+               .logo-container {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background: #000;
+    padding: 20px 30px;
+}
 
-        .logo-box img {
-            height: 56px;
-            width: auto;
-            object-fit: contain;
-        }
+/* Logo Box Styling */
+.logo-box {
+    width: 90px;
+    height: 90px;
+    background: linear-gradient(145deg, #0a0f2c, #000);
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 
+        0 0 15px rgba(255, 215, 0, 0.4),
+        inset 0 0 10px rgba(255, 215, 0, 0.2);
+    border: 2px solid rgba(255, 215, 0, 0.5);
+}
+
+.logo-box img {
+    width: 100%;
+    height: auto;
+     border-radius: 20px;
+    object-fit: contain;
+}
+
+/* Text Styling */
+.logo-text h1 {
+    font-size: 48px;
+    font-weight: bold;
+    margin: 0;
+    background: linear-gradient(90deg, #FFD700, #FFA500);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.logo-text p {
+    margin: 0;
+    font-size: 20px;
+    color: #ddd;
+    letter-spacing: 1px;
+}
     </style>
 </head>
 
 <body>
     <div class="card">
         <div class="hero">
-            <div class="logo-box">
-                <img
-                    src="https://res.cloudinary.com/dmswb6fya/image/upload/f_auto,q_auto,c_limit,w_240/v1775635083/erp_uploads/fwp2aeerokjfljm2aw2a.png" />
-            </div>
+                       <div class="logo-container">
+  
+  <div class="logo-box">
+        <img src="https://res.cloudinary.com/dmswb6fya/image/upload/v1775799826/teacher_profiles/gxiptwcbpk2aaclrufol.png" alt="Logo">
+    </div>
+    <div class="logo-text">
+        <h1>Defacto</h1>
+        <p>Institute | BHANIYAWALA</p>
+    </div>
+</div>
             <div class="eyebrow">Student Portal</div>
             <p class="subtitle">Your ERP profile setup guide is attached with this email.</p>
         </div>
         <div class="content">
-            <p class="copy">Welcome to ${INSTITUTE_NAME}</p>
+            <p class="copy">Welcome to ${INSTITUTE_NAME}, {{studentName}}!</p>
+            <div class="panel">
+                <p class="panel-title">Your Login Credentials:</p>
+                <ul class="instruction-list">
+                    <li><strong>Student ID:</strong> {{rollNo}}</li>
+                    <li><strong>Password:</strong> {{password}}</li>
+                </ul>
+            </div>
             <p class="note">The attached PDF includes the setup instructions—open it and use it to access your ERP portal.</p>
             <p class="closing">${CLOSING_LINES.join('<br/>')}</p>
-
         </div>
         </div>
 </body>
@@ -195,7 +241,7 @@ module.exports = {
 </html>`,
     subjectPush: `Welcome to ${INSTITUTE_NAME}`,
     bodyPush: `Welcome to ${INSTITUTE_NAME}. Review the setup instructions in your email and use the portal link to set up your ERP profile.`,
-    placeholders: ['portalUrl'],
+    placeholders: ['portalUrl', 'studentName', 'rollNo', 'password'],
     legacyBodies: [legacyBody],
     welcomeInstituteName: INSTITUTE_NAME,
     profileSetupPdfTitle: PROFILE_SETUP_TITLE,

@@ -222,6 +222,7 @@ const CreateFeeModal = ({ onClose, onSave }) => {
                                         outline: 'none'
                                     }}
                                     required={!form.studentId}
+                                    autoComplete="new-password"
                                 />
 
                                 {isDropdownOpen && (

@@ -279,7 +279,7 @@ exports.getFees = async (req, res) => {
         const limit = parseInt(req.query.limit, 10) || 10;
         const skip = (page - 1) * limit;
 
-        const { status, batchId, course, month, year } = req.query;
+        const { search, status, batchId, course, month, year } = req.query;
 
         const query = {};
         if (status) query.status = status;
@@ -292,6 +292,14 @@ exports.getFees = async (req, res) => {
             const batches = await Batch.find({ course }).select('_id');
             const batchIds = batches.map(b => b._id);
             query.batchId = { $in: batchIds };
+        }
+        
+        if (search) {
+            const regex = new RegExp(search, 'i');
+            const matchingStudents = await Student.find({
+                $or: [{ name: regex }, { rollNo: regex }, { phone: regex }]
+            }).select('_id');
+            query.studentId = { $in: matchingStudents.map(s => s._id) };
         }
 
         const total = await Fee.countDocuments(query);

@@ -20,6 +20,7 @@ const TeacherFilters = ({
                     placeholder="Search teachers... (Ctrl+K)"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
+                    autoComplete="new-password"
                 />
             </div>
             <select className="tb-select" value={statusFilt} onChange={(e) => setStatusFilt(e.target.value)}>

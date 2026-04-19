@@ -23,12 +23,30 @@ const StudentFilters = ({
                     placeholder="Search ID, Name..."
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
+                    autoComplete="new-password"
                 />
             </div>
 
             <div className="toolbar-actions">
                 <div className="toolbar-label hide-mobile">
                     <Filter size={14} /> Filters:
+                </div>
+
+                <div className="flex gap-2 mr-2">
+                    <button
+                        type="button"
+                        className={`btn btn-sm ${filters.signupStatus === 'yes' ? 'btn-primary' : 'btn-outline'}`}
+                        onClick={() => setFilters({ ...filters, signupStatus: 'yes' })}
+                    >
+                        Signed Up
+                    </button>
+                    <button
+                        type="button"
+                        className={`btn btn-sm ${!filters.signupStatus ? 'btn-primary' : 'btn-outline'}`}
+                        onClick={() => setFilters({ ...filters, signupStatus: '' })}
+                    >
+                        All Students
+                    </button>
                 </div>
 
                 <select
