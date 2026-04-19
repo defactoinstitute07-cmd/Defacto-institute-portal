@@ -507,6 +507,76 @@ exports.addChapterToSubject = async ({ subjectId, name, durationDays, actorRole 
     };
 };
 
+exports.bulkReplaceChapters = async ({ subjectId, chapters, actorRole = 'admin', actorId = null }) => {
+    const objectId = asObjectId(subjectId, 'Subject');
+
+    if (!Array.isArray(chapters)) {
+        const error = new Error('chapters must be an array.');
+        error.status = 400;
+        throw error;
+    }
+
+    const subject = await Subject.findById(objectId);
+    if (!subject) {
+        const error = new Error('Subject not found.');
+        error.status = 404;
+        throw error;
+    }
+
+    ensureTeacherCanManageSubject({ subject, actorRole, actorId });
+
+    // Build a map of existing chapters by ID for status/date preservation
+    const existingMap = new Map();
+    (subject.chapters || []).forEach((ch) => {
+        existingMap.set(String(ch._id), ch.toObject());
+    });
+
+    const normalized = chapters.map((chapter, index) => {
+        const name = String(chapter?.name || '').trim();
+        const duration = Number(chapter?.durationDays);
+
+        if (!name) {
+            const error = new Error(`Chapter name is required at position ${index + 1}.`);
+            error.status = 400;
+            throw error;
+        }
+
+        if (!Number.isFinite(duration) || duration < 1) {
+            const error = new Error(`Chapter durationDays must be at least 1 at position ${index + 1}.`);
+            error.status = 400;
+            throw error;
+        }
+
+        // If an _id is provided and matches an existing chapter, preserve its status/dates
+        const existingId = chapter?._id ? String(chapter._id) : null;
+        const existing = existingId ? existingMap.get(existingId) : null;
+
+        return {
+            _id: existing ? existing._id : undefined,
+            name,
+            durationDays: Math.round(duration),
+            status: existing ? existing.status : 'upcoming',
+            completedAt: existing ? existing.completedAt : null,
+            projectedStartDate: null,
+            projectedCompletionDate: null
+        };
+    });
+
+    subject.chapters = normalized;
+    recalculateChapterTimeline(subject);
+    subject.totalChapters = subject.chapters.length;
+    await subject.save();
+
+    const response = subject.toObject();
+    const progress = buildSubjectProgress(response);
+
+    return {
+        ...response,
+        totalChapters: progress.totalChapters,
+        progress
+    };
+};
+
 exports.updateChapterDetails = async ({ subjectId, chapterId, name, durationDays, status, actorRole, actorId = null, adminOverride = false }) => {
     const subjectObjectId = asObjectId(subjectId, 'Subject');
 

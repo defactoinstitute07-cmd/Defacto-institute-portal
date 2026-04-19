@@ -84,16 +84,16 @@ const deriveOverallStatus = (results) => {
     return 'failed';
 };
 
-const sendNotificationBatch = async ({ 
-    title, 
-    message, 
+const sendNotificationBatch = async ({
+    title,
+    message,
     type = 'general',
-    studentIds = [], 
-    sendToAll = false, 
-    deliveryMethods = [], 
-    batchId = '', 
+    studentIds = [],
+    sendToAll = false,
+    deliveryMethods = [],
+    batchId = '',
     recipientType = 'student',
-    adminId = null, 
+    adminId = null,
     scheduledFor = null
 }) => {
     const methods = normalizeDeliveryMethods(deliveryMethods);
@@ -148,10 +148,10 @@ const sendNotificationBatch = async ({
         let emailResult;
 
         if (methods.includes('push')) {
-            pushResult = await sendPushNotification({ 
-                student: recipient, 
-                message, 
-                title, 
+            pushResult = await sendPushNotification({
+                student: recipient,
+                message,
+                title,
                 type,
                 recipientType
             });
@@ -159,17 +159,17 @@ const sendNotificationBatch = async ({
         }
 
         if (methods.includes('email')) {
-            const rawEmailResult = await sendEmail({ 
+            const rawEmailResult = await sendEmail({
                 student: recipientType === 'student' ? recipient : null,
                 teacher: recipientType === 'teacher' ? recipient : null,
-                message, 
-                admin, 
+                message,
+                admin,
                 subjectOverride: title,
                 messageType: type,
                 eventType: type,
                 recipientRole: recipientType
             });
-            
+
             // Transform for Notification model schema (requires 'status' field)
             emailResult = {
                 status: rawEmailResult.success ? 'sent' : 'failed',
@@ -272,7 +272,7 @@ const getNotificationHistory = async ({ page = 1, limit = 5, status = '', delive
     await cleanupOldNotifications(3);
 
     const query = {};
-    
+
     // Only fetch records from the last 3 days
     const threeDaysAgo = new Date();
     threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
@@ -503,7 +503,7 @@ const cleanupOldNotifications = async (days = 7) => {
     // We only delete notifications that are NOT scheduled in the future (though cutoffDate handles that)
     const result = await Notification.deleteMany({
         createdAt: { $lt: cutoffDate },
-        status: { $ne: 'scheduled' } 
+        status: { $ne: 'scheduled' }
     });
 
     return { deletedCount: result.deletedCount, cutoffDate };

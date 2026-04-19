@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
     ChevronLeft,
@@ -12,11 +12,13 @@ import {
     Pencil,
     Save,
     X,
-    User
+    User,
+    Upload,
+    Trash2
 } from 'lucide-react';
 import ERPLayout from '../components/ERPLayout';
 import apiClient, { API_BASE_URL } from '../api/apiConfig';
-import { addSubjectChapter, assignSubjectTeacher, getSubjectById, updateSubjectChapter, updateSubjectChapterStatus } from '../api/subjectApi';
+import { addSubjectChapter, assignSubjectTeacher, bulkUpdateSubjectChapters, getSubjectById, updateSubjectChapter, updateSubjectChapterStatus } from '../api/subjectApi';
 
 const inputClass = 'w-full rounded-md border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 outline-none transition focus:border-indigo-400';
 const chapterStatusOptions = [
@@ -90,6 +92,15 @@ export default function SubjectDetailsPage() {
     const [selectedTeacherId, setSelectedTeacherId] = useState('');
     const [assigningTeacher, setAssigningTeacher] = useState(false);
 
+    // Bulk upload state
+    const [showBulkUpload, setShowBulkUpload] = useState(false);
+    const [bulkText, setBulkText] = useState('');
+    const [bulkDefaultDuration, setBulkDefaultDuration] = useState(1);
+
+    // Local edit tracking state
+    const [localChapters, setLocalChapters] = useState(null); // null = no local edits
+    const [bulkSaving, setBulkSaving] = useState(false);
+
     const primaryBatchId = Array.isArray(subject?.batchIds) && subject.batchIds.length > 0
         ? (subject.batchIds[0]?._id || subject.batchIds[0])
         : '';
@@ -108,6 +119,7 @@ export default function SubjectDetailsPage() {
         try {
             const { data } = await getSubjectById(id);
             setSubject(data.subject);
+            setLocalChapters(null); // reset local edits on reload
         } catch (requestError) {
             const message = requestError?.response?.data?.message || 'Failed to load subject details.';
             setError(message);
@@ -153,8 +165,11 @@ export default function SubjectDetailsPage() {
         setSelectedTeacherId(currentTeacherId || '');
     }, [subject]);
 
-    const chapters = subject?.chapters || [];
-    const chapterCounts = chapters.reduce((acc, chapter) => {
+    // The chapters to render: local edits take priority over server state
+    const activeChapters = localChapters !== null ? localChapters : (subject?.chapters || []);
+    const hasLocalEdits = localChapters !== null;
+
+    const chapterCounts = activeChapters.reduce((acc, chapter) => {
         const normalizedStatus = String(chapter?.status || 'upcoming').trim().toLowerCase();
         if (normalizedStatus === 'completed') {
             acc.completed += 1;
@@ -165,13 +180,15 @@ export default function SubjectDetailsPage() {
         }
         return acc;
     }, { upcoming: 0, ongoing: 0, completed: 0 });
-    const filteredChapters = chapters
+
+    const filteredChapters = activeChapters
         .map((chapter, index) => ({ chapter, chapterNumber: index + 1 }))
         .filter(({ chapter }) => chapterStatusFilter === 'all' || chapter.status === chapterStatusFilter);
+
     const progress = subject?.progress || {
-        totalChapters: chapters.length,
+        totalChapters: activeChapters.length,
         completedChapters: 0,
-        remainingChapters: chapters.length,
+        remainingChapters: activeChapters.length,
         progressPercentage: 0,
         nextChapter: null
     };
@@ -187,6 +204,23 @@ export default function SubjectDetailsPage() {
         const duration = Number(chapterForm.durationDays);
         if (!Number.isFinite(duration) || duration < 1) {
             pushFlash('error', 'Duration must be at least 1 day.');
+            return;
+        }
+
+        // If we have local edits, add locally instead of hitting the API
+        if (hasLocalEdits) {
+            const newChapter = {
+                _tempId: Date.now().toString(),
+                name: chapterForm.name.trim(),
+                durationDays: duration,
+                status: chapterForm.status || 'upcoming',
+                completedAt: null,
+                projectedStartDate: null,
+                projectedCompletionDate: null
+            };
+            setLocalChapters((prev) => [...prev, newChapter]);
+            setChapterForm({ name: '', durationDays: 1, status: 'upcoming' });
+            pushFlash('success', 'Chapter added locally. Click "Save All Changes" to persist.');
             return;
         }
 
@@ -226,6 +260,23 @@ export default function SubjectDetailsPage() {
     };
 
     const handleStatusUpdate = async (chapterId, status) => {
+        // If local edits mode, update locally
+        if (hasLocalEdits) {
+            setLocalChapters((prev) =>
+                prev.map((ch) => {
+                    const chId = ch._id || ch._tempId;
+                    if (String(chId) !== String(chapterId)) return ch;
+                    return {
+                        ...ch,
+                        status,
+                        completedAt: status === 'completed' ? new Date().toISOString() : null
+                    };
+                })
+            );
+            pushFlash('success', 'Status changed locally. Click "Save All Changes" to persist.');
+            return;
+        }
+
         setStatusUpdatingId(chapterId);
         try {
             await updateSubjectChapterStatus(id, chapterId, status);
@@ -239,7 +290,11 @@ export default function SubjectDetailsPage() {
     };
 
     const handleStartEdit = (chapter) => {
-        setEditingChapterId(chapter._id);
+        // If not already in local edit mode, switch into it
+        if (!hasLocalEdits) {
+            setLocalChapters([...(subject?.chapters || [])]);
+        }
+        setEditingChapterId(chapter._id || chapter._tempId);
         setEditForm({
             name: chapter.name,
             durationDays: chapter.durationDays,
@@ -252,7 +307,7 @@ export default function SubjectDetailsPage() {
         setEditForm({ name: '', durationDays: 1, status: 'upcoming' });
     };
 
-    const handleSaveEdit = async (chapter) => {
+    const handleSaveEdit = (chapter) => {
         const duration = Number(editForm.durationDays);
         if (!editForm.name.trim()) {
             pushFlash('error', 'Chapter name cannot be empty.');
@@ -263,33 +318,107 @@ export default function SubjectDetailsPage() {
             return;
         }
 
-        setStatusUpdatingId(chapter._id);
-        let chapterUpdated = false;
-        try {
-            await updateSubjectChapter(id, chapter._id, {
-                name: editForm.name,
-                durationDays: duration,
-                adminOverride: true
-            });
-            chapterUpdated = true;
+        const chId = chapter._id || chapter._tempId;
 
-            if (editForm.status !== chapter.status) {
-                await updateSubjectChapterStatus(id, chapter._id, editForm.status);
-            }
+        setLocalChapters((prev) =>
+            prev.map((ch) => {
+                const currentId = ch._id || ch._tempId;
+                if (String(currentId) !== String(chId)) return ch;
+                return {
+                    ...ch,
+                    name: editForm.name.trim(),
+                    durationDays: duration,
+                    status: editForm.status,
+                    completedAt: editForm.status === 'completed' ? (ch.completedAt || new Date().toISOString()) : null
+                };
+            })
+        );
 
-            await loadSubject();
-            handleCancelEdit();
-            pushFlash('success', 'Chapter updated successfully.');
-        } catch (requestError) {
-            if (chapterUpdated) {
-                await loadSubject();
-                pushFlash('error', requestError?.response?.data?.message || 'Chapter details were saved, but the status could not be updated.');
-            } else {
-                pushFlash('error', requestError?.response?.data?.message || 'Failed to update chapter.');
-            }
-        } finally {
-            setStatusUpdatingId('');
+        handleCancelEdit();
+        pushFlash('success', 'Chapter edited locally. Click "Save All Changes" to persist.');
+    };
+
+    const handleDeleteLocalChapter = (chapterId) => {
+        if (!hasLocalEdits) {
+            setLocalChapters([...(subject?.chapters || [])].filter((ch) => String(ch._id) !== String(chapterId)));
+        } else {
+            setLocalChapters((prev) =>
+                prev.filter((ch) => String(ch._id || ch._tempId) !== String(chapterId))
+            );
         }
+        pushFlash('success', 'Chapter removed locally. Click "Save All Changes" to persist.');
+    };
+
+    // Bulk upload: parse text and add to local chapters
+    const handleBulkUpload = () => {
+        const lines = bulkText
+            .split('\n')
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0);
+
+        if (lines.length === 0) {
+            pushFlash('error', 'Please enter at least one chapter name.');
+            return;
+        }
+
+        const duration = Number(bulkDefaultDuration);
+        if (!Number.isFinite(duration) || duration < 1) {
+            pushFlash('error', 'Default duration must be at least 1 day.');
+            return;
+        }
+
+        const newChapters = lines.map((name, i) => ({
+            _tempId: `bulk_${Date.now()}_${i}`,
+            name,
+            durationDays: Math.round(duration),
+            status: 'upcoming',
+            completedAt: null,
+            projectedStartDate: null,
+            projectedCompletionDate: null
+        }));
+
+        // Combine with existing chapters (local or server)
+        const existing = localChapters !== null ? localChapters : [...(subject?.chapters || [])];
+        setLocalChapters([...existing, ...newChapters]);
+        setBulkText('');
+        setShowBulkUpload(false);
+        pushFlash('success', `${newChapters.length} chapter${newChapters.length > 1 ? 's' : ''} added locally. Click "Save All Changes" to persist.`);
+    };
+
+    // Save all local changes to the server
+    const handleSaveAllChanges = async () => {
+        if (!localChapters) return;
+
+        const invalid = localChapters.find((ch) => !ch.name?.trim());
+        if (invalid) {
+            pushFlash('error', 'All chapters must have a name.');
+            return;
+        }
+
+        setBulkSaving(true);
+        try {
+            const chaptersPayload = localChapters.map((ch) => ({
+                _id: ch._id || undefined, // only pass real IDs, not temp IDs
+                name: ch.name,
+                durationDays: ch.durationDays
+            }));
+
+            await bulkUpdateSubjectChapters(id, chaptersPayload);
+            setLocalChapters(null);
+            await loadSubject();
+            pushFlash('success', 'All chapters saved successfully.');
+        } catch (requestError) {
+            pushFlash('error', requestError?.response?.data?.message || 'Failed to save chapters.');
+        } finally {
+            setBulkSaving(false);
+        }
+    };
+
+    const handleDiscardChanges = () => {
+        setLocalChapters(null);
+        setEditingChapterId('');
+        setEditForm({ name: '', durationDays: 1, status: 'upcoming' });
+        pushFlash('success', 'Local changes discarded.');
     };
 
     const formatDate = (value) => {
@@ -388,32 +517,68 @@ export default function SubjectDetailsPage() {
                 </div>
             )}
 
+            {/* Sticky Save Bar — appears when local edits exist */}
+            {hasLocalEdits && (
+                <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 px-5 py-4 shadow-sm">
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100">
+                            <Pencil size={14} className="text-amber-700" />
+                        </div>
+                        <div>
+                            <p className="text-sm font-bold text-amber-800">Unsaved Changes</p>
+                            <p className="text-xs font-semibold text-amber-600">
+                                {activeChapters.length} chapter{activeChapters.length !== 1 ? 's' : ''} in draft — save when ready.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            disabled={bulkSaving}
+                            onClick={handleDiscardChanges}
+                            className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-70"
+                        >
+                            <X size={16} /> Discard
+                        </button>
+                        <button
+                            type="button"
+                            disabled={bulkSaving}
+                            onClick={handleSaveAllChanges}
+                            className="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:opacity-70"
+                        >
+                            {bulkSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                            Save All Changes
+                        </button>
+                    </div>
+                </div>
+            )}
+
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-4">
                 <div className="rounded-md border border-slate-100 bg-white p-5 shadow-sm">
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Chapters</p>
-                    <p className="mt-2 text-3xl font-black text-slate-800">{progress.totalChapters}</p>
+                    <p className="mt-2 text-3xl font-black text-slate-800">{hasLocalEdits ? activeChapters.length : progress.totalChapters}</p>
                 </div>
                 <div className="rounded-md border border-emerald-100 bg-white p-5 shadow-sm">
                     <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Completed</p>
-                    <p className="mt-2 text-3xl font-black text-emerald-700">{progress.completedChapters}</p>
+                    <p className="mt-2 text-3xl font-black text-emerald-700">{hasLocalEdits ? chapterCounts.completed : progress.completedChapters}</p>
                 </div>
                 <div className="rounded-md border border-amber-100 bg-white p-5 shadow-sm">
                     <p className="text-[10px] font-black uppercase tracking-widest text-amber-500">Remaining</p>
-                    <p className="mt-2 text-3xl font-black text-amber-700">{progress.remainingChapters}</p>
+                    <p className="mt-2 text-3xl font-black text-amber-700">{hasLocalEdits ? (activeChapters.length - chapterCounts.completed) : progress.remainingChapters}</p>
                 </div>
                 <div className="rounded-md border border-indigo-100 bg-white p-5 shadow-sm">
                     <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500">Progress</p>
-                    <p className="mt-2 text-3xl font-black text-indigo-700">{progress.progressPercentage}%</p>
+                    <p className="mt-2 text-3xl font-black text-indigo-700">{hasLocalEdits ? (activeChapters.length === 0 ? 0 : Math.round((chapterCounts.completed / activeChapters.length) * 100)) : progress.progressPercentage}%</p>
                 </div>
             </div>
 
             <div className="mt-5 rounded-md border border-slate-100 bg-white p-5 shadow-sm">
                 <div className="mb-2 flex items-center justify-between">
                     <p className="text-xs font-black uppercase tracking-widest text-slate-400">Course Progress</p>
-                    <p className="text-sm font-bold text-slate-600">{progress.completedChapters}/{progress.totalChapters} chapters</p>
+                    <p className="text-sm font-bold text-slate-600">{hasLocalEdits ? chapterCounts.completed : progress.completedChapters}/{hasLocalEdits ? activeChapters.length : progress.totalChapters} chapters</p>
                 </div>
                 <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100">
-                    <div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-cyan-500 transition-all" style={{ width: `${progress.progressPercentage}%` }} />
+                    <div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-cyan-500 transition-all" style={{ width: `${hasLocalEdits ? (activeChapters.length === 0 ? 0 : Math.round((chapterCounts.completed / activeChapters.length) * 100)) : progress.progressPercentage}%` }} />
                 </div>
             </div>
 
@@ -529,50 +694,105 @@ export default function SubjectDetailsPage() {
             </section>
 
             <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-3">
-                <div className="rounded-md border border-slate-100 bg-white p-6 shadow-sm lg:col-span-1">
-                    <h2 className="text-base font-black uppercase tracking-wide text-slate-800">Add Chapter</h2>
-                    <form className="mt-4 space-y-4" onSubmit={handleAddChapter}>
-                        <div>
-                            <label className="mb-1 block text-xs font-black uppercase tracking-wide text-slate-400">Chapter Name</label>
-                            <input
-                                className={inputClass}
-                                value={chapterForm.name}
-                                onChange={(event) => setChapterForm((prev) => ({ ...prev, name: event.target.value }))}
-                                placeholder="e.g. Quadratic Equations"
-                                maxLength={120}
-                            />
-                        </div>
-                        <div>
-                            <label className="mb-1 block text-xs font-black uppercase tracking-wide text-slate-400">Duration (Days)</label>
-                            <input
-                                className={inputClass}
-                                type="number"
-                                min={1}
-                                value={chapterForm.durationDays}
-                                onChange={(event) => setChapterForm((prev) => ({ ...prev, durationDays: event.target.value }))}
-                            />
-                        </div>
-                        <div>
-                            <label className="mb-1 block text-xs font-black uppercase tracking-wide text-slate-400">Status</label>
-                            <select
-                                className={inputClass}
-                                value={chapterForm.status}
-                                onChange={(event) => setChapterForm((prev) => ({ ...prev, status: event.target.value }))}
+                <div className="rounded-md border border-slate-100 bg-white p-6 shadow-sm lg:col-span-1 space-y-6">
+                    {/* Add Single Chapter */}
+                    <div>
+                        <h2 className="text-base font-black uppercase tracking-wide text-slate-800">Add Chapter</h2>
+                        <form className="mt-4 space-y-4" onSubmit={handleAddChapter}>
+                            <div>
+                                <label className="mb-1 block text-xs font-black uppercase tracking-wide text-slate-400">Chapter Name</label>
+                                <input
+                                    className={inputClass}
+                                    value={chapterForm.name}
+                                    onChange={(event) => setChapterForm((prev) => ({ ...prev, name: event.target.value }))}
+                                    placeholder="e.g. Quadratic Equations"
+                                    maxLength={120}
+                                />
+                            </div>
+                            <div>
+                                <label className="mb-1 block text-xs font-black uppercase tracking-wide text-slate-400">Duration (Days)</label>
+                                <input
+                                    className={inputClass}
+                                    type="number"
+                                    min={1}
+                                    value={chapterForm.durationDays}
+                                    onChange={(event) => setChapterForm((prev) => ({ ...prev, durationDays: event.target.value }))}
+                                />
+                            </div>
+                            <div>
+                                <label className="mb-1 block text-xs font-black uppercase tracking-wide text-slate-400">Status</label>
+                                <select
+                                    className={inputClass}
+                                    value={chapterForm.status}
+                                    onChange={(event) => setChapterForm((prev) => ({ ...prev, status: event.target.value }))}
+                                >
+                                    {chapterStatusOptions.map((option) => (
+                                        <option key={option.value} value={option.value}>{option.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <button
+                                type="submit"
+                                disabled={saving}
+                                className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-70"
                             >
-                                {chapterStatusOptions.map((option) => (
-                                    <option key={option.value} value={option.value}>{option.label}</option>
-                                ))}
-                            </select>
-                        </div>
+                                {saving ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+                                Add Chapter
+                            </button>
+                        </form>
+                    </div>
+
+                    {/* Bulk Upload Chapters */}
+                    <div className="border-t border-slate-100 pt-5">
                         <button
-                            type="submit"
-                            disabled={saving}
-                            className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-70"
+                            type="button"
+                            onClick={() => setShowBulkUpload(!showBulkUpload)}
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-bold text-indigo-700 transition hover:bg-indigo-100"
                         >
-                            {saving ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-                            Add Chapter
+                            <Upload size={16} />
+                            {showBulkUpload ? 'Hide Bulk Upload' : 'Bulk Upload Chapters'}
                         </button>
-                    </form>
+
+                        {showBulkUpload && (
+                            <div className="mt-4 space-y-3">
+                                <div>
+                                    <label className="mb-1 block text-xs font-black uppercase tracking-wide text-slate-400">
+                                        Chapter Names (one per line)
+                                    </label>
+                                    <textarea
+                                        className="w-full rounded-md border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 outline-none transition focus:border-indigo-400"
+                                        rows={8}
+                                        value={bulkText}
+                                        onChange={(e) => setBulkText(e.target.value)}
+                                        placeholder={`Chapter 1 Name\nChapter 2 Name\nChapter 3 Name\n...`}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="mb-1 block text-xs font-black uppercase tracking-wide text-slate-400">
+                                        Default Duration (Days)
+                                    </label>
+                                    <input
+                                        className={inputClass}
+                                        type="number"
+                                        min={1}
+                                        value={bulkDefaultDuration}
+                                        onChange={(e) => setBulkDefaultDuration(e.target.value)}
+                                    />
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleBulkUpload}
+                                    className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700"
+                                >
+                                    <Upload size={16} />
+                                    Add {bulkText.split('\n').filter((l) => l.trim()).length} Chapter{bulkText.split('\n').filter((l) => l.trim()).length !== 1 ? 's' : ''}
+                                </button>
+                                <p className="text-xs font-semibold text-slate-500">
+                                    Chapters will be added locally. Click "Save All Changes" to persist them to the server.
+                                </p>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 <div className="rounded-md border border-slate-100 bg-white shadow-sm lg:col-span-2">
@@ -581,7 +801,7 @@ export default function SubjectDetailsPage() {
                             <h2 className="text-base font-black uppercase tracking-wide text-slate-800">Chapter List</h2>
                             <div className="flex flex-wrap items-center gap-2">
                                 {[
-                                    { value: 'all', label: 'All', count: chapters.length },
+                                    { value: 'all', label: 'All', count: activeChapters.length },
                                     { value: 'upcoming', label: 'Upcoming', count: chapterCounts.upcoming },
                                     { value: 'ongoing', label: 'Ongoing', count: chapterCounts.ongoing },
                                     { value: 'completed', label: 'Completed', count: chapterCounts.completed }
@@ -605,7 +825,7 @@ export default function SubjectDetailsPage() {
                         </div>
                     </div>
 
-                    {chapters.length === 0 ? (
+                    {activeChapters.length === 0 ? (
                         <div className="px-6 py-12 text-center text-sm font-semibold text-slate-400">
                             No chapters added yet.
                         </div>
@@ -618,12 +838,13 @@ export default function SubjectDetailsPage() {
                             {filteredChapters.map(({ chapter, chapterNumber }) => {
                                 const chapterStatusMeta = getChapterStatusMeta(chapter.status);
                                 const isCompleted = chapter.status === 'completed';
-                                const isUpdating = statusUpdatingId === chapter._id;
-                                const isEditing = editingChapterId === chapter._id;
+                                const chId = chapter._id || chapter._tempId;
+                                const isUpdating = statusUpdatingId === chId;
+                                const isEditing = editingChapterId === chId;
                                 const ChapterStatusIcon = chapterStatusMeta.icon;
 
                                 return (
-                                    <div key={chapter._id} className="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
+                                    <div key={chId} className="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
                                         <div>
                                             {isEditing ? (
                                                 <div className="space-y-2">
@@ -699,7 +920,7 @@ export default function SubjectDetailsPage() {
                                                         <select
                                                             className="bg-transparent text-xs font-bold uppercase text-slate-700 outline-none"
                                                             value={chapter.status}
-                                                            onChange={(event) => handleStatusUpdate(chapter._id, event.target.value)}
+                                                            onChange={(event) => handleStatusUpdate(chId, event.target.value)}
                                                             disabled={isUpdating}
                                                         >
                                                             {chapterStatusOptions.map((option) => (
@@ -714,6 +935,14 @@ export default function SubjectDetailsPage() {
                                                         className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
                                                     >
                                                         <Pencil size={12} /> Edit
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        disabled={isUpdating}
+                                                        onClick={() => handleDeleteLocalChapter(chId)}
+                                                        className="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100"
+                                                    >
+                                                        <Trash2 size={12} /> Delete
                                                     </button>
                                                 </>
                                             )}

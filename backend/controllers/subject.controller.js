@@ -84,6 +84,21 @@ exports.updateChapterStatus = async (req, res) => {
     }
 };
 
+exports.bulkUpdateChapters = async (req, res) => {
+    try {
+        const subject = await subjectService.bulkReplaceChapters({
+            subjectId: req.params.id,
+            chapters: req.body?.chapters,
+            actorRole: req.role,
+            actorId: req.userId
+        });
+        res.json({ message: 'Chapters updated successfully.', subject });
+    } catch (error) {
+        const status = error.status || 500;
+        res.status(status).json({ message: error.message || 'Failed to update chapters.' });
+    }
+};
+
 exports.getMySubjects = async (req, res) => {
     try {
         const data = await subjectService.listSubjectsForStudent({

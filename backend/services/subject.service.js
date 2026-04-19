@@ -30,6 +30,7 @@ exports.createSubject = (payload) => attendanceService.createSubject(payload);
 exports.listSubjects = (filters) => attendanceService.listSubjects(filters);
 exports.getSubjectById = (payload) => attendanceService.getSubjectById(payload);
 exports.addChapterToSubject = (payload) => attendanceService.addChapterToSubject(payload);
+exports.bulkReplaceChapters = (payload) => attendanceService.bulkReplaceChapters(payload);
 exports.updateChapterDetails = (payload) => attendanceService.updateChapterDetails(payload);
 exports.updateChapterStatus = (payload) => attendanceService.updateChapterStatus(payload);
 exports.assignTeacherToSubject = (payload) => attendanceService.assignTeacherToSubject(payload);

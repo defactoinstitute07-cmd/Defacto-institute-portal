@@ -13,6 +13,7 @@ router.patch('/:id/teacher', adminAuth, controller.assignTeacher);
 router.patch('/:id/batches', adminAuth, controller.assignBatches);
 router.post('/:id/syllabus', verifyAdminOrTeacher, uploadSyllabus.single('syllabus'), controller.uploadSyllabus);
 router.post('/:id/chapters', verifyAdminOrTeacher, controller.addChapter);
+router.put('/:id/chapters/bulk', verifyAdminOrTeacher, controller.bulkUpdateChapters);
 router.patch('/:id/chapters/:chapterId', verifyAdminOrTeacher, controller.updateChapter);
 router.patch('/:id/chapters/:chapterId/status', verifyAdminOrTeacher, controller.updateChapterStatus);
 

@@ -21,3 +21,5 @@ export const updateSubjectChapter = (id, chapterId, data) =>
 	apiClient.patch(`/subjects/${id}/chapters/${chapterId}`, data);
 export const updateSubjectChapterStatus = (id, chapterId, status) =>
 	apiClient.patch(`/subjects/${id}/chapters/${chapterId}/status`, { status });
+export const bulkUpdateSubjectChapters = (id, chapters) =>
+	apiClient.put(`/subjects/${id}/chapters/bulk`, { chapters });
