@@ -1,7 +1,7 @@
 const Teacher = require('../models/Teacher');
+const bcrypt = require('bcryptjs');
 const { triggerAutomaticNotification } = require('../services/notificationService');
 const { logNotificationEvent } = require('../services/activityLogService');
-
 // GET /api/teachers
 exports.getAllTeachers = async (req, res) => {
     try {
@@ -140,7 +140,7 @@ exports.updateTeacher = async (req, res) => {
         }
 
         if (password) {
-            update.password = password; // hashing is handled by pre-save hook
+            update.password = await bcrypt.hash(password, 10);
         }
 
         const teacher = await Teacher.findByIdAndUpdate(req.params.id, update, { returnDocument: 'after' });

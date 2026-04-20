@@ -17,6 +17,7 @@ const TeacherFormModal = ({ mode, teacher, toast, onSave, onClose, imgSrc }) => 
     const [phone, setPhone] = useState(teacher?.phone || '');
     const [email, setEmail] = useState(teacher?.email || '');
     const [joiningDate, setJoiningDate] = useState(teacher?.joiningDate?.slice(0, 10) || '');
+    const [password, setPassword] = useState('');
     const [imgFile, setImgFile] = useState(null);
     const [imgPreview, setImgPreview] = useState(teacher?.profileImage ? imgSrc(teacher.profileImage) : null);
 
@@ -39,6 +40,7 @@ const TeacherFormModal = ({ mode, teacher, toast, onSave, onClose, imgSrc }) => 
         formData.append('email', email);
         formData.append('phone', phone);
         formData.append('joiningDate', joiningDate);
+        if (password) formData.append('password', password);
 
         if (imgFile) formData.append('profileImage', imgFile);
         return formData;
@@ -181,6 +183,12 @@ const TeacherFormModal = ({ mode, teacher, toast, onSave, onClose, imgSrc }) => 
                                     <span className="text-xs font-bold text-slate-600 uppercase">Joining Date</span>
                                     <input type="date" className="w-full h-11 rounded-lg border border-slate-300 px-3 text-sm" value={joiningDate} onChange={(event) => setJoiningDate(event.target.value)} />
                                 </label>
+                                {mode === 'edit' && (
+                                    <label className="space-y-1">
+                                        <span className="text-xs font-bold text-slate-600 uppercase">New Password</span>
+                                        <input type="password" placeholder="Leave empty to keep current" className="w-full h-11 rounded-lg border border-slate-300 px-3 text-sm" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" />
+                                    </label>
+                                )}
                             </div>
                         </section>
 

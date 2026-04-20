@@ -104,7 +104,7 @@ const AdminLoginPage = () => {
                     {/* Header Elements */}
                     <div className="text-center mb-8 relative">
 
-                        <h1 className="text-2xl font-black text-slate-800 tracking-tight mb-2">Institution De Facto Institute</h1>
+                        <h1 className="text-2xl font-black text-slate-800 tracking-tight mb-2">Institution Defacto Institute</h1>
 
                         <p className="text-slate-500 font-medium text-sm">Strictly for authorized administrators.</p>
                     </div>

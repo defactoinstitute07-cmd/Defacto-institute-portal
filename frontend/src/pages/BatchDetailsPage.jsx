@@ -5,7 +5,7 @@ import {
     Users, User, IndianRupee, Clock, BookOpen, ChevronLeft,
     ArrowUpRight, Calendar,
     Search, FileDown,
-    Eye, X, Download
+    Eye, X, Download, Loader2, Book
 } from 'lucide-react';
 import ERPLayout from '../components/ERPLayout';
 import { API_BASE_URL } from '../api/apiConfig';
@@ -13,7 +13,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { SkeletonStat, SkeletonTable, SkeletonSidebarItem } from '../components/common/SkeletonLoaders';
 import apiClient from '../api/apiConfig';
-import { getSubjects } from '../api/subjectApi';
+import { getSubjects, getSubjectById } from '../api/subjectApi';
 
 const BatchDetailsPage = () => {
     const { id } = useParams();
@@ -73,6 +73,130 @@ const BatchDetailsPage = () => {
         ? batchSubjects.map((subject) => subject.name)
         : (batch.subjects || []);
 
+    const [exportingCourse, setExportingCourse] = useState(false);
+
+    const handleExportCoursePDF = async () => {
+        if (!batchSubjects || batchSubjects.length === 0) {
+            alert('No subjects found for this batch.');
+            return;
+        }
+
+        setExportingCourse(true);
+        try {
+            const fullSubjects = await Promise.all(
+                batchSubjects.map(async (sub) => {
+                    if (sub.chapters && sub.chapters.length > 0) return sub;
+                    try {
+                        const res = await getSubjectById(sub._id);
+                        return res.data?.subject || sub;
+                    } catch (err) {
+                        return sub;
+                    }
+                })
+            );
+
+            const doc = new jsPDF();
+            doc.setFontSize(22);
+            doc.text(`Course Curriculum`, 14, 22);
+
+            doc.setFontSize(14);
+            doc.setTextColor(50);
+            doc.text(`Batch: ${batch.name || 'Unknown'}`, 14, 32);
+
+            doc.setFontSize(11);
+            doc.setTextColor(100);
+            doc.text(`Course: ${batch.course || 'N/A'} | Total Subjects: ${fullSubjects.length}`, 14, 40);
+
+            let currentY = 50;
+
+            for (let i = 0; i < fullSubjects.length; i++) {
+                const sub = fullSubjects[i];
+
+                let teacherName = 'Unassigned';
+                if (sub.teacherId) {
+                    if (typeof sub.teacherId === 'object' && sub.teacherId.name) {
+                        teacherName = sub.teacherId.name;
+                    } else {
+                        teacherName = 'Teacher Assigned';
+                    }
+                }
+
+                const completedChapters = (sub.chapters || []).filter(c => c.status === 'completed').length;
+                const totalChapters = (sub.chapters || []).length;
+
+                if (currentY > 250) {
+                    doc.addPage();
+                    currentY = 20;
+                }
+
+                doc.setFontSize(14);
+                doc.setTextColor(0);
+                doc.text(`${i + 1}. Subject: ${sub.name || 'Untitled'}`, 14, currentY);
+                currentY += 6;
+                doc.setFontSize(10);
+                doc.setTextColor(100);
+                doc.text(`Teacher: ${teacherName} | Progress: ${completedChapters}/${totalChapters} Chapters`, 14, currentY);
+
+                const tableData = (sub.chapters || []).map((ch, idx) => {
+                    let formattedDate = 'N/A';
+                    if (ch.completedAt) {
+                        const d = new Date(ch.completedAt);
+                        formattedDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+                    }
+                    return [
+                        idx + 1,
+                        ch.name || '',
+                        ch.durationDays ? `${ch.durationDays} Days` : '-',
+                        (ch.status || 'upcoming').toUpperCase(),
+                        formattedDate
+                    ];
+                });
+
+                if (tableData.length === 0) {
+                    currentY += 8;
+                    doc.setFontSize(10);
+                    doc.setTextColor(150);
+                    doc.text('No chapters added for this subject.', 14, currentY);
+                    currentY += 15;
+                    continue;
+                }
+
+                autoTable(doc, {
+                    startY: currentY + 4,
+                    head: [['#', 'Chapter Name', 'Duration', 'Status', 'Completed Date']],
+                    body: tableData,
+                    theme: 'grid',
+                    headStyles: { fillColor: [79, 70, 229] },
+                    margin: { left: 14 },
+                    didParseCell: function (data) {
+                        if (data.section === 'body' && data.column.index === 3) {
+                            const status = data.cell.raw;
+                            if (status === 'COMPLETED') {
+                                data.cell.styles.textColor = [21, 128, 61];
+                                data.cell.styles.fontStyle = 'bold';
+                            } else if (status === 'ONGOING') {
+                                data.cell.styles.textColor = [180, 83, 9];
+                                data.cell.styles.fontStyle = 'bold';
+                            } else {
+                                data.cell.styles.textColor = [37, 99, 235];
+                                data.cell.styles.fontStyle = 'bold';
+                            }
+                        }
+                    }
+                });
+
+                currentY = doc.lastAutoTable.finalY + 15;
+            }
+
+            doc.save(`${batch.name ? batch.name.replace(/\s+/g, '_') : 'Batch'}_Course_Curriculum.pdf`);
+        } catch (error) {
+            console.error('Export failed', error);
+            alert('Failed to export Course PDF');
+        } finally {
+            setExportingCourse(false);
+        }
+    };
+
     return (
         <ERPLayout title={`Batch: ${batch.name}`}>
             <style>{`
@@ -92,8 +216,14 @@ const BatchDetailsPage = () => {
                     <ChevronLeft size={20} /> Back to Batches
                 </Link>
                 <div className="flex gap-2">
-                    <button className="btn btn-outline flex gap-2" onClick={() => generateTimetablePDF(true)}>
-                        <Eye size={16} /> Preview Timetable
+
+                    <button
+                        className="btn btn-outline flex gap-2 border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100"
+                        onClick={handleExportCoursePDF}
+                        disabled={exportingCourse}
+                    >
+                        {exportingCourse ? <Loader2 size={16} className="animate-spin" /> : <Book size={16} />}
+                        {exportingCourse ? 'Exporting...' : 'Export Course PDF'}
                     </button>
                     <button className="btn btn-primary flex gap-2" onClick={() => {
                         const doc = new jsPDF();
@@ -284,10 +414,10 @@ const BatchDetailsPage = () => {
                                                         <div className="flex items-center gap-3">
                                                             <div className="w-8 h-8 rounded-full bg-slate-100 flex-shrink-0 overflow-hidden border border-slate-200 flex items-center justify-center">
                                                                 {student.profileImage ? (
-                                                                    <img 
-                                                                        src={student.profileImage.startsWith('http') ? student.profileImage : `${API_BASE_URL}${student.profileImage.startsWith('/') ? '' : '/'}${student.profileImage.replace(/\\/g, '/')}`} 
-                                                                        alt="" 
-                                                                        className="w-full h-full object-cover" 
+                                                                    <img
+                                                                        src={student.profileImage.startsWith('http') ? student.profileImage : `${API_BASE_URL}${student.profileImage.startsWith('/') ? '' : '/'}${student.profileImage.replace(/\\/g, '/')}`}
+                                                                        alt=""
+                                                                        className="w-full h-full object-cover"
                                                                         onError={(e) => {
                                                                             e.target.onerror = null;
                                                                             e.target.src = '';

@@ -14,7 +14,8 @@ import {
     X,
     User,
     Upload,
-    Trash2
+    Trash2,
+    Download
 } from 'lucide-react';
 import ERPLayout from '../components/ERPLayout';
 import apiClient, { API_BASE_URL } from '../api/apiConfig';
@@ -473,6 +474,33 @@ export default function SubjectDetailsPage() {
         }
     };
 
+    const handleExportCSV = () => {
+        if (!subject) return;
+
+        const teacherName = currentTeacher ? currentTeacher.name : 'Unassigned';
+
+        const headers = ['Chapter Name', 'Duration (Days)', 'Status', 'Completed At', 'Assigned Teacher'];
+        
+        const rows = activeChapters.map(ch => [
+            `"${(ch.name || '').replace(/"/g, '""')}"`,
+            ch.durationDays || '',
+            ch.status || 'upcoming',
+            ch.completedAt ? new Date(ch.completedAt).toLocaleDateString() : 'N/A',
+            `"${teacherName}"`
+        ]);
+
+        const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `${subject.name}_Syllabus_Export.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     if (loading) {
         return (
             <ERPLayout title="Subject Details">
@@ -821,6 +849,14 @@ export default function SubjectDetailsPage() {
                                         </span>
                                     </button>
                                 ))}
+                                <div className="w-px h-5 bg-slate-200 mx-1"></div>
+                                <button
+                                    onClick={handleExportCSV}
+                                    title="Export Syllabus Data"
+                                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+                                >
+                                    <Download size={14} className="text-slate-500" /> Export CSV
+                                </button>
                             </div>
                         </div>
                     </div>

@@ -267,7 +267,7 @@ const getRecipients = async ({ search = '', page = 1, limit = 25, status = 'acti
     };
 };
 
-const getNotificationHistory = async ({ page = 1, limit = 5, status = '', deliveryType = '', studentId = '' }) => {
+const getNotificationHistory = async ({ page = 1, limit = 5, status = '', deliveryType = '', type = '', search = '' }) => {
     // Automatically cleanup data older than 3 days
     await cleanupOldNotifications(3);
 
@@ -280,25 +280,68 @@ const getNotificationHistory = async ({ page = 1, limit = 5, status = '', delive
 
     if (status) query.status = status;
     if (deliveryType) query.deliveryType = deliveryType;
-    if (studentId) query.studentId = studentId;
+    if (type) query.type = type;
+
+    if (search) {
+        const [students, teachers] = await Promise.all([
+            Student.find({
+                $or: [
+                    { name: { $regex: search, $options: 'i' } },
+                    { rollNo: { $regex: search, $options: 'i' } }
+                ]
+            }).select('_id').lean(),
+            Teacher.find({
+                $or: [
+                    { name: { $regex: search, $options: 'i' } },
+                    { regNo: { $regex: search, $options: 'i' } }
+                ]
+            }).select('_id').lean()
+        ]);
+        
+        const matchingStudentIds = students.map(s => s._id);
+        const matchingTeacherIds = teachers.map(t => t._id);
+        
+        const searchConditions = [];
+        if (matchingStudentIds.length) searchConditions.push({ studentId: { $in: matchingStudentIds } });
+        if (matchingTeacherIds.length) searchConditions.push({ teacherId: { $in: matchingTeacherIds } });
+        searchConditions.push({ message: { $regex: search, $options: 'i' } });
+        searchConditions.push({ title: { $regex: search, $options: 'i' } });
+        
+        if (searchConditions.length > 0) {
+           if (query.$or) {
+               query.$and = [{ $or: query.$or }, { $or: searchConditions }];
+               delete query.$or;
+           } else {
+               query.$or = searchConditions;
+           }
+        }
+    }
 
     const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
     const safePage = Math.max(parseInt(page, 10) || 1, 1);
     const skip = (safePage - 1) * safeLimit;
 
-    const [notifications, total] = await Promise.all([
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const [notifications, total, overallTotal, todayTotal] = await Promise.all([
         Notification.find(query)
             .populate('studentId', 'name rollNo className contact')
+            .populate('teacherId', 'name regNo contact')
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(safeLimit)
             .lean(),
-        Notification.countDocuments(query)
+        Notification.countDocuments(query),
+        Notification.countDocuments({ createdAt: { $gte: threeDaysAgo } }),
+        Notification.countDocuments({ createdAt: { $gte: todayStart } })
     ]);
 
     return {
         notifications,
         total,
+        overallTotal,
+        todayTotal,
         page: safePage,
         pages: Math.ceil(total / safeLimit)
     };

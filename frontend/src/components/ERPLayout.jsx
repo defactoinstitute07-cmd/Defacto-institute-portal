@@ -117,27 +117,52 @@ const ERPLayout = ({ children, title }) => {
             )}
 
             <nav className={`sidebar ${mini ? 'mini' : ''} ${mobileOpen ? 'open' : ''}`}>
-                <div className="sb-brand">
-                    <div className="sb-logo">
-                        {admin.instituteLogo ? (
+                <div className="flex items-center gap-3 px-2 py-3 overflow-hidden">
+                    {/* Logo Icon Container */}
+                    <div className="flex-shrink-0 w-12 h-12 rounded-2xl overflow-hidden border-[1.5px] border-yellow-500/60 shadow-lg bg-[#0a1120] flex items-center justify-center">
+                        {admin?.instituteLogo ? (
                             <img
                                 src={admin.instituteLogo}
-                                alt="Logo"
-                                style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 5 }}
+                                alt="Defacto Institute Logo"
+                                className="w-full h-full object-cover"
                                 onError={(event) => {
                                     event.target.style.display = 'none';
-                                    event.target.parentElement.innerHTML = '<div class="sb-logo-fallback"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4c0-.6.4-1 1-1h10c.6 0 1 .4 1 1v18"/><path d="M6 18h12"/><path d="M10 8h4"/><path d="M10 12h4"/><path d="M10 16h4"/><path d="M3 22h18"/></svg></div>';
+                                    // Reverts to the default 'DF' fallback if image fails to load
+                                    event.target.nextElementSibling.style.display = 'flex';
                                 }}
                             />
-                        ) : (
-                            <Building2 size={18} color="#fff" />
-                        )}
-                    </div>
-                    {!mini && (
-                        <div className="sb-brand-copy">
-                            <div className="sb-name">De Facto </div>
-                            <div className="sb-name">Institute</div>
+                        ) : null}
 
+                        {/* Fallback Icon (Shows if no logo or if logo fails to load) */}
+                        <div
+                            className="w-full h-full flex flex-col items-center justify-center"
+                            style={{ display: admin?.instituteLogo ? 'none' : 'flex' }}
+                        >
+                            <span className="text-white font-black text-xl tracking-tighter leading-none relative z-10">DF</span>
+                            {/* Subtle gold triangle accent mimicking your logo */}
+                            <div className="absolute w-0 h-0 border-l-[12px] border-r-[12px] border-b-[20px] border-l-transparent border-r-transparent border-b-yellow-500/20 -mb-4"></div>
+                        </div>
+                    </div>
+
+                    {/* Brand Text Container (Hidden when sidebar is collapsed/mini) */}
+                    {!mini && (
+                        <div className="flex flex-col justify-center whitespace-nowrap">
+                            {/* Main "Defacto" Text */}
+                            <span
+                                className="text-3xl font-black tracking-tight leading-none"
+                                style={{
+                                    color: '#FACC15', // Tailwind's yellow-400
+                                    WebkitTextStroke: '1px #0f172a', // Dark outline to match the image
+                                    textShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                }}
+                            >
+                                Defacto
+                            </span>
+
+                            {/* Subtitle Text */}
+                            <span className="text-[11px] font-black text-slate-900 tracking-wider mt-0.5 uppercase">
+                                Institute <span className="text-slate-400 mx-1">|</span> BHANIYAWALA
+                            </span>
                         </div>
                     )}
                 </div>

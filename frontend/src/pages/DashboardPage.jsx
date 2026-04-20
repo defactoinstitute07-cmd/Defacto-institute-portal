@@ -108,10 +108,10 @@ const DashboardPage = () => {
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16, alignItems: 'center' }}>
                             <div style={{ display: 'flex', justifyContent: 'center' }}>
-                               
-                                    <div style={{ fontSize: '1.8rem', lineHeight: 1, fontWeight: 900, color: 'var(--erp-primary)' }}>{weeklyAttendance?.presentPercentage || 0}%</div>
-                                    
-                                
+
+                                <div style={{ fontSize: '1.8rem', lineHeight: 1, fontWeight: 900, color: 'var(--erp-primary)' }}>{weeklyAttendance?.presentPercentage || 0}%</div>
+
+
                             </div>
                             <div style={{ textAlign: 'center' }}>
                                 <div style={{ fontSize: '2rem', lineHeight: 1, fontWeight: 800, color: 'var(--erp-primary)' }}>{weeklyAttendance?.present || 0}</div>
@@ -151,59 +151,7 @@ const DashboardPage = () => {
                     </div>
                 </div>
 
-                {/* Collections & Exams Row */}
-                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                    {/* Recent Collections */}
-                    <div className="card" style={{ padding: 20, flex: '1 1 calc(50% - 8px)', minWidth: 300 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--erp-primary)' }}>Recent Collections</h3>
-                            <a href="/fees" style={{ fontSize: '0.85rem', color: 'var(--erp-primary)', textDecoration: 'none', fontWeight: 600 }}>View all</a>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                            {recentCollections.length > 0 ? recentCollections.map((col) => (
-                                <div key={col._id} style={{ padding: 12, background: '#f8fafc', borderRadius: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div>
-                                        <div className="td-bold">{col.studentName}</div>
-                                        <div className="td-sm">{col.batchInfo}</div>
-                                        <div className="td-sm" style={{ color: '#64748b', marginTop: 2 }}>Rs {fmt(col.amount)} - {new Date(col.date).toLocaleDateString('en-IN')}</div>
-                                    </div>
-                                    <span style={{ background: '#ecfdf5', color: '#047857', padding: '4px 12px', borderRadius: 4, fontSize: '0.8rem', fontWeight: 600 }}>
-                                        {col.status}
-                                    </span>
-                                </div>
-                            )) : (
-                                <div style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>
-                                    No recent collections
-                                </div>
-                            )}
-                        </div>
-                    </div>
 
-                    {/* Upcoming Exams */}
-                    <div className="card" style={{ padding: 20, flex: '1 1 calc(50% - 8px)', minWidth: 300 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--erp-primary)' }}>Upcoming Exams</h3>
-                            <a href="/exams" style={{ fontSize: '0.85rem', color: 'var(--erp-primary)', textDecoration: 'none', fontWeight: 600 }}>Manage</a>
-                        </div>
-                        {upcomingExams.length > 0 ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                {upcomingExams.map((exam) => (
-                                    <div key={exam._id} style={{ padding: 12, background: '#f8fafc', borderRadius: 6 }}>
-                                        <div className="td-bold">{exam.examName || 'Exam'}</div>
-                                        <div className="td-sm">{exam.batchId?.name}</div>
-                                        <div className="td-sm" style={{ color: '#64748b', marginTop: 2 }}>
-                                            {new Date(exam.examDate).toLocaleDateString('en-IN')}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>
-                                No upcoming or recent exams available.
-                            </div>
-                        )}
-                    </div>
-                </div>
             </div>
         </ERPLayout>
     );

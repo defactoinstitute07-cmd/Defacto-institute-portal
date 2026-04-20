@@ -64,11 +64,18 @@ const NotificationsPage = () => {
   const [filterPushReady, setFilterPushReady] = useState(false);
   const [historyPage, setHistoryPage] = useState(1);
   const [hasMoreHistory, setHasMoreHistory] = useState(false);
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyFilterType, setHistoryFilterType] = useState("");
+  const [historyFilterStatus, setHistoryFilterStatus] = useState("");
+  const [expandedMsgId, setExpandedMsgId] = useState(null);
+  const [historyStats, setHistoryStats] = useState({ total: 0, today: 0 });
 
   const [loadingRecipients, setLoadingRecipients] = useState(true);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [sending, setSending] = useState(false);
   const [isCleaning, setIsCleaning] = useState(false);
+
+  const [activeTab, setActiveTab] = useState("compose");
 
   // Action Modal State
   const [actionState, setActionState] = useState({
@@ -156,16 +163,22 @@ const NotificationsPage = () => {
   const loadHistory = async (page = 1, append = false) => {
     if (!append) setLoadingHistory(true);
     try {
-      const { data } = await fetchNotificationHistory({ page, limit: 5 });
+      const { data } = await fetchNotificationHistory({
+        page, limit: 10,
+        search: historySearch,
+        status: historyFilterStatus,
+        type: historyFilterType
+      });
       const newNotifications = data.notifications || [];
-      
+
       if (append) {
         setHistory(prev => [...prev, ...newNotifications]);
       } else {
         setHistory(newNotifications);
+        setHistoryStats({ total: data.overallTotal || 0, today: data.todayTotal || 0 });
       }
-      
-      setHasMoreHistory(newNotifications.length === 5);
+
+      setHasMoreHistory(newNotifications.length === 10);
       setHistoryPage(page);
     } catch {
       toast.error("Failed to load notification history.");
@@ -179,7 +192,11 @@ const NotificationsPage = () => {
   };
 
   const handleManualRefresh = async () => {
-    await Promise.all([loadRecipients(studentSearch), loadHistory()]);
+    if (activeTab === 'compose') {
+      await loadRecipients(studentSearch);
+    } else {
+      await loadHistory();
+    }
   };
 
   useEffect(() => {
@@ -191,6 +208,13 @@ const NotificationsPage = () => {
       )
       .catch(console.error);
   }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (activeTab === 'history') loadHistory(1, false);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [historySearch, historyFilterStatus, historyFilterType, activeTab]);
 
   useEffect(() => {
     const timer = setTimeout(() => loadRecipients(studentSearch), 300);
@@ -292,10 +316,10 @@ const NotificationsPage = () => {
       setActionState(prev => ({ ...prev, isOpen: false }));
       loadHistory();
     } catch (err) {
-      setActionState(prev => ({ 
-        ...prev, 
-        loading: false, 
-        error: err.response?.data?.message || 'Authorization failed' 
+      setActionState(prev => ({
+        ...prev,
+        loading: false,
+        error: err.response?.data?.message || 'Authorization failed'
       }));
     }
   };
@@ -307,577 +331,661 @@ const NotificationsPage = () => {
 
         {alert && <AlertMessage type={alert.type} message={alert.text} />}
 
-        <div className="grid lg:grid-cols-[1.5fr_0.9fr] gap-6">
+        <div className="flex border-b border-gray-200 mb-6 w-max">
+          <button
+            onClick={() => setActiveTab('compose')}
+            className={`px-5 py-3 font-semibold text-sm -mb-[1px] ${activeTab === 'compose' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-gray-500 hover:text-gray-700 hover:border-gray-300 border-b-2 border-transparent transition-colors'}`}
+          >
+            Compose Notification
+          </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`px-5 py-3 font-semibold text-sm -mb-[1px] ${activeTab === 'history' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-gray-500 hover:text-gray-700 hover:border-gray-300 border-b-2 border-transparent transition-colors'}`}
+          >
+            Notification History
+          </button>
+        </div>
 
-          {/* Compose Notification */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+        {activeTab === 'compose' && (
+          <div className="grid lg:grid-cols-[1.5fr_0.9fr] gap-6">
 
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 flex items-center justify-center bg-indigo-50 text-indigo-600 rounded-lg">
-                  <Bell size={18} />
+            {/* Compose Notification */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 flex items-center justify-center bg-indigo-50 text-indigo-600 rounded-lg">
+                    <Bell size={18} />
+                  </div>
+
+                  <div>
+                    <h2 className="font-semibold text-gray-900">
+                      Compose Notification
+                    </h2>
+                    <p className="text-sm text-gray-500">
+                      Send push or email notifications.
+                    </p>
+                  </div>
                 </div>
 
-                <div>
-                  <h2 className="font-semibold text-gray-900">
-                    Compose Notification
-                  </h2>
-                  <p className="text-sm text-gray-500">
-                    Send push or email notifications.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleManualRefresh}
-                  disabled={loadingRecipients || loadingHistory}
-                  className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 disabled:opacity-60"
-                >
-                  <RefreshCcw size={14} className={loadingRecipients || loadingHistory ? "animate-spin" : ""} />
-                  Refresh
-                </button>
-                <div className="flex bg-gray-100 p-1 rounded-lg">
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => { setRecipientType("student"); setSelectedRecipients([]); }}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${recipientType === "student" ? "bg-white text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                    onClick={handleManualRefresh}
+                    disabled={loadingRecipients || loadingHistory}
+                    className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 disabled:opacity-60"
                   >
-                    Students
+                    <RefreshCcw size={14} className={loadingRecipients || loadingHistory ? "animate-spin" : ""} />
+                    Refresh
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => { setRecipientType("teacher"); setSelectedRecipients([]); }}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${recipientType === "teacher" ? "bg-white text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
-                  >
-                    Teachers
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <form onSubmit={handleSend} className="space-y-5">
-
-              {/* Title and Type */}
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-1">
-                    Notification Title
-                  </label>
-                  <input
-                    type="text"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="e.g. Exam Alert"
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm
-                    focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-1">
-                    Notification Type
-                  </label>
-                  <select
-                    value={type}
-                    onChange={(e) => setType(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm
-                    focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white font-medium"
-                  >
-                    <option value="general">General Notification</option>
-                    <option value="fee">Fee Reminder</option>
-                    <option value="attendance">Attendance Alert</option>
-                    <option value="homework">Homework Upload</option>
-                    <option value="announcement">Announcement</option>
-                    <option value="exam">Exam Schedule</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Message */}
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-1">
-                  Message Content
-                </label>
-                <textarea
-                  rows={4}
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Write your message here..."
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm
-                  focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                />
-              </div>
-
-              {/* Schedule For */}
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-1">
-                  Schedule Notification (Optional)
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="datetime-local"
-                    value={scheduledFor}
-                    min={new Date().toISOString().slice(0, 16)}
-                    onChange={(e) => setScheduledFor(e.target.value)}
-                    className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm
-                    focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white"
-                  />
-                  {scheduledFor && (
+                  <div className="flex bg-gray-100 p-1 rounded-lg">
                     <button
                       type="button"
-                      onClick={() => setScheduledFor("")}
-                      className="px-4 py-2.5 text-sm font-semibold text-red-600 border border-red-200 rounded-lg hover:bg-red-50"
+                      onClick={() => { setRecipientType("student"); setSelectedRecipients([]); }}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${recipientType === "student" ? "bg-white text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
                     >
-                      Clear
+                      Students
                     </button>
-                  )}
+                    <button
+                      type="button"
+                      onClick={() => { setRecipientType("teacher"); setSelectedRecipients([]); }}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${recipientType === "teacher" ? "bg-white text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                    >
+                      Teachers
+                    </button>
+                  </div>
                 </div>
-                <p className="text-[10px] text-gray-400 italic px-1">
-                  Leave empty to send immediately.
-                </p>
               </div>
 
-              {/* Filters */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <div className="flex items-center gap-2 border rounded-lg px-3 py-2 bg-gray-50/50">
-                  <Filter size={14} className="text-gray-400" />
-                  <select
-                    value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value)}
-                    className="w-full bg-transparent outline-none text-sm font-medium text-gray-700"
-                  >
-                    <option value="active">Active {recipientType === 'student' ? 'Students' : 'Teachers'}</option>
-                    <option value="inactive">Inactive {recipientType === 'student' ? 'Students' : 'Teachers'}</option>
-                    <option value="all">All Status</option>
-                  </select>
+              <form onSubmit={handleSend} className="space-y-5">
+
+                {/* Title and Type */}
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-1">
+                      Notification Title
+                    </label>
+                    <input
+                      type="text"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="e.g. Exam Alert"
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm
+                    focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-1">
+                      Notification Type
+                    </label>
+                    <select
+                      value={type}
+                      onChange={(e) => setType(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm
+                    focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white font-medium"
+                    >
+                      <option value="general">General Notification</option>
+                      <option value="fee">Fee Reminder</option>
+                      <option value="attendance">Attendance Alert</option>
+                      <option value="homework">Homework Upload</option>
+                      <option value="announcement">Announcement</option>
+                      <option value="exam">Exam Schedule</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Message */}
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-1">
+                    Message Content
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    placeholder="Write your message here..."
+                    className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm
+                  focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  />
+                </div>
+
+                {/* Schedule For */}
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-1">
+                    Schedule Notification (Optional)
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="datetime-local"
+                      value={scheduledFor}
+                      min={new Date().toISOString().slice(0, 16)}
+                      onChange={(e) => setScheduledFor(e.target.value)}
+                      className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm
+                    focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white"
+                    />
+                    {scheduledFor && (
+                      <button
+                        type="button"
+                        onClick={() => setScheduledFor("")}
+                        className="px-4 py-2.5 text-sm font-semibold text-red-600 border border-red-200 rounded-lg hover:bg-red-50"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-gray-400 italic px-1">
+                    Leave empty to send immediately.
+                  </p>
+                </div>
+
+                {/* Filters */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <div className="flex items-center gap-2 border rounded-lg px-3 py-2 bg-gray-50/50">
+                    <Filter size={14} className="text-gray-400" />
+                    <select
+                      value={filterStatus}
+                      onChange={(e) => setFilterStatus(e.target.value)}
+                      className="w-full bg-transparent outline-none text-sm font-medium text-gray-700"
+                    >
+                      <option value="active">Active {recipientType === 'student' ? 'Students' : 'Teachers'}</option>
+                      <option value="inactive">Inactive {recipientType === 'student' ? 'Students' : 'Teachers'}</option>
+                      <option value="all">All Status</option>
+                    </select>
+                  </div>
+
+                  {recipientType === 'student' && (
+                    <>
+                      <div className="flex items-center gap-2 border rounded-lg px-3 py-2 bg-gray-50/50">
+                        <Users size={14} className="text-gray-400" />
+                        <select
+                          value={filterBatch}
+                          onChange={(e) => setFilterBatch(e.target.value)}
+                          className="w-full bg-transparent outline-none text-sm font-medium text-gray-700"
+                        >
+                          <option value="">All Batches</option>
+                          {batches.map(b => (
+                            <option key={b._id} value={b._id}>{b.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="flex items-center gap-3 border rounded-lg px-3 py-2 bg-gray-50/50">
+                        <label className="flex items-center gap-2 cursor-pointer w-full text-sm font-medium text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={filterPendingFees}
+                            onChange={(e) => setFilterPendingFees(e.target.checked)}
+                            className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                          />
+                          Pending Fees
+                        </label>
+                      </div>
+                    </>
+                  )}
+
+                  <div className="flex items-center gap-3 border rounded-lg px-3 py-2 bg-gray-50/50">
+                    <label className="flex items-center gap-2 cursor-pointer w-full text-sm font-medium text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={filterPushReady}
+                        onChange={(e) => setFilterPushReady(e.target.checked)}
+                        className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                      />
+                      Push Ready Only
+                    </label>
+                  </div>
                 </div>
 
                 {recipientType === 'student' && (
-                  <>
-                    <div className="flex items-center gap-2 border rounded-lg px-3 py-2 bg-gray-50/50">
-                      <Users size={14} className="text-gray-400" />
-                      <select
-                        value={filterBatch}
-                        onChange={(e) => setFilterBatch(e.target.value)}
-                        className="w-full bg-transparent outline-none text-sm font-medium text-gray-700"
-                      >
-                        <option value="">All Batches</option>
-                        {batches.map(b => (
-                          <option key={b._id} value={b._id}>{b.name}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="flex items-center gap-3 border rounded-lg px-3 py-2 bg-gray-50/50">
-                      <label className="flex items-center gap-2 cursor-pointer w-full text-sm font-medium text-gray-700">
-                        <input
-                          type="checkbox"
-                          checked={filterPendingFees}
-                          onChange={(e) => setFilterPendingFees(e.target.checked)}
-                          className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
-                        />
-                        Pending Fees
-                      </label>
-                    </div>
-                  </>
-                )}
-
-                <div className="flex items-center gap-3 border rounded-lg px-3 py-2 bg-gray-50/50">
-                  <label className="flex items-center gap-2 cursor-pointer w-full text-sm font-medium text-gray-700">
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
                     <input
                       type="checkbox"
-                      checked={filterPushReady}
-                      onChange={(e) => setFilterPushReady(e.target.checked)}
+                      checked={sendToBatch}
+                      onChange={(e) => setSendToBatch(e.target.checked)}
+                      disabled={!filterBatch}
                       className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
                     />
-                    Push Ready Only
+                    Send to entire selected batch
                   </label>
-                </div>
-              </div>
+                )}
 
-              {recipientType === 'student' && (
-                <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                {/* Search */}
+                <div className="flex items-center gap-3 border rounded-lg px-3 py-2">
+                  <Search size={16} className="text-gray-500" />
                   <input
-                    type="checkbox"
-                    checked={sendToBatch}
-                    onChange={(e) => setSendToBatch(e.target.checked)}
-                    disabled={!filterBatch}
-                    className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                    value={studentSearch}
+                    onChange={(e) => setStudentSearch(e.target.value)}
+                    placeholder="Search by name, roll no..."
+                    className="w-full outline-none text-sm"
+                    autoComplete="new-password"
                   />
-                  Send to entire selected batch
-                </label>
-              )}
+                </div>
 
-              {/* Search */}
-              <div className="flex items-center gap-3 border rounded-lg px-3 py-2">
-                <Search size={16} className="text-gray-500" />
-                <input
-                  value={studentSearch}
-                  onChange={(e) => setStudentSearch(e.target.value)}
-                  placeholder="Search by name, roll no..."
-                  className="w-full outline-none text-sm"
-                  autoComplete="new-password"
-                />
-              </div>
-
-              {/* Bulk Actions */}
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={selectAllFiltered}
-                  disabled={recipients.length === 0}
-                  className="flex-1 flex items-center justify-center gap-2 py-2 px-3 border border-indigo-200 
+                {/* Bulk Actions */}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={selectAllFiltered}
+                    disabled={recipients.length === 0}
+                    className="flex-1 flex items-center justify-center gap-2 py-2 px-3 border border-indigo-200 
                   bg-indigo-50 text-indigo-700 rounded-lg text-xs font-semibold hover:bg-indigo-100 transition-colors"
-                >
-                  <CheckSquare size={14} />
-                  Select All Filtered ({recipients.length})
-                </button>
+                  >
+                    <CheckSquare size={14} />
+                    Select All Filtered ({recipients.length})
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={clearSelection}
-                  disabled={selectedRecipients.length === 0}
-                  className="flex-1 flex items-center justify-center gap-2 py-2 px-3 border border-red-200 
+                  <button
+                    type="button"
+                    onClick={clearSelection}
+                    disabled={selectedRecipients.length === 0}
+                    className="flex-1 flex items-center justify-center gap-2 py-2 px-3 border border-red-200 
                    bg-red-50 text-red-700 rounded-lg text-xs font-semibold hover:bg-red-100 transition-colors"
-                >
-                  <Trash2 size={14} />
-                  Clear Selection ({selectedRecipients.length})
-                </button>
-              </div>
+                  >
+                    <Trash2 size={14} />
+                    Clear Selection ({selectedRecipients.length})
+                  </button>
+                </div>
 
-              {/* Student List */}
-              <div className="border rounded-lg max-h-72 overflow-y-auto">
+                {/* Student List */}
+                <div className="border rounded-lg max-h-72 overflow-y-auto">
 
-                {loadingRecipients ? (
-                  <div className="p-6 text-center text-gray-500 flex justify-center gap-2">
-                    <Loader2 className="animate-spin" size={18} />
-                    Loading recipients...
-                  </div>
-                ) : recipients.length === 0 ? (
-                  <div className="p-10 text-center text-gray-500 flex flex-col items-center gap-2">
-                    {!studentSearch.trim() && !filterBatch && !filterPendingFees && !filterPushReady ? (
-                      <>
-                        <Search size={32} className="text-gray-300 mb-2" />
-                        <p className="font-medium">Search or Apply Filter to Load Recipients</p>
-                        <p className="text-xs text-gray-400">Type a name or select a batch to see matching {recipientType}s</p>
-                      </>
-                    ) : (
-                      <p>No recipients found matching your criteria</p>
-                    )}
-                  </div>
-                ) : (
-                  recipients.map((student) => {
-                    const checked = selectedIds.includes(student._id);
-                    const activityStatus = student.activity?.status || "inactive";
-                    const pushDeviceCount = student.pushStatus?.deviceTokenCount ?? countValidDeviceTokens(student.deviceTokens);
+                  {loadingRecipients ? (
+                    <div className="p-6 text-center text-gray-500 flex justify-center gap-2">
+                      <Loader2 className="animate-spin" size={18} />
+                      Loading recipients...
+                    </div>
+                  ) : recipients.length === 0 ? (
+                    <div className="p-10 text-center text-gray-500 flex flex-col items-center gap-2">
+                      {!studentSearch.trim() && !filterBatch && !filterPendingFees && !filterPushReady ? (
+                        <>
+                          <Search size={32} className="text-gray-300 mb-2" />
+                          <p className="font-medium">Search or Apply Filter to Load Recipients</p>
+                          <p className="text-xs text-gray-400">Type a name or select a batch to see matching {recipientType}s</p>
+                        </>
+                      ) : (
+                        <p>No recipients found matching your criteria</p>
+                      )}
+                    </div>
+                  ) : (
+                    recipients.map((student) => {
+                      const checked = selectedIds.includes(student._id);
+                      const activityStatus = student.activity?.status || "inactive";
+                      const pushDeviceCount = student.pushStatus?.deviceTokenCount ?? countValidDeviceTokens(student.deviceTokens);
 
-                    return (
-                      <label
-                        key={student._id}
-                        className={`flex gap-3 p-4 border-b cursor-pointer
+                      return (
+                        <label
+                          key={student._id}
+                          className={`flex gap-3 p-4 border-b cursor-pointer
                         ${checked ? "bg-indigo-50" : "hover:bg-gray-50"}`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleRecipient(student)}
-                        />
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleRecipient(student)}
+                          />
 
-                        <div>
-                          <p className="font-semibold text-gray-900">
-                            {student.name}
-                          </p>
+                          <div>
+                            <p className="font-semibold text-gray-900">
+                              {student.name}
+                            </p>
 
-                          <p className="text-xs text-gray-500">
-                            {student.rollNo} • {student.className} •{" "}
-                            {student.email}
-                          </p>
+                            <p className="text-xs text-gray-500">
+                              {student.rollNo} • {student.className} •{" "}
+                              {student.email}
+                            </p>
 
-                          <div className="flex flex-wrap gap-2 mt-2">
-                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${activityStatus === "online"
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${activityStatus === "online"
                                 ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                                 : activityStatus === "offline"
                                   ? "bg-slate-100 text-slate-700 border-slate-200"
                                   : "bg-amber-50 text-amber-700 border-amber-200"
-                              }`}>
-                              {activityStatus}
-                            </span>
-                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${pushDeviceCount > 0
+                                }`}>
+                                {activityStatus}
+                              </span>
+                              <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${pushDeviceCount > 0
                                 ? "bg-indigo-50 text-indigo-700 border-indigo-200"
                                 : "bg-rose-50 text-rose-700 border-rose-200"
-                              }`}>
-                              {pushDeviceCount > 0 ? `push ready (${pushDeviceCount})` : "no device token"}
-                            </span>
+                                }`}>
+                                {pushDeviceCount > 0 ? `push ready (${pushDeviceCount})` : "no device token"}
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      </label>
-                    );
-                  })
-                )}
+                        </label>
+                      );
+                    })
+                  )}
 
-              </div>
+                </div>
 
-              {/* Delivery Methods */}
+                {/* Delivery Methods */}
 
-              <div className="grid md:grid-cols-2 gap-4">
+                <div className="grid md:grid-cols-2 gap-4">
 
-                <button
-                  type="button"
-                  onClick={() => toggleMethod("push")}
-                  className={`p-4 rounded-lg border flex gap-3 text-left
+                  <button
+                    type="button"
+                    onClick={() => toggleMethod("push")}
+                    className={`p-4 rounded-lg border flex gap-3 text-left
                   ${deliveryMethods.push
-                      ? "border-indigo-500 bg-indigo-50"
-                      : "border-gray-200"
-                    }`}
-                >
-                  <Smartphone size={18} />
-                  <div>
-                    <p className="font-semibold">Mobile Push</p>
-                    <p className="text-xs text-gray-500">
-                      Send push notification
-                    </p>
-                  </div>
-                </button>
+                        ? "border-indigo-500 bg-indigo-50"
+                        : "border-gray-200"
+                      }`}
+                  >
+                    <Smartphone size={18} />
+                    <div>
+                      <p className="font-semibold">Mobile Push</p>
+                      <p className="text-xs text-gray-500">
+                        Send push notification
+                      </p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => toggleMethod("email")}
+                    className={`p-4 rounded-lg border flex gap-3 text-left
+                  ${deliveryMethods.email
+                        ? "border-indigo-500 bg-indigo-50"
+                        : "border-gray-200"
+                      }`}
+                  >
+                    <Mail size={18} />
+                    <div>
+                      <p className="font-semibold">Email</p>
+                      <p className="text-xs text-gray-500">
+                        Send email message
+                      </p>
+                    </div>
+                  </button>
+
+                </div>
+
+                {/* Send Button */}
 
                 <button
-                  type="button"
-                  onClick={() => toggleMethod("email")}
-                  className={`p-4 rounded-lg border flex gap-3 text-left
-                  ${deliveryMethods.email
-                      ? "border-indigo-500 bg-indigo-50"
-                      : "border-gray-200"
-                    }`}
+                  type="submit"
+                  disabled={sending}
+                  className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700
+                text-white px-5 py-2.5 rounded-lg text-sm font-semibold"
                 >
-                  <Mail size={18} />
-                  <div>
-                    <p className="font-semibold">Email</p>
-                    <p className="text-xs text-gray-500">
-                      Send email message
-                    </p>
-                  </div>
+                  {sending ? (
+                    <Loader2 className="animate-spin" size={16} />
+                  ) : (
+                    <Send size={16} />
+                  )}
+
+                  {sending ? "Sending..." : "Send Notification"}
                 </button>
 
+              </form>
+            </div>
+
+            {/* Overview */}
+
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+
+              <h3 className="font-semibold text-gray-900 mb-4">
+                Dispatch Overview
+              </h3>
+
+              <div className="space-y-3 text-sm">
+
+                <div className="flex justify-between p-3 border rounded-lg">
+                  <span className="text-gray-500">Selected Students</span>
+                  <span className="font-semibold">{sendToBatch ? "Batch" : selectedIds.length}</span>
+                </div>
+
+                <div className="flex justify-between p-3 border rounded-lg">
+                  <span className="text-gray-500">Delivery Methods</span>
+                  <span className="font-semibold">
+                    {activeDeliveryMethods.join(", ")}
+                  </span>
+                </div>
+
+                <div className="flex justify-between p-3 border rounded-lg">
+                  <span className="text-gray-500">Push Ready</span>
+                  <span className="font-semibold">{selectedPushReadyCount}</span>
+                </div>
+
+                <div className="flex justify-between p-3 border rounded-lg">
+                  <span className="text-gray-500">Online Now</span>
+                  <span className="font-semibold">{selectedOnlineCount}</span>
+                </div>
+
               </div>
-
-              {/* Send Button */}
-
-              <button
-                type="submit"
-                disabled={sending}
-                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700
-                text-white px-5 py-2.5 rounded-lg text-sm font-semibold"
-              >
-                {sending ? (
-                  <Loader2 className="animate-spin" size={16} />
-                ) : (
-                  <Send size={16} />
-                )}
-
-                {sending ? "Sending..." : "Send Notification"}
-              </button>
-
-            </form>
-          </div>
-
-          {/* Overview */}
-
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-
-            <h3 className="font-semibold text-gray-900 mb-4">
-              Dispatch Overview
-            </h3>
-
-            <div className="space-y-3 text-sm">
-
-              <div className="flex justify-between p-3 border rounded-lg">
-                <span className="text-gray-500">Selected Students</span>
-                <span className="font-semibold">{sendToBatch ? "Batch" : selectedIds.length}</span>
-              </div>
-
-              <div className="flex justify-between p-3 border rounded-lg">
-                <span className="text-gray-500">Delivery Methods</span>
-                <span className="font-semibold">
-                  {activeDeliveryMethods.join(", ")}
-                </span>
-              </div>
-
-              <div className="flex justify-between p-3 border rounded-lg">
-                <span className="text-gray-500">Push Ready</span>
-                <span className="font-semibold">{selectedPushReadyCount}</span>
-              </div>
-
-              <div className="flex justify-between p-3 border rounded-lg">
-                <span className="text-gray-500">Online Now</span>
-                <span className="font-semibold">{selectedOnlineCount}</span>
-              </div>
-
             </div>
           </div>
-        </div>
+        )}
 
         {/* Notification History */}
 
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+        {activeTab === 'history' && (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
 
-          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center justify-between mb-5">
 
-            <div className="flex flex-col gap-1">
-              <h2 className="text-lg font-semibold text-gray-900">Notification History</h2>
-              <p className="text-xs text-amber-600 flex items-center gap-1 font-medium">
-                <AlertCircle size={12} />
-                Records are automatically deleted after 3 days.
-              </p>
+              <div className="flex flex-col gap-1">
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-3">
+                  Notification History
+                  <span className="text-xs font-medium bg-gray-100 px-2 py-0.5 rounded-full text-gray-600">Total: {historyStats.total}</span>
+                  <span className="text-xs font-medium bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full">Today: {historyStats.today}</span>
+                </h2>
+                <p className="text-xs text-amber-600 flex items-center gap-1 font-medium mt-1">
+                  <AlertCircle size={12} />
+                  Records are automatically deleted after 3 days.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-500">
+                  {history.length} records
+                </span>
+                <button
+                  type="button"
+                  onClick={loadHistory}
+                  disabled={loadingHistory}
+                  className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 disabled:opacity-60"
+                >
+                  <RefreshCcw size={14} className={loadingHistory ? "animate-spin" : ""} />
+                  Refresh
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCleanupHistory}
+                  disabled={isCleaning || loadingHistory}
+                  className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold border border-red-200 rounded-lg text-red-600 hover:bg-red-50 disabled:opacity-60"
+                >
+                  {isCleaning ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                  Clear Old History
+                </button>
+              </div>
+
             </div>
 
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-gray-500">
-                {history.length} records
-              </span>
-              <button
-                type="button"
-                onClick={loadHistory}
-                disabled={loadingHistory}
-                className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 disabled:opacity-60"
-              >
-                <RefreshCcw size={14} className={loadingHistory ? "animate-spin" : ""} />
-                Refresh
-              </button>
-              <button
-                type="button"
-                onClick={handleCleanupHistory}
-                disabled={isCleaning || loadingHistory}
-                className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold border border-red-200 rounded-lg text-red-600 hover:bg-red-50 disabled:opacity-60"
-              >
-                {isCleaning ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                Clear Old History
-              </button>
+            {/* History Filters */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+              <div className="flex items-center gap-3 border rounded-lg px-3 py-2 bg-gray-50/50">
+                <Search size={16} className="text-gray-500" />
+                <input
+                  value={historySearch}
+                  onChange={(e) => setHistorySearch(e.target.value)}
+                  placeholder="Search history..."
+                  className="w-full outline-none text-sm bg-transparent"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 border rounded-lg px-3 py-2 bg-gray-50/50">
+                <Filter size={14} className="text-gray-400" />
+                <select
+                  value={historyFilterType}
+                  onChange={(e) => setHistoryFilterType(e.target.value)}
+                  className="w-full bg-transparent outline-none text-sm font-medium text-gray-700"
+                >
+                  <option value="">All Types</option>
+                  <option value="studentRegistration">Student Registration</option>
+                  <option value="feeGenerated">Standard Fee Generated</option>
+                  <option value="feePayment">Standard Fee Payment</option>
+                  <option value="feeOverdue">Standard Fee Overdue</option>
+                  <option value="examResult">Standard Exam Result</option>
+                  <option value="testAnnouncement">Test Announcement</option>
+                  <option value="teacherRegistration">Faculty Registration</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2 border rounded-lg px-3 py-2 bg-gray-50/50">
+                <Filter size={14} className="text-gray-400" />
+                <select
+                  value={historyFilterStatus}
+                  onChange={(e) => setHistoryFilterStatus(e.target.value)}
+                  className="w-full bg-transparent outline-none text-sm font-medium text-gray-700"
+                >
+                  <option value="">All Statuses</option>
+                  <option value="sent">Sent</option>
+                  <option value="partial">Partial</option>
+                  <option value="failed">Failed</option>
+                  <option value="logged">Logged</option>
+                  <option value="pending">Pending</option>
+                </select>
+              </div>
             </div>
+
+            <div className="w-full overflow-x-auto rounded-lg shadow-sm">
+              {/* Added min-w-[900px] to force the table to stay wide enough to scroll */}
+              <table className="w-full min-w-[900px] text-sm">
+                <thead className="bg-gray-50 border-b">
+                  {/* Added whitespace-nowrap to keep headers on a single line */}
+                  <tr className="text-gray-600 text-left whitespace-nowrap">
+                    <th className="px-4 py-3 font-semibold">Message</th>
+                    <th className="px-4 py-3 font-semibold">Delivery</th>
+                    <th className="px-4 py-3 font-semibold">Target</th>
+                    <th className="px-4 py-3 font-semibold">Time</th>
+                    <th className="px-4 py-3 font-semibold text-center">Status</th>
+                    <th className="px-4 py-3 font-semibold">Reason</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {loadingHistory ? (
+                    <tr>
+                      <td colSpan="6" className="text-center py-10 text-gray-500">
+                        <div className="flex items-center justify-center gap-2">
+                          <Loader2 size={18} className="animate-spin" />
+                          Loading notification history...
+                        </div>
+                      </td>
+                    </tr>
+                  ) : history.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="text-center py-10 text-gray-400">
+                        No notifications found
+                      </td>
+                    </tr>
+                  ) : (
+                    history.map((entry) => (
+                      <tr
+                        key={entry._id}
+                        className="border-b hover:bg-gray-50 transition"
+                      >
+                        {/* Message */}
+                        <td
+                          className="py-3 px-4 font-medium text-gray-900 cursor-pointer max-w-sm"
+                          onClick={() => setExpandedMsgId(expandedMsgId === entry._id ? null : entry._id)}
+                        >
+                          <div className={`transition-all ${expandedMsgId === entry._id ? 'whitespace-pre-wrap' : 'truncate'}`}>
+                            <span className="font-bold block text-xs text-indigo-600 mb-0.5">{entry.title || entry.type}</span>
+                            {entry.message}
+                          </div>
+                          {expandedMsgId === entry._id && (
+                            <div className="mt-2 text-xs text-gray-500 bg-gray-50 p-2 rounded border border-gray-100">
+                              <div><strong>Date:</strong> {new Date(entry.createdAt).toLocaleString("en-IN")}</div>
+                              <div><strong>Type:</strong> {entry.type}</div>
+                              <div><strong>Target ID:</strong> {entry.targetId}</div>
+                              <div><strong>Delivery Route:</strong> {entry.deliveryType}</div>
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Delivery */}
+                        <td className="px-4 whitespace-nowrap">
+                          <span className="px-2 py-1 rounded-md text-xs font-semibold bg-indigo-50 text-indigo-700">
+                            {formatDeliveryType(entry.deliveryType)}
+                          </span>
+                        </td>
+
+                        {/* Student */}
+                        <td className="px-4 whitespace-nowrap">
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-gray-900">
+                              {entry.recipientType === 'teacher' ? (entry.teacherId?.name || "Deleted") : (entry.studentId?.name || "Deleted")}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {entry.recipientType === 'teacher' ? entry.teacherId?.regNo : entry.studentId?.rollNo}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* Time */}
+                        <td className="px-4 text-gray-600 whitespace-nowrap">
+                          {new Date(entry.createdAt).toLocaleString("en-IN")}
+                        </td>
+
+                        {/* Status */}
+                        <td className="px-4 text-center whitespace-nowrap">
+                          <span
+                            className={`px-2 py-1 rounded-md text-xs font-semibold
+        ${STATUS_STYLES[entry.status] || STATUS_STYLES.pending}`}
+                          >
+                            {entry.status}
+                          </span>
+                        </td>
+
+                        {/* Reason */}
+                        <td className="px-4 py-3 text-xs text-red-600 font-medium max-w-xs">
+                          {entry.status === 'failed' || entry.status === 'partial' ? (
+                            <div className="flex flex-col gap-0.5">
+                              {entry.pushResult?.error && (
+                                <span className="flex items-center gap-1">
+                                  <Smartphone size={10} className="text-gray-400 shrink-0" />
+                                  <span className="truncate">{entry.pushResult.error}</span>
+                                </span>
+                              )}
+                              {entry.emailResult?.error && (
+                                <span className="flex items-center gap-1">
+                                  <Mail size={10} className="text-gray-400 shrink-0" />
+                                  <span className="truncate">{entry.emailResult.error}</span>
+                                </span>
+                              )}
+                              {!entry.pushResult?.error && !entry.emailResult?.error && (
+                                <span className="text-gray-400 italic">No specific error recorded</span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-gray-300">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {hasMoreHistory && (
+              <div className="mt-4 flex justify-center pb-2">
+                <button
+                  onClick={handleLoadMoreHistory}
+                  disabled={loadingHistory}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-erp-primary hover:bg-indigo-50 rounded-lg transition-colors border border-indigo-100 disabled:opacity-50"
+                >
+                  {loadingHistory ? <Loader2 size={16} className="animate-spin" /> : <RefreshCcw size={16} />}
+                  Show More History
+                </button>
+              </div>
+            )}
 
           </div>
-
-         <div className="w-full overflow-x-auto rounded-lg shadow-sm">
-  {/* Added min-w-[900px] to force the table to stay wide enough to scroll */}
-  <table className="w-full min-w-[900px] text-sm">
-    <thead className="bg-gray-50 border-b">
-      {/* Added whitespace-nowrap to keep headers on a single line */}
-      <tr className="text-gray-600 text-left whitespace-nowrap">
-        <th className="px-4 py-3 font-semibold">Message</th>
-        <th className="px-4 py-3 font-semibold">Delivery</th>
-        <th className="px-4 py-3 font-semibold">Target</th>
-        <th className="px-4 py-3 font-semibold">Time</th>
-        <th className="px-4 py-3 font-semibold text-center">Status</th>
-        <th className="px-4 py-3 font-semibold">Reason</th>
-      </tr>
-    </thead>
-
-    <tbody>
-      {loadingHistory ? (
-        <tr>
-          <td colSpan="6" className="text-center py-10 text-gray-500">
-            <div className="flex items-center justify-center gap-2">
-              <Loader2 size={18} className="animate-spin" />
-              Loading notification history...
-            </div>
-          </td>
-        </tr>
-      ) : history.length === 0 ? (
-        <tr>
-          <td colSpan="6" className="text-center py-10 text-gray-400">
-            No notifications found
-          </td>
-        </tr>
-      ) : (
-        history.map((entry) => (
-          <tr
-            key={entry._id}
-            className="border-b hover:bg-gray-50 transition"
-          >
-            {/* Message */}
-            <td className="py-3 px-4 font-medium text-gray-900 max-w-xs truncate">
-              {entry.message}
-            </td>
-
-            {/* Delivery */}
-            <td className="px-4 whitespace-nowrap">
-              <span className="px-2 py-1 rounded-md text-xs font-semibold bg-indigo-50 text-indigo-700">
-                {formatDeliveryType(entry.deliveryType)}
-              </span>
-            </td>
-
-            {/* Student */}
-            <td className="px-4 whitespace-nowrap">
-              <div className="flex flex-col">
-                <span className="font-semibold text-gray-900">
-                  {entry.studentId?.name || "Deleted"}
-                </span>
-                <span className="text-xs text-gray-500">
-                  {entry.studentId?.rollNo}
-                </span>
-              </div>
-            </td>
-
-            {/* Time */}
-            <td className="px-4 text-gray-600 whitespace-nowrap">
-              {new Date(entry.createdAt).toLocaleString("en-IN")}
-            </td>
-
-            {/* Status */}
-            <td className="px-4 text-center whitespace-nowrap">
-              <span
-                className={`px-2 py-1 rounded-md text-xs font-semibold
-        ${STATUS_STYLES[entry.status] || STATUS_STYLES.pending}`}
-              >
-                {entry.status}
-              </span>
-            </td>
-
-            {/* Reason */}
-            <td className="px-4 py-3 text-xs text-red-600 font-medium max-w-xs">
-              {entry.status === 'failed' || entry.status === 'partial' ? (
-                <div className="flex flex-col gap-0.5">
-                  {entry.pushResult?.error && (
-                    <span className="flex items-center gap-1">
-                      <Smartphone size={10} className="text-gray-400 shrink-0" />
-                      <span className="truncate">{entry.pushResult.error}</span>
-                    </span>
-                  )}
-                  {entry.emailResult?.error && (
-                    <span className="flex items-center gap-1">
-                      <Mail size={10} className="text-gray-400 shrink-0" />
-                      <span className="truncate">{entry.emailResult.error}</span>
-                    </span>
-                  )}
-                  {!entry.pushResult?.error && !entry.emailResult?.error && (
-                    <span className="text-gray-400 italic">No specific error recorded</span>
-                  )}
-                </div>
-              ) : (
-                <span className="text-gray-300">—</span>
-              )}
-            </td>
-          </tr>
-        ))
-      )}
-    </tbody>
-  </table>
-</div>
-
-{hasMoreHistory && (
-  <div className="mt-4 flex justify-center pb-2">
-    <button
-      onClick={handleLoadMoreHistory}
-      disabled={loadingHistory}
-      className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-erp-primary hover:bg-indigo-50 rounded-lg transition-colors border border-indigo-100 disabled:opacity-50"
-    >
-      {loadingHistory ? <Loader2 size={16} className="animate-spin" /> : <RefreshCcw size={16} />}
-      Show More History
-    </button>
-  </div>
-)}
-
-        </div>
+        )}
 
       </div>
       <ActionModal
