@@ -2,6 +2,7 @@ import React from 'react';
 import { User, Eye, Pencil, Search, UserCheck, UserX, Loader2, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { SkeletonTable } from '../common/SkeletonLoaders';
+import { API_BASE_URL } from '../../api/apiConfig';
 
 const formatDateTime = (value) => value ? new Date(value).toLocaleString('en-IN') : '—';
 const countValidDeviceTokens = (deviceTokens = []) =>
@@ -84,7 +85,7 @@ const StudentTable = ({
                                     <div className="w-10 h-10 rounded-sm bg-slate-100 flex items-center justify-center text-slate-400 overflow-hidden border">
                                         {s.profileImage ? (
                                             <img 
-                                                src={s.profileImage} 
+                                                src={s.profileImage.startsWith('http') ? s.profileImage : `${API_BASE_URL}${s.profileImage.startsWith('/') ? '' : '/'}${s.profileImage}`} 
                                                 alt="" 
                                                 className="w-full h-full object-cover" 
                                                 onError={(e) => {

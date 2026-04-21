@@ -293,26 +293,25 @@ const NotificationsPage = () => {
     }
   };
 
-  const handleCleanupHistory = async () => {
+  const handleCleanupHistory = async (purgeAll = false) => {
     setActionState({
       isOpen: true,
       type: 'danger',
-      title: 'Purge Notification History',
-      desc: 'This will delete ALL notification logs older than 3 days. This action is permanent. Enter admin password to authorize cleanup.',
-      onConfirm: (pwd) => confirmCleanup(pwd),
+      title: purgeAll ? 'Purge Entire History' : 'Purge Old History',
+      desc: purgeAll 
+        ? 'This will delete EVERY notification log in the system. This action is permanent. Enter admin password to authorize total purge.'
+        : 'This will delete ALL notification logs older than 3 days. This action is permanent. Enter admin password to authorize cleanup.',
+      onConfirm: (pwd) => confirmCleanup(pwd, purgeAll ? 0 : 3),
       loading: false,
       error: ''
     });
   };
 
-  const confirmCleanup = async (pwd) => {
+  const confirmCleanup = async (pwd, days = 3) => {
     setActionState(prev => ({ ...prev, loading: true, error: '' }));
     try {
-      const { data } = await cleanupNotificationHistory(pwd);
-      setAlert({
-        type: "success",
-        text: data.message || "Old history cleaned successfully."
-      });
+      const { data } = await cleanupNotificationHistory(pwd, days);
+      toast.success(data.message || "History cleaned successfully.");
       setActionState(prev => ({ ...prev, isOpen: false }));
       loadHistory();
     } catch (err) {
@@ -792,12 +791,23 @@ const NotificationsPage = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={handleCleanupHistory}
+                  onClick={() => handleCleanupHistory(false)}
+                  disabled={isCleaning || loadingHistory}
+                  className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold border border-amber-200 rounded-lg text-amber-600 hover:bg-amber-50 disabled:opacity-60"
+                  title="Delete records older than 3 days"
+                >
+                  <RefreshCcw size={14} />
+                  Clean (>3 Days)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCleanupHistory(true)}
                   disabled={isCleaning || loadingHistory}
                   className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold border border-red-200 rounded-lg text-red-600 hover:bg-red-50 disabled:opacity-60"
+                  title="Delete all records permanently"
                 >
                   {isCleaning ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                  Clear Old History
+                  Purge All
                 </button>
               </div>
 

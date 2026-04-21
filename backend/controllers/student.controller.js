@@ -702,7 +702,12 @@ exports.bulkUpload = async (req, res) => {
 // GET /api/students/export
 exports.exportStudents = async (req, res) => {
     try {
-        const students = await Student.find()
+        const { className, batchId } = req.query;
+        const filter = {};
+        if (className) filter.className = className;
+        if (batchId) filter.batchId = batchId;
+
+        const students = await Student.find(filter)
             .populate('batchId', 'name subjects')
             .sort({ joinedAt: -1 })
             .lean();

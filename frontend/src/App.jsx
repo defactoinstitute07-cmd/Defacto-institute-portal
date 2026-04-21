@@ -21,7 +21,9 @@ import DashboardPage from './pages/DashboardPage';
 import TeacherDashboard from './pages/TeacherDashboard';
 import ApkManagementPage from './pages/ApkManagementPage';
 import { checkAdminExists } from './api/adminApi';
+import AllStudentsPage from './pages/AllStudentsPage';
 import ProtectedRoute from './components/ProtectedRoute';
+
 
 import { Loader2 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
@@ -98,7 +100,9 @@ function App() {
                 <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['admin']}><DashboardPage /></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute allowedRoles={['admin']}><AdminProfilePage /></ProtectedRoute>} />
                 <Route path="/students" element={<ProtectedRoute allowedRoles={['admin']}><StudentsPage /></ProtectedRoute>} />
+                <Route path="/students/all" element={<ProtectedRoute allowedRoles={['admin']}><AllStudentsPage /></ProtectedRoute>} />
                 <Route path="/students/:id" element={<ProtectedRoute allowedRoles={['admin']}><StudentProfilePage /></ProtectedRoute>} />
+
                 <Route path="/fees" element={<ProtectedRoute allowedRoles={['admin']}><FeesPage /></ProtectedRoute>} />
                 <Route path="/batches" element={<ProtectedRoute allowedRoles={['admin']}><BatchesPage /></ProtectedRoute>} />
                 <Route path="/batches/:id" element={<ProtectedRoute allowedRoles={['admin']}><BatchDetailsPage /></ProtectedRoute>} />

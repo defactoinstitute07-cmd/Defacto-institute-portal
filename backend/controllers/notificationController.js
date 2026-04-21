@@ -65,10 +65,16 @@ exports.sendNotifications = async (req, res, next) => {
 
 exports.cleanupHistory = async (req, res, next) => {
     try {
-        const result = await notificationService.cleanupOldNotifications();
+        const { days } = req.body;
+        // Default to 3 days if not specified, aligning with the UI promise
+        const dayLimit = (days !== undefined && days !== null) ? parseInt(days, 10) : 3;
+        
+        const result = await notificationService.cleanupOldNotifications(dayLimit);
         res.json({
             success: true,
-            message: `Successfully deleted ${result.deletedCount} old notification records.`,
+            message: dayLimit === 0 
+                ? 'Successfully purged all notification history.' 
+                : `Successfully deleted ${result.deletedCount} notification records older than ${dayLimit} days.`,
             ...result
         });
     } catch (error) {

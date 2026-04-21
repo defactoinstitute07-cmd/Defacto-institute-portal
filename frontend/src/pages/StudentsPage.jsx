@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import ERPLayout from '../components/ERPLayout';
-import { Plus, Download, Upload, Check, AlertCircle, RefreshCcw } from 'lucide-react';
+import { Plus, Download, Upload, Check, AlertCircle, RefreshCcw, Users2, FileSpreadsheet } from 'lucide-react';
 
 // Sub-Components
 import DashboardStats from '../components/students/DashboardStats';
@@ -15,7 +16,7 @@ import StudentProfileModal from '../components/students/StudentProfileModal';
 import ActionModal from '../components/common/ActionModal';
 import BulkImportModal from '../components/students/BulkImportModal';
 
-import apiClient from '../api/apiConfig';
+import apiClient, { API_BASE_URL } from '../api/apiConfig';
 import { hasClientSession } from '../utils/authSession';
 
 const EMPTY_FORM = {
@@ -320,7 +321,7 @@ const StudentsPage = () => {
         }
     };
 
-    const exportData = (type) => {
+    const exportData = async (type) => {
         if (students.length === 0) {
             addToast('No records to export', 'error');
             return;
@@ -335,6 +336,50 @@ const StudentsPage = () => {
             autoTable(doc, { head: [['Roll No', 'Name', 'Class', 'Batch', 'Contact', 'Status']], body: tableData, startY: 30 });
             doc.save(`Students_Export_${new Date().toISOString().slice(0, 10)}.pdf`);
             addToast('Exported as PDF');
+        } else if (type === 'excel') {
+            setLoading(true);
+            try {
+                const params = new URLSearchParams();
+                if (filters.className) params.append('className', filters.className);
+                if (filters.batch) params.append('batchId', filters.batch);
+
+                const { data } = await apiClient.get(`/students/export?${params.toString()}`);
+                const allStudents = data.students || [];
+
+                if (allStudents.length === 0) {
+                    addToast('No students found to export', 'error');
+                    return;
+                }
+
+                const headers = [
+                    "NAME", "DATE OF BIRTH", "GENDER", "MOBILE NUMBER",
+                    "EMAIL ADDRESS", "FATHER'S NAME", "MOTHER'S NAME", "PARENT CONTACT NUMBER", "FULL ADDRESS", "STANDARD / COURSE", "BATCHNAME"
+                ];
+
+                const excelData = allStudents.map(s => ({
+                    "NAME": s.name || '',
+                    "DATE OF BIRTH": s.dob ? new Date(s.dob).toLocaleDateString('en-GB').split('/').join('-') : '',
+                    "GENDER": s.gender || '',
+                    "MOBILE NUMBER": s.contact || '',
+                    "EMAIL ADDRESS": s.email || '',
+                    "FATHER'S NAME": s.fatherName || '',
+                    "MOTHER'S NAME": s.motherName || '',
+                    "PARENT CONTACT NUMBER": s.parentPhone || '',
+                    "FULL ADDRESS": s.address || '',
+                    "STANDARD / COURSE": s.className || '',
+                    "BATCHNAME": s.batchId?.name || ''
+                }));
+
+                const ws = XLSX.utils.json_to_sheet(excelData, { header: headers });
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Students");
+                XLSX.writeFile(wb, `Students_Bulk_Import_Format_${new Date().toISOString().slice(0, 10)}.xlsx`);
+                addToast('Exported for Bulk Import (Excel)');
+            } catch (error) {
+                addToast('Failed to export Excel', 'error');
+            } finally {
+                setLoading(false);
+            }
         } else {
             const csvRows = [];
             const headers = ['Student Name', 'Roll No', 'Class', 'Batch', 'Contact Number', 'Email', 'Admission Date', 'Status'];
@@ -531,19 +576,36 @@ const StudentsPage = () => {
                     <h1>Student Directory</h1>
                     <p>Manage admissions, enrollments, and student records</p>
                 </div>
-                <div className="flex items-center gap-3 mt-4 sm:mt-0">
-                    <button className="btn btn-outline" onClick={() => loadData()} disabled={loading}>
-                        <RefreshCcw size={16} className={loading ? 'spin' : ''} /> Refresh Activity
-                    </button>
-                    <button className="btn btn-outline" onClick={() => { setModal('bulk'); setBulkResults(null); setErr(''); }}>
-                        <Upload size={16} /> Bulk View
-                    </button>
-                    <button className="btn btn-outline" onClick={() => exportData('pdf')}>
-                        <Download size={16} /> Export PDF
-                    </button>
-                    <button className="btn btn-primary" onClick={() => { setForm(EMPTY_FORM); setStep(1); setModal('admission'); setSelectedStudent(null); }}>
+                <div className="flex flex-wrap items-center gap-2 mt-4 sm:mt-0">
+                    {/* Primary Action */}
+                    <button className="btn btn-primary shadow-md" onClick={() => { setForm(EMPTY_FORM); setStep(1); setModal('admission'); setSelectedStudent(null); }}>
                         <Plus size={18} /> New Admission
                     </button>
+
+                    <div className="h-8 w-px bg-slate-200 mx-1 hide-mobile"></div>
+
+                    {/* Directory Actions */}
+                    <button className="btn btn-outline btn-sm" onClick={() => navigate('/students/all')} title="View Full Directory">
+                        <Users2 size={14} /> View All
+                    </button>
+                    <button className="btn btn-outline btn-sm" onClick={() => loadData()} disabled={loading} title="Refresh Latest Activity">
+                        <RefreshCcw size={14} className={loading ? 'spin' : ''} /> Refresh
+                    </button>
+                    <button className="btn btn-outline btn-sm" onClick={() => { setModal('bulk'); setBulkResults(null); setErr(''); }} title="Bulk Management">
+                        <Upload size={14} /> Bulk View
+                    </button>
+
+                    <div className="h-8 w-px bg-slate-200 mx-1 hide-mobile"></div>
+
+                    {/* Export Actions */}
+                    <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-md border border-slate-200">
+                        <button className="btn btn-ghost btn-xs text-slate-600 hover:text-indigo-600" onClick={() => exportData('pdf')} title="Export as PDF">
+                            <Download size={14} /> PDF
+                        </button>
+                        <button className="btn btn-ghost btn-xs text-slate-600 hover:text-green-600" onClick={() => exportData('excel')} title="Export for Bulk Import">
+                            <FileSpreadsheet size={14} /> Excel
+                        </button>
+                    </div>
                 </div>
             </div>
 

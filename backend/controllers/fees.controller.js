@@ -516,6 +516,18 @@ exports.recordPayment = async (req, res) => {
                     console.error('[fees.recordPayment.email] Failed to send receipt email', emailError?.message || emailError);
                 }
             }
+
+            // Trigger Push Notification
+            triggerAutomaticNotification({
+                eventType: 'feePayment',
+                studentId: fee.studentId._id,
+                adminId: req.admin?.id || null,
+                message: `We have successfully received your payment of Rs ${formatCurrency(latestPayment.paidAmount)}. Receipt No: ${latestPayment.receiptNo}`,
+                data: {
+                    amountPaid: latestPayment.paidAmount,
+                    receiptNo: latestPayment.receiptNo
+                }
+            }).catch(() => console.error('[fees.recordPayment.notification] Push notification dispatch failed'));
         }
 
         return res.json({ success: true, receiptNo, fee });
