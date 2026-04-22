@@ -506,6 +506,7 @@ exports.updateStudent = async (req, res) => {
         const oldStudent = await Student.findById(req.params.id);
         if (!oldStudent) return res.status(404).json({ message: 'Student not found' });
 
+        const discountChanged = data.discount !== undefined && Number(data.discount) !== oldStudent.discount;
         const isActivatingBatch = !oldStudent.batchId && data.batchId;
 
         if (data.password !== undefined) {
@@ -526,6 +527,33 @@ exports.updateStudent = async (req, res) => {
         }
 
         const student = await Student.findByIdAndUpdate(req.params.id, data, { returnDocument: 'after' });
+
+        if (discountChanged) {
+            try {
+                const newDiscount = Number(data.discount);
+                const unpaidFees = await Fee.find({
+                    studentId: student._id,
+                    status: { $in: ['pending', 'partial', 'overdue'] }
+                });
+
+                for (const fee of unpaidFees) {
+                    fee.discount = newDiscount;
+                    fee.totalFee = Math.max((fee.monthlyTuitionFee || 0) + (fee.registrationFee || 0) + (fee.fine || 0) - newDiscount, 0);
+                    
+                    const amountPaid = Number(fee.amountPaid || 0);
+                    const pending = Math.max(fee.totalFee - amountPaid, 0);
+                    fee.pendingAmount = pending;
+
+                    if (pending <= 0 && fee.totalFee > 0) fee.status = 'paid';
+                    else if (amountPaid > 0 && pending > 0) fee.status = 'partial';
+                    else fee.status = 'pending';
+
+                    await fee.save();
+                }
+            } catch (feeUpdateError) {
+                console.error('[updateStudent.retroactiveDiscount] Failed to update unpaid fees:', feeUpdateError.message);
+            }
+        }
 
         if (isActivatingBatch) {
             if (student && data.batchId) {

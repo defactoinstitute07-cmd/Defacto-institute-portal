@@ -19,7 +19,9 @@ const RecordPaymentModal = ({ fee, onClose, onSave }) => {
     const [form, setForm] = useState({
         amountPaid: '',
         mode: 'UPI',
-        fine: '0'
+        fine: '0',
+        date: new Date().toISOString().split('T')[0],
+        discount: '0'
     });
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
@@ -47,9 +49,10 @@ const RecordPaymentModal = ({ fee, onClose, onSave }) => {
 
     if (!fee) return null;
 
-    const totalDue = fee.totalFee || 0;
-    const monthlyBase = fee.monthlyTuitionFee || 0;
-    const remainingBalance = fee.pendingAmount || 0;
+    const totalOriginal = (fee.monthlyTuitionFee || 0) + (fee.registrationFee || 0) + (fee.fine || 0);
+    const currentTotalDiscount = (fee.discount || 0) + (Number(form.discount || 0));
+    const payableAmount = Math.max(totalOriginal - currentTotalDiscount, 0);
+    const remainingBalance = Math.max(payableAmount - (fee.amountPaid || 0), 0);
 
     return (
         <div
@@ -139,20 +142,28 @@ const RecordPaymentModal = ({ fee, onClose, onSave }) => {
                         {/* --- BILL SUMMARY --- */}
                         <div style={{ padding: '20px 24px', background: '#f8fafc', borderBottom: `1px solid ${borderColor}` }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                                <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Total Billed</span>
-                                <span style={{ fontSize: '1rem', fontWeight: 800 }}>₹ {totalDue.toLocaleString()}</span>
+                                <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Total Amount</span>
+                                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1e293b' }}>₹ {totalOriginal.toLocaleString()}</span>
                             </div>
 
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-                                <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Monthly Base Fee</span>
-                                <span style={{ fontWeight: 700, color: '#1e293b', fontSize: '0.85rem' }}>₹ {monthlyBase.toLocaleString()}</span>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                                <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Discount</span>
+                                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#dc2626' }}>- ₹ {currentTotalDiscount.toLocaleString()}</span>
+                            </div>
+
+                            <div style={{ 
+                                display: 'flex', justifyContent: 'space-between', marginBottom: 12, 
+                                padding: '8px 12px', background: '#f1f5f9', borderRadius: '4px', marginTop: 12 
+                            }}>
+                                <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Total Payable</span>
+                                <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>₹ {payableAmount.toLocaleString()}</span>
                             </div>
 
                             <div style={{
                                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                paddingTop: 12, borderTop: `1px solid ${borderColor}`
+                                paddingTop: 12, borderTop: `1px solid ${borderColor}`, marginTop: 8
                             }}>
-                                <div style={{ fontSize: '0.72rem', fontWeight: 900, color: accentBlue }}>REMAINING</div>
+                                <div style={{ fontSize: '0.72rem', fontWeight: 900, color: accentBlue, textTransform: 'uppercase' }}>Remaining to Pay</div>
                                 <div style={{ fontSize: '1.2rem', fontWeight: 900, color: accentBlue }}>₹ {remainingBalance.toLocaleString()}</div>
                             </div>
                         </div>
@@ -171,12 +182,13 @@ const RecordPaymentModal = ({ fee, onClose, onSave }) => {
                                 <div style={{ position: 'relative' }}>
                                     <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontWeight: 800, color: '#94a3b8' }}>₹</span>
                                     <input
-                                        type="number" required max={remainingBalance} step="0.01"
+                                        type="number" required max={Math.max(remainingBalance - Number(form.discount || 0), 0)} step="0.01"
                                         style={{ borderRadius: sharpRadius, padding: '11px 11px 11px 28px', border: `1px solid ${borderColor}`, fontSize: '0.88rem', fontWeight: 700, background: '#fcfdfd', width: '100%', boxSizing: 'border-box' }}
                                         value={form.amountPaid}
                                         onChange={e => {
                                             let val = e.target.value;
-                                            if (Number(val) > remainingBalance) val = remainingBalance.toString();
+                                            const maxAllowed = Math.max(remainingBalance - Number(form.discount || 0), 0);
+                                            if (Number(val) > maxAllowed) val = maxAllowed.toString();
                                             setForm({ ...form, amountPaid: val });
                                         }}
                                     />
@@ -191,6 +203,28 @@ const RecordPaymentModal = ({ fee, onClose, onSave }) => {
                                     style={{ borderRadius: sharpRadius, padding: '11px', border: `1px solid ${borderColor}`, fontSize: '0.88rem', fontWeight: 700, background: '#fcfdfd', width: '100%', boxSizing: 'border-box' }}
                                     value={form.fine}
                                     onChange={e => setForm({ ...form, fine: e.target.value })}
+                                />
+                            </div>
+
+                            {/* Payment Date */}
+                            <div style={{ marginBottom: 18 }}>
+                                <label style={{ fontSize: '0.68rem', fontWeight: 800, color: labelColor, display: 'block', marginBottom: 6 }}>PAYMENT DATE *</label>
+                                <input
+                                    type="date" required
+                                    style={{ borderRadius: sharpRadius, padding: '11px', border: `1px solid ${borderColor}`, fontSize: '0.88rem', fontWeight: 700, background: '#fcfdfd', width: '100%', boxSizing: 'border-box' }}
+                                    value={form.date}
+                                    onChange={e => setForm({ ...form, date: e.target.value })}
+                                />
+                            </div>
+
+                            {/* Additional Discount */}
+                            <div style={{ marginBottom: 18 }}>
+                                <label style={{ fontSize: '0.68rem', fontWeight: 800, color: labelColor, display: 'block', marginBottom: 6 }}>ADDITIONAL DISCOUNT</label>
+                                <input
+                                    type="number"
+                                    style={{ borderRadius: sharpRadius, padding: '11px', border: `1px solid ${borderColor}`, fontSize: '0.88rem', fontWeight: 700, background: '#fcfdfd', width: '100%', boxSizing: 'border-box' }}
+                                    value={form.discount}
+                                    onChange={e => setForm({ ...form, discount: e.target.value })}
                                 />
                             </div>
 

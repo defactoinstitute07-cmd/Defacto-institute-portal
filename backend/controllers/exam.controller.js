@@ -624,3 +624,56 @@ exports.getBatchTopScorers = async (req, res) => {
     }
 };
 
+
+// GET /api/exams/export/history/:classLevel — Get complete marks history for a class level
+exports.getClassMarksHistory = async (req, res) => {
+    try {
+        const { classLevel } = req.params;
+        const normalizedClassLevel = String(classLevel || '').trim();
+
+        if (!normalizedClassLevel) {
+            return res.status(400).json({ message: 'Class level is required.' });
+        }
+
+        // 1. Find all exams for this class level
+        const exams = await Exam.find({ classLevel: normalizedClassLevel })
+            .sort({ date: 1 })
+            .lean();
+
+        if (exams.length === 0) {
+            return res.json({ exams: [], students: [], results: [] });
+        }
+
+        const examIds = exams.map(e => e._id);
+
+        // 2. Identify all batches linked to these exams
+        const allBatchIds = new Set();
+        for (const exam of exams) {
+            const batchIds = await resolveExamLinkedBatchIds(exam);
+            batchIds.forEach(id => allBatchIds.add(id));
+        }
+
+        // 3. Find all students in these batches
+        const students = await Student.find({
+            batchId: { $in: Array.from(allBatchIds) },
+            status: 'active'
+        })
+        .select('name rollNo batchId')
+        .populate('batchId', 'name')
+        .sort({ name: 1 })
+        .lean();
+
+        // 4. Find all results for these exams
+        const results = await ExamResult.find({
+            examId: { $in: examIds }
+        }).lean();
+
+        res.json({
+            exams,
+            students,
+            results
+        });
+    } catch (err) {
+        res.status(500).json({ message: 'Server error', error: err.message });
+    }
+};

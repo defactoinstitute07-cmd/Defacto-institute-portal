@@ -14,5 +14,7 @@ router.post('/generate', verifyAdminPassword, feesController.generateFeesBulk);
 router.post('/remind-overdue', verifyAdminPassword, feesController.remindOverdue);
 
 router.post('/:id/pay', verifyAdminPassword, feesController.recordPayment);
+router.delete('/:id', verifyAdminPassword, feesController.deleteFee);
+
 
 module.exports = router;

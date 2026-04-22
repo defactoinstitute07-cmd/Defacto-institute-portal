@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Search, Plus, Download, AlertCircle, Loader2, History, CreditCard, LineChart, Clock, Settings, Bell } from 'lucide-react';
+import { Search, Plus, Download, AlertCircle, Loader2, History, CreditCard, LineChart, Clock, Settings, Bell, Trash2 } from 'lucide-react';
 import ERPLayout from '../components/ERPLayout';
 import ReceiptPreviewModal from '../components/fees/ReceiptPreviewModal';
 import RecordPaymentModal from '../components/fees/RecordPaymentModal';
@@ -330,7 +330,7 @@ const FeesPage = () => {
             const feeForReceipt = data.fee || { ...selFee, amountPaid: Number(selFee.amountPaid || 0) + Number(formData.amountPaid || 0) };
             const previewUrl = await generateReceipt(
                 feeForReceipt,
-                { ...formData, amount: formData.amountPaid, receiptNo: data.receiptNo, date: new Date() },
+                { ...formData, amount: formData.amountPaid, receiptNo: data.receiptNo, date: formData.date || new Date() },
                 true
             );
             setPreviewPdf({ isOpen: true, blobUrl: previewUrl, filename: `Receipt_${data.receiptNo}.pdf` });
@@ -422,6 +422,32 @@ const FeesPage = () => {
                     setActionState((prev) => ({ ...prev, loading: false, error: error.response?.data?.message || 'Reminder operation failed' }));
                 }
             },
+            loading: false,
+            error: ''
+        });
+    };
+
+    const confirmDeleteFee = async (id, password) => {
+        setActionState((prev) => ({ ...prev, loading: true, error: '' }));
+        try {
+            await apiClient.delete(`/fees/${id}`, { data: { adminPassword: password } });
+            setActionState((prev) => ({ ...prev, isOpen: false }));
+            // Remove from local state
+            setFees((prev) => prev.filter((f) => f._id !== id));
+            setTotal((prev) => prev - 1);
+            loadMetrics();
+        } catch (error) {
+            setActionState((prev) => ({ ...prev, loading: false, error: error.response?.data?.message || 'Deletion failed' }));
+        }
+    };
+
+    const handleDeleteFee = (fee) => {
+        setActionState({
+            isOpen: true,
+            type: 'verify',
+            title: 'Delete Fee Record',
+            desc: `Delete the fee record for ${fee.studentId?.name || 'this student'} for ${fee.month} ${fee.year}? This cannot be undone.`,
+            onConfirm: (password) => confirmDeleteFee(fee._id, password),
             loading: false,
             error: ''
         });
@@ -551,6 +577,7 @@ const FeesPage = () => {
                                                     <div className="flex gap-2">
                                                         <button className="btn btn-outline btn-sm" onClick={() => { setSelFee(fee); setModal('history'); }} title="History"><History size={13} /></button>
                                                         {fee.status !== 'paid' && <button className="btn btn-primary btn-sm" onClick={() => { setSelFee(fee); setModal('payment'); }} title="Pay"><CreditCard size={13} /></button>}
+                                                        {/* <button className="btn btn-outline btn-sm text-red-600 hover:bg-red-50 border-red-200" onClick={() => handleDeleteFee(fee)} title="Delete"><Trash2 size={13} /></button> */}
                                                     </div>
                                                 </td>
                                             </tr>

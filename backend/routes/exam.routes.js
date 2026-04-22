@@ -20,5 +20,7 @@ router.get('/:id/analytics', ctrl.getExamAnalytics);
 router.get('/student/:id/performance', ctrl.getStudentPerformance);
 router.get('/batch/:id/improvers', ctrl.getBatchImprovers);
 router.get('/batch/:id/top-scorers', ctrl.getBatchTopScorers);
+router.get('/export/history/:classLevel', ctrl.getClassMarksHistory);
+
 
 module.exports = router;

@@ -427,7 +427,7 @@ exports.createFee = async (req, res) => {
 exports.recordPayment = async (req, res) => {
     try {
         const { id } = req.params;
-        const { amountPaid, mode, fine } = req.body;
+        const { amountPaid, mode, fine, date, discount } = req.body;
 
         // Validate payment method
         const allowedModes = ['UPI', 'Cash'];
@@ -440,13 +440,20 @@ exports.recordPayment = async (req, res) => {
 
         const paid = Number(amountPaid || 0);
         const fineAmount = Number(fine || 0);
-        if (paid <= 0 && fineAmount <= 0) {
-            return res.status(400).json({ message: 'Payment amount must be greater than zero' });
+        const discAmount = Number(discount || 0);
+
+        if (paid <= 0 && fineAmount <= 0 && discAmount <= 0) {
+            return res.status(400).json({ message: 'Payment or discount amount must be greater than zero' });
         }
 
         if (fineAmount > 0) {
             fee.fine = Number(fee.fine || 0) + fineAmount;
             fee.totalFee = Number(fee.totalFee || 0) + fineAmount;
+        }
+
+        if (discAmount > 0) {
+            fee.discount = Number(fee.discount || 0) + discAmount;
+            fee.totalFee = Math.max(Number(fee.totalFee || 0) - discAmount, 0);
         }
 
         fee.amountPaid = Number(fee.amountPaid || 0) + paid;
@@ -459,7 +466,7 @@ exports.recordPayment = async (req, res) => {
             paymentMethod: paymentMode,
             remarks: '',
             receiptNo,
-            date: new Date()
+            date: date ? new Date(date) : new Date()
         });
 
         await fee.save();
@@ -660,3 +667,17 @@ exports.remindOverdue = async (req, res) => {
         return res.status(500).json({ message: 'Server error', error: err.message });
     }
 };
+
+// DELETE /api/fees/:id
+exports.deleteFee = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const fee = await Fee.findByIdAndDelete(id);
+        if (!fee) return res.status(404).json({ message: 'Fee record not found' });
+        res.json({ success: true, message: 'Fee record deleted successfully' });
+    } catch (err) {
+        console.error('[fees.deleteFee] Error deleting fee record');
+        return res.status(500).json({ message: 'Server error', error: err.message });
+    }
+};
+

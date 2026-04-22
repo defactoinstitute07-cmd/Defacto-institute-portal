@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import ERPLayout from '../components/ERPLayout';
 import CreateTestModal from '../components/exams/CreateTestModal.jsx';
 import MarksEntryModal from '../components/exams/MarksEntryModal.jsx';
+import ExportHistoryModal from '../components/exams/ExportHistoryModal.jsx';
 import apiClient from '../api/apiConfig';
 import {
     BookOpen, Plus, ClipboardList, Trophy, Edit3,
     Trash2, Loader2, AlertCircle, CheckCircle2, XCircle,
-    ChevronRight, Clock, Award, Star, Sparkles
+    ChevronRight, Clock, Award, Star, Sparkles, History
 } from 'lucide-react';
 
 const statusBadge = (status) => {
@@ -50,6 +51,7 @@ const ExamsPage = () => {
     const [resultsLoading, setResultsLoading] = useState(false);
     const [showCreate, setShowCreate] = useState(false);
     const [showMarks, setShowMarks] = useState(null);
+    const [showExport, setShowExport] = useState(false);
     const [error, setError] = useState('');
     const [deleteConfirm, setDeleteConfirm] = useState(null);
     const [analytics, setAnalytics] = useState(null);
@@ -169,9 +171,14 @@ const ExamsPage = () => {
                     <h1 style={{ fontSize: '1.7rem', fontWeight: 900, color: 'var(--erp-primary)' }}>Exams & Results</h1>
                     <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Create tests, enter marks and view color-coded results</p>
                 </div>
-                <button className="btn btn-primary" onClick={() => setShowCreate(true)} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <Plus size={16} /> Create Test
-                </button>
+                <div style={{ display: 'flex', gap: 12 }}>
+                    <button className="btn btn-outline" onClick={() => setShowExport(true)} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <History size={16} /> Download Full History
+                    </button>
+                    <button className="btn btn-primary" onClick={() => setShowCreate(true)} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Plus size={16} /> Create Test
+                    </button>
+                </div>
             </div>
 
             {error && (
@@ -650,6 +657,7 @@ const ExamsPage = () => {
                 />
             )}
             {showMarks && <MarksEntryModal exam={showMarks} onClose={() => setShowMarks(null)} onSave={() => { setShowMarks(null); fetchExams(); }} />}
+            {showExport && <ExportHistoryModal onClose={() => setShowExport(false)} classLevels={uniqueClassLevels} />}
         </ERPLayout>
     );
 };
