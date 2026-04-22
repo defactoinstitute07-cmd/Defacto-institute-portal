@@ -4,6 +4,7 @@ const ExamResult = require('../models/ExamResult');
 const Student = require('../models/Student');
 const Batch = require('../models/Batch');
 const Subject = require('../models/Subject');
+const { CACHE_PREFIXES, invalidateRouteCaches } = require('../middleware/responseCache');
 const { logNotificationEvent } = require('../services/activityLogService');
 
 const resolveExamLinkedBatchIds = async (exam) => {
@@ -25,6 +26,39 @@ const resolveExamLinkedBatchIds = async (exam) => {
 
     return [];
 };
+
+const buildExamMap = async (examIds, select = 'date totalMarks') => {
+    const uniqueExamIds = Array.from(new Set(
+        (examIds || [])
+            .map((id) => String(id || '').trim())
+            .filter(Boolean)
+    ));
+
+    if (uniqueExamIds.length === 0) {
+        return new Map();
+    }
+
+    const exams = await Exam.find({ _id: { $in: uniqueExamIds } })
+        .select(select)
+        .lean();
+
+    return new Map(exams.map((exam) => [String(exam._id), exam]));
+};
+
+const sortResultsByExamDateDesc = (results, examMap) => (
+    results
+        .filter((result) => examMap.has(String(result.examId)))
+        .sort((a, b) => {
+            const left = new Date(examMap.get(String(a.examId))?.date || 0).getTime();
+            const right = new Date(examMap.get(String(b.examId))?.date || 0).getTime();
+            return right - left;
+        })
+);
+
+const invalidateExamReadCaches = () => invalidateRouteCaches([
+    CACHE_PREFIXES.dashboard,
+    CACHE_PREFIXES.exams
+]);
 
 // GET /api/exams — list all exams
 exports.getAllExams = async (req, res) => {
@@ -215,6 +249,7 @@ exports.createExam = async (req, res) => {
             }
         });
 
+        await invalidateExamReadCaches();
         res.status(201).json({
             message: 'Test created successfully',
             exam,
@@ -245,6 +280,7 @@ exports.updateExam = async (req, res) => {
 
         await exam.save();
         await exam.populate('batchId', 'name subjects');
+        await invalidateExamReadCaches();
         res.json({ message: 'Exam updated', exam });
     } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });
@@ -256,6 +292,7 @@ exports.deleteExam = async (req, res) => {
     try {
         await Exam.findByIdAndDelete(req.params.id);
         await ExamResult.deleteMany({ examId: req.params.id });
+        await invalidateExamReadCaches();
         res.json({ message: 'Exam and all results deleted' });
     } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });
@@ -280,7 +317,9 @@ exports.getExamStudents = async (req, res) => {
             .lean();
 
         // Attach existing result if any
-        const results = await ExamResult.find({ examId: exam._id }).lean();
+        const results = await ExamResult.find({ examId: exam._id })
+            .select('studentId marksObtained isPresent remarks uploadedAt')
+            .lean();
         const resultMap = {};
         results.forEach(r => { resultMap[r.studentId.toString()] = r; });
 
@@ -335,7 +374,7 @@ exports.saveMarks = async (req, res) => {
         const uploadedBy = req.teacher?.id || null; // null means admin
 
         const linkedBatchIds = await resolveExamLinkedBatchIds(exam);
-        const studentIds = marks.map((m) => m.studentId);
+        const studentIds = Array.from(new Set(marks.map((m) => String(m.studentId))));
         const students = await Student.find({ _id: { $in: studentIds } })
             .select('_id name email batchId')
             .lean();
@@ -428,6 +467,7 @@ exports.saveMarks = async (req, res) => {
             }
         });
 
+        await invalidateExamReadCaches();
         res.json({ message: `Marks saved for ${marks.length} students.` });
     } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });
@@ -557,32 +597,52 @@ exports.getStudentPerformance = async (req, res) => {
 exports.getBatchImprovers = async (req, res) => {
     try {
         const batchId = req.params.id;
-        const students = await Student.find({ batchId, status: 'active' }).select('name').lean();
+        const students = await Student.find({ batchId, status: 'active' }).select('_id name').lean();
+        if (students.length === 0) {
+            return res.json({ improvers: [] });
+        }
+
+        const studentIds = students.map((student) => student._id);
+        const studentNameMap = new Map(students.map((student) => [String(student._id), student.name]));
+
+        const results = await ExamResult.find({ studentId: { $in: studentIds } })
+            .select('studentId examId marksObtained isPresent')
+            .lean();
+
+        const examMap = await buildExamMap(results.map((result) => result.examId), 'date totalMarks');
+        const resultGroups = new Map();
+
+        results.forEach((result) => {
+            const key = String(result.studentId);
+            if (!resultGroups.has(key)) {
+                resultGroups.set(key, []);
+            }
+            resultGroups.get(key).push(result);
+        });
 
         const improvers = [];
 
-        for (const student of students) {
-            const results = await ExamResult.find({ studentId: student._id })
-                .populate('examId')
-                .sort({ 'examId.date': -1 })
-                .limit(2)
-                .lean();
-
-            if (results.length === 2 && results[0].isPresent && results[1].isPresent) {
-                const currentPerc = (results[0].marksObtained / results[0].examId.totalMarks) * 100;
-                const lastPerc = (results[1].marksObtained / results[1].examId.totalMarks) * 100;
-                const diff = parseFloat((currentPerc - lastPerc).toFixed(2));
-
-                if (diff > 0) {
-                    improvers.push({
-                        name: student.name,
-                        improvement: diff,
-                        current: currentPerc.toFixed(1),
-                        last: lastPerc.toFixed(1)
-                    });
-                }
+        resultGroups.forEach((studentResults, studentId) => {
+            const latestResults = sortResultsByExamDateDesc(studentResults, examMap).slice(0, 2);
+            if (latestResults.length !== 2 || !latestResults[0].isPresent || !latestResults[1].isPresent) {
+                return;
             }
-        }
+
+            const currentExam = examMap.get(String(latestResults[0].examId));
+            const lastExam = examMap.get(String(latestResults[1].examId));
+            const currentPerc = currentExam?.totalMarks ? (latestResults[0].marksObtained / currentExam.totalMarks) * 100 : 0;
+            const lastPerc = lastExam?.totalMarks ? (latestResults[1].marksObtained / lastExam.totalMarks) * 100 : 0;
+            const diff = parseFloat((currentPerc - lastPerc).toFixed(2));
+
+            if (diff > 0) {
+                improvers.push({
+                    name: studentNameMap.get(studentId) || 'Unknown',
+                    improvement: diff,
+                    current: currentPerc.toFixed(1),
+                    last: lastPerc.toFixed(1)
+                });
+            }
+        });
 
         res.json({ improvers: improvers.sort((a, b) => b.improvement - a.improvement).slice(0, 10) });
     } catch (err) {
@@ -594,29 +654,45 @@ exports.getBatchImprovers = async (req, res) => {
 exports.getBatchTopScorers = async (req, res) => {
     try {
         const batchId = req.params.id;
-        const students = await Student.find({ batchId, status: 'active' }).select('name').lean();
-
-        const scorers = [];
-
-        for (const student of students) {
-            const results = await ExamResult.find({ studentId: student._id, isPresent: true })
-                .populate('examId')
-                .lean();
-
-            if (results.length > 0) {
-                const totalPerc = results.reduce((sum, r) => {
-                    const maxMarks = r.examId?.totalMarks || 100;
-                    return sum + (r.marksObtained / maxMarks) * 100;
-                }, 0);
-                const avgPerc = totalPerc / results.length;
-
-                scorers.push({
-                    name: student.name,
-                    avgScore: parseFloat(avgPerc.toFixed(2)),
-                    testsTaken: results.length
-                });
-            }
+        const students = await Student.find({ batchId, status: 'active' }).select('_id name').lean();
+        if (students.length === 0) {
+            return res.json({ scorers: [] });
         }
+
+        const studentIds = students.map((student) => student._id);
+        const studentNameMap = new Map(students.map((student) => [String(student._id), student.name]));
+
+        const results = await ExamResult.find({
+            studentId: { $in: studentIds },
+            isPresent: true
+        })
+            .select('studentId examId marksObtained')
+            .lean();
+
+        const examMap = await buildExamMap(results.map((result) => result.examId), 'totalMarks');
+        const scoreTotals = new Map();
+
+        results.forEach((result) => {
+            const exam = examMap.get(String(result.examId));
+            if (!exam?.totalMarks) {
+                return;
+            }
+
+            const key = String(result.studentId);
+            if (!scoreTotals.has(key)) {
+                scoreTotals.set(key, { totalPercentage: 0, testsTaken: 0 });
+            }
+
+            const entry = scoreTotals.get(key);
+            entry.totalPercentage += (result.marksObtained / exam.totalMarks) * 100;
+            entry.testsTaken += 1;
+        });
+
+        const scorers = Array.from(scoreTotals.entries()).map(([studentId, entry]) => ({
+            name: studentNameMap.get(studentId) || 'Unknown',
+            avgScore: parseFloat((entry.totalPercentage / entry.testsTaken).toFixed(2)),
+            testsTaken: entry.testsTaken
+        }));
 
         res.json({ scorers: scorers.sort((a, b) => b.avgScore - a.avgScore).slice(0, 10) });
     } catch (err) {
@@ -644,29 +720,42 @@ exports.getClassMarksHistory = async (req, res) => {
             return res.json({ exams: [], students: [], results: [] });
         }
 
-        const examIds = exams.map(e => e._id);
+        const examIds = exams.map((exam) => exam._id);
+        const subjectIds = Array.from(new Set(
+            exams
+                .map((exam) => String(exam.subjectId || '').trim())
+                .filter(Boolean)
+        ));
+
+        const subjects = subjectIds.length > 0
+            ? await Subject.find({ _id: { $in: subjectIds } }).select('_id batchIds').lean()
+            : [];
+        const subjectMap = new Map(subjects.map((subject) => [String(subject._id), subject]));
 
         // 2. Identify all batches linked to these exams
         const allBatchIds = new Set();
-        for (const exam of exams) {
-            const batchIds = await resolveExamLinkedBatchIds(exam);
-            batchIds.forEach(id => allBatchIds.add(id));
-        }
+        exams.forEach((exam) => {
+            const subject = exam.subjectId ? subjectMap.get(String(exam.subjectId)) : null;
+            const linkedBatchIds = Array.isArray(subject?.batchIds) && subject.batchIds.length > 0
+                ? subject.batchIds.map((id) => String(id))
+                : (exam.batchId ? [String(exam.batchId)] : []);
 
-        // 3. Find all students in these batches
-        const students = await Student.find({
-            batchId: { $in: Array.from(allBatchIds) },
-            status: 'active'
-        })
-        .select('name rollNo batchId')
-        .populate('batchId', 'name')
-        .sort({ name: 1 })
-        .lean();
+            linkedBatchIds.forEach((id) => allBatchIds.add(id));
+        });
 
-        // 4. Find all results for these exams
-        const results = await ExamResult.find({
-            examId: { $in: examIds }
-        }).lean();
+        const [students, results] = await Promise.all([
+            Student.find({
+                batchId: { $in: Array.from(allBatchIds) },
+                status: 'active'
+            })
+                .select('name rollNo batchId')
+                .populate('batchId', 'name')
+                .sort({ name: 1 })
+                .lean(),
+            ExamResult.find({
+                examId: { $in: examIds }
+            }).lean()
+        ]);
 
         res.json({
             exams,

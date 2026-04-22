@@ -2,6 +2,7 @@ const Batch = require('../models/Batch');
 const Student = require('../models/Student');
 const Subject = require('../models/Subject');
 const mongoose = require('mongoose');
+const { CACHE_PREFIXES, invalidateRouteCaches } = require('../middleware/responseCache');
 
 const normalizeBatchDate = (value) => {
     if (!value) return null;
@@ -25,6 +26,13 @@ const normalizeBatchDate = (value) => {
     const parsed = new Date(text);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
+
+const invalidateBatchReadCaches = () => invalidateRouteCaches([
+    CACHE_PREFIXES.dashboard,
+    CACHE_PREFIXES.students,
+    CACHE_PREFIXES.batches,
+    CACHE_PREFIXES.exams
+]);
 
 // GET /api/batches
 exports.getAllBatches = async (req, res) => {
@@ -116,6 +124,7 @@ exports.createBatch = async (req, res) => {
             schedule
         });
         await batch.save();
+        await invalidateBatchReadCaches();
         res.status(201).json({ message: 'Batch created', batch });
     } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });
@@ -139,6 +148,7 @@ exports.updateBatch = async (req, res) => {
         if (!batch) return res.status(404).json({ message: 'Batch not found' });
 
 
+        await invalidateBatchReadCaches();
         res.json({ message: 'Batch updated', batch });
     } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });
@@ -152,6 +162,7 @@ exports.deleteBatch = async (req, res) => {
         if (!batch) return res.status(404).json({ message: 'Batch not found' });
 
 
+        await invalidateBatchReadCaches();
         res.json({ message: 'Batch deleted' });
     } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });
@@ -165,6 +176,7 @@ exports.toggleStatus = async (req, res) => {
         if (!batch) return res.status(404).json({ message: 'Batch not found' });
         batch.isActive = !batch.isActive;
         await batch.save();
+        await invalidateBatchReadCaches();
         res.json({ message: `Batch ${batch.isActive ? 'activated' : 'deactivated'}`, batch });
     } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });

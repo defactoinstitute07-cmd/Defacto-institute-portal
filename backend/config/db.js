@@ -1,63 +1,69 @@
 const mongoose = require('mongoose');
 
-// Cache connection state for serverless environments (like Vercel)
-let cachedConnection = null;
-let connectPromise = null;
+const globalCache = globalThis.__erpMongooseCache || (globalThis.__erpMongooseCache = {
+    connection: null,
+    promise: null,
+    listenersAttached: false
+});
 
-/**
- * Connects to MongoDB Atlas with retry logic and caching.
- * @param {number} retries - Number of retry attempts.
- * @param {number} delay - Delay between retries in milliseconds.
- */
-const connectDB = async (retries = 3, delay = 2000) => {
-    // If connection is already established, reuse it
-    if (cachedConnection && mongoose.connection.readyState === 1) {
-        console.log('Using existing MongoDB connection');
-        return cachedConnection;
+function attachConnectionListeners() {
+    if (globalCache.listenersAttached) {
+        return;
     }
 
-    // If another request already started connecting, wait for it.
-    if (connectPromise) {
-        await connectPromise;
-        if (cachedConnection && mongoose.connection.readyState === 1) {
-            return cachedConnection;
-        }
+    globalCache.listenersAttached = true;
+
+    mongoose.connection.on('error', () => {
+        console.error('MongoDB connection error');
+    });
+
+    mongoose.connection.on('disconnected', () => {
+        globalCache.connection = null;
+        console.warn('MongoDB disconnected');
+    });
+}
+
+/**
+ * Connects to MongoDB Atlas with retry logic and process-level caching.
+ * This avoids duplicate connections across warm serverless invocations.
+ */
+const connectDB = async (retries = 3, delay = 2000) => {
+    if (mongoose.connection.readyState === 1 && globalCache.connection) {
+        return globalCache.connection;
+    }
+
+    if (globalCache.promise) {
+        await globalCache.promise;
+        return globalCache.connection;
     }
 
     const MONGODB_URI = process.env.MONGODB_URI;
 
     if (!MONGODB_URI) {
-        console.error('❌ MONGODB_URI is not defined in environment variables');
+        console.error('MONGODB_URI is not defined in environment variables');
         throw new Error('MONGODB_URI is not defined');
     }
 
     const options = {
-        serverSelectionTimeoutMS: 5000, // 5s to select a server
-        socketTimeoutMS: 45000,         // 45s socket timeout
+        serverSelectionTimeoutMS: 5000,
+        socketTimeoutMS: 45000,
+        maxPoolSize: Math.max(parseInt(process.env.MONGODB_MAX_POOL_SIZE || '10', 10) || 10, 1),
+        minPoolSize: 0,
+        maxIdleTimeMS: Math.max(parseInt(process.env.MONGODB_MAX_IDLE_MS || '10000', 10) || 10000, 1000)
     };
 
     while (retries > 0) {
         try {
-            console.log(`Connecting to MongoDB... (Attempts remaining: ${retries})`);
+            globalCache.promise = mongoose.connect(MONGODB_URI, options);
+            globalCache.connection = await globalCache.promise;
+            globalCache.promise = null;
 
-            connectPromise = mongoose.connect(MONGODB_URI, options);
-            cachedConnection = await connectPromise;
-            connectPromise = null;
+            attachConnectionListeners();
 
-            console.log('✅ MongoDB Connected Successfully');
-
-            // Setup connection event listeners
-            mongoose.connection.on('error', (err) => {
-                console.error('MongoDB connection error');
-            });
-
-            mongoose.connection.on('disconnected', () => {
-                console.warn('⚠️ MongoDB disconnected. Attempting to reconnect...');
-            });
-
-            return cachedConnection;
+            return globalCache.connection;
         } catch (error) {
-            connectPromise = null;
+            globalCache.promise = null;
+            globalCache.connection = null;
             retries -= 1;
             console.error('MongoDB connection failed');
 
@@ -66,10 +72,11 @@ const connectDB = async (retries = 3, delay = 2000) => {
                 throw error;
             }
 
-            console.log(`Retrying in ${delay / 1000}s...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
+            await new Promise((resolve) => setTimeout(resolve, delay));
         }
     }
+
+    return globalCache.connection;
 };
 
 module.exports = connectDB;

@@ -3,46 +3,78 @@ const Teacher = require('../models/Teacher');
 const Batch = require('../models/Batch');
 const Fee = require('../models/Fee');
 const Attendance = require('../models/Attendance');
+const Exam = require('../models/Exam');
 
 // GET /api/dashboard/overview
 exports.getOverview = async (req, res) => {
     try {
-        // Total Students
-        const totalStudents = await Student.countDocuments();
-
-        // Active Batches
-        const activeBatches = await Batch.countDocuments({ status: 'active' });
-
-        // Total Teachers
-        const totalTeachers = await Teacher.countDocuments();
-
-        // Students Online (active session in last 5 minutes)
         const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-        const studentsOnline = await Student.countDocuments({
-            lastActive: { $gte: fiveMinutesAgo }
-        });
-
-        // Students Offline (seen in last 7 days)
         const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-        const studentsOffline = await Student.countDocuments({
-            lastActive: { $gte: sevenDaysAgo, $lt: fiveMinutesAgo }
-        });
+        const [totalStudents, activeBatches, totalTeachers, activityRows] = await Promise.all([
+            Student.countDocuments(),
+            Batch.countDocuments({ isActive: true }),
+            Teacher.countDocuments(),
+            Student.aggregate([
+                {
+                    $project: {
+                        activityAt: {
+                            $ifNull: [
+                                '$lastActiveAt',
+                                { $ifNull: ['$lastAppOpenAt', '$portalAccess.lastLoginAt'] }
+                            ]
+                        }
+                    }
+                },
+                {
+                    $group: {
+                        _id: null,
+                        studentsOnline: {
+                            $sum: {
+                                $cond: [{ $gte: ['$activityAt', fiveMinutesAgo] }, 1, 0]
+                            }
+                        },
+                        studentsOffline: {
+                            $sum: {
+                                $cond: [
+                                    {
+                                        $and: [
+                                            { $gte: ['$activityAt', sevenDaysAgo] },
+                                            { $lt: ['$activityAt', fiveMinutesAgo] }
+                                        ]
+                                    },
+                                    1,
+                                    0
+                                ]
+                            }
+                        },
+                        studentsInactive: {
+                            $sum: {
+                                $cond: [
+                                    {
+                                        $or: [
+                                            { $eq: ['$activityAt', null] },
+                                            { $lt: ['$activityAt', sevenDaysAgo] }
+                                        ]
+                                    },
+                                    1,
+                                    0
+                                ]
+                            }
+                        }
+                    }
+                }
+            ])
+        ]);
 
-        // Students Inactive (no activity in 7 days)
-        const studentsInactive = await Student.countDocuments({
-            $or: [
-                { lastActive: { $lt: sevenDaysAgo } },
-                { lastActive: { $exists: false } }
-            ]
-        });
+        const activity = activityRows[0] || {};
 
         return res.json({
             totalStudents,
             activeBatches,
             totalTeachers,
-            studentsOnline: studentsOnline || 0,
-            studentsOffline: studentsOffline || 0,
-            studentsInactive: studentsInactive || 0
+            studentsOnline: activity.studentsOnline || 0,
+            studentsOffline: activity.studentsOffline || 0,
+            studentsInactive: activity.studentsInactive || 0
         });
     } catch (err) {
         console.error('Error fetching dashboard overview');
@@ -159,6 +191,7 @@ exports.getRecentCollections = async (req, res) => {
         const limit = parseInt(req.query.limit, 10) || 5;
 
         const collections = await Fee.find()
+            .select('studentId batchId paymentHistory createdAt status')
             .populate('studentId', 'name rollNo')
             .populate('batchId', 'name course')
             .sort({ 'paymentHistory.0.date': -1 })
@@ -184,15 +217,14 @@ exports.getRecentCollections = async (req, res) => {
 // GET /api/dashboard/upcoming-exams
 exports.getUpcomingExams = async (req, res) => {
     try {
-        // This is a placeholder - adjust based on your Exam model structure
-        const Exam = require('../models/Exam');
-        
         const now = new Date();
         const upcomingExams = await Exam.find({
-            examDate: { $gte: now }
+            date: { $gte: now },
+            status: 'scheduled'
         })
+            .select('name subject chapter date totalMarks passingMarks batchId status')
             .populate('batchId', 'name')
-            .sort({ examDate: 1 })
+            .sort({ date: 1 })
             .limit(5)
             .lean();
 

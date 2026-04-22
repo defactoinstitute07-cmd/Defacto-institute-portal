@@ -67,6 +67,9 @@ const NotificationsPage = () => {
   const [historySearch, setHistorySearch] = useState("");
   const [historyFilterType, setHistoryFilterType] = useState("");
   const [historyFilterStatus, setHistoryFilterStatus] = useState("");
+  const [historyFilterChannel, setHistoryFilterChannel] = useState("");
+  const [historyFilterEmailStatus, setHistoryFilterEmailStatus] = useState("");
+  const [historyFilterPushStatus, setHistoryFilterPushStatus] = useState("");
   const [expandedMsgId, setExpandedMsgId] = useState(null);
   const [historyStats, setHistoryStats] = useState({ total: 0, today: 0 });
 
@@ -167,7 +170,10 @@ const NotificationsPage = () => {
         page, limit: 10,
         search: historySearch,
         status: historyFilterStatus,
-        type: historyFilterType
+        type: historyFilterType,
+        deliveryType: historyFilterChannel,
+        emailStatus: historyFilterEmailStatus,
+        pushStatus: historyFilterPushStatus
       });
       const newNotifications = data.notifications || [];
 
@@ -214,7 +220,7 @@ const NotificationsPage = () => {
       if (activeTab === 'history') loadHistory(1, false);
     }, 400);
     return () => clearTimeout(timer);
-  }, [historySearch, historyFilterStatus, historyFilterType, activeTab]);
+  }, [historySearch, historyFilterStatus, historyFilterType, historyFilterChannel, historyFilterEmailStatus, historyFilterPushStatus, activeTab]);
 
   useEffect(() => {
     const timer = setTimeout(() => loadRecipients(studentSearch), 300);
@@ -814,13 +820,13 @@ const NotificationsPage = () => {
             </div>
 
             {/* History Filters */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3 mb-5">
               <div className="flex items-center gap-3 border rounded-lg px-3 py-2 bg-gray-50/50">
                 <Search size={16} className="text-gray-500" />
                 <input
                   value={historySearch}
                   onChange={(e) => setHistorySearch(e.target.value)}
-                  placeholder="Search history..."
+                  placeholder="Search..."
                   className="w-full outline-none text-sm bg-transparent"
                 />
               </div>
@@ -830,16 +836,27 @@ const NotificationsPage = () => {
                 <select
                   value={historyFilterType}
                   onChange={(e) => setHistoryFilterType(e.target.value)}
-                  className="w-full bg-transparent outline-none text-sm font-medium text-gray-700"
+                  className="w-full bg-transparent outline-none text-[11px] font-medium text-gray-700"
                 >
                   <option value="">All Types</option>
-                  <option value="studentRegistration">Student Registration</option>
-                  <option value="feeGenerated">Standard Fee Generated</option>
-                  <option value="feePayment">Standard Fee Payment</option>
-                  <option value="feeOverdue">Standard Fee Overdue</option>
-                  <option value="examResult">Standard Exam Result</option>
-                  <option value="testAnnouncement">Test Announcement</option>
-                  <option value="teacherRegistration">Faculty Registration</option>
+                  <option value="studentRegistration">Registration</option>
+                  <option value="feeOverdue">Fee Overdue</option>
+                  <option value="examResult">Exam Result</option>
+                  <option value="testAnnouncement">Test Alert</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2 border rounded-lg px-3 py-2 bg-gray-50/50">
+                <Smartphone size={14} className="text-gray-400" />
+                <select
+                  value={historyFilterChannel}
+                  onChange={(e) => setHistoryFilterChannel(e.target.value)}
+                  className="w-full bg-transparent outline-none text-[11px] font-medium text-gray-700"
+                >
+                  <option value="">All Channels</option>
+                  <option value="push">Push Only</option>
+                  <option value="email">Email Only</option>
+                  <option value="both">Push + Email</option>
                 </select>
               </div>
 
@@ -848,14 +865,38 @@ const NotificationsPage = () => {
                 <select
                   value={historyFilterStatus}
                   onChange={(e) => setHistoryFilterStatus(e.target.value)}
-                  className="w-full bg-transparent outline-none text-sm font-medium text-gray-700"
+                  className="w-full bg-transparent outline-none text-[11px] font-medium text-gray-700"
                 >
-                  <option value="">All Statuses</option>
+                  <option value="">Overall Status</option>
                   <option value="sent">Sent</option>
                   <option value="partial">Partial</option>
                   <option value="failed">Failed</option>
-                  <option value="logged">Logged</option>
-                  <option value="pending">Pending</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2 border rounded-lg px-3 py-2 bg-gray-50/50 border-orange-100">
+                <Mail size={14} className="text-orange-400" />
+                <select
+                  value={historyFilterEmailStatus}
+                  onChange={(e) => setHistoryFilterEmailStatus(e.target.value)}
+                  className="w-full bg-transparent outline-none text-[11px] font-medium text-gray-700"
+                >
+                  <option value="">Email Status</option>
+                  <option value="sent">Email Sent</option>
+                  <option value="failed">Email Failed</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2 border rounded-lg px-3 py-2 bg-gray-50/50 border-indigo-100">
+                <Smartphone size={14} className="text-indigo-400" />
+                <select
+                  value={historyFilterPushStatus}
+                  onChange={(e) => setHistoryFilterPushStatus(e.target.value)}
+                  className="w-full bg-transparent outline-none text-[11px] font-medium text-gray-700"
+                >
+                  <option value="">Push Status</option>
+                  <option value="sent">Push Sent</option>
+                  <option value="failed">Push Failed</option>
                 </select>
               </div>
             </div>

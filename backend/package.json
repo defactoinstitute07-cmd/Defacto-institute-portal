@@ -5,6 +5,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
+    "indexes:performance": "node scripts/createPerformanceIndexes.js",
     "migrate:remove-batch-subjectids": "node scripts/removeBatchSubjectIds.js",
     "migrate:subjects-shared-model": "node scripts/migrateSubjectsToSharedModel.js",
     "migrate:remove-subject-batchid": "node scripts/removeSubjectBatchIdLegacyField.js"

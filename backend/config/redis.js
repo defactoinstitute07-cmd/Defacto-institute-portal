@@ -33,6 +33,15 @@ function deleteMemoryValue(key) {
     memoryStore.delete(key);
 }
 
+function deleteMemoryValuesByPrefix(prefix) {
+    cleanupMemoryStore();
+    for (const key of memoryStore.keys()) {
+        if (key.startsWith(prefix)) {
+            memoryStore.delete(key);
+        }
+    }
+}
+
 async function getRedisClient() {
     if (!process.env.REDIS_URL) {
         return null;
@@ -97,9 +106,27 @@ async function deleteCacheValue(key) {
     deleteMemoryValue(key);
 }
 
+async function deleteCacheByPrefix(prefix) {
+    const client = await getRedisClient();
+    if (client?.isOpen) {
+        const keys = [];
+        for await (const key of client.scanIterator({ MATCH: `${prefix}*`, COUNT: 100 })) {
+            keys.push(key);
+        }
+
+        if (keys.length > 0) {
+            await client.del(keys);
+        }
+        return;
+    }
+
+    deleteMemoryValuesByPrefix(prefix);
+}
+
 module.exports = {
     getRedisClient,
     setCacheValue,
     getCacheValue,
-    deleteCacheValue
+    deleteCacheValue,
+    deleteCacheByPrefix
 };

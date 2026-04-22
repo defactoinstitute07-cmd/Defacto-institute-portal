@@ -5,6 +5,7 @@ const Admin = require('../models/Admin');
 const PDFDocument = require('pdfkit');
 const path = require('path');
 const fs = require('fs');
+const { CACHE_PREFIXES, invalidateRouteCaches } = require('../middleware/responseCache');
 const { triggerAutomaticNotification, resolveNotificationTemplate } = require('../services/notificationService');
 const { sendEmail } = require('../services/emailService');
 
@@ -27,6 +28,12 @@ const formatCurrency = (value) => {
         maximumFractionDigits: 2
     });
 };
+
+const invalidateFeeReadCaches = () => invalidateRouteCaches([
+    CACHE_PREFIXES.dashboard,
+    CACHE_PREFIXES.fees,
+    CACHE_PREFIXES.students
+]);
 
 const createFeeReceiptPdfBuffer = ({ fee, payment, admin }) => {
     const student = fee.studentId || {};
@@ -302,14 +309,16 @@ exports.getFees = async (req, res) => {
             query.studentId = { $in: matchingStudents.map(s => s._id) };
         }
 
-        const total = await Fee.countDocuments(query);
-        const fees = await Fee.find(query)
-            .populate('studentId', 'name rollNo profileImage className session address')
-            .populate('batchId', 'name course')
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(limit)
-            .lean();
+        const [total, fees] = await Promise.all([
+            Fee.countDocuments(query),
+            Fee.find(query)
+                .populate('studentId', 'name rollNo profileImage className session address')
+                .populate('batchId', 'name course')
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit)
+                .lean()
+        ]);
 
         return res.json({
             success: true,
@@ -416,6 +425,7 @@ exports.createFee = async (req, res) => {
             }
         }).catch(() => console.error('[fees.createFee.notification] Notification dispatch failed'));
 
+        await invalidateFeeReadCaches();
         return res.status(201).json({ success: true, fee });
     } catch (err) {
         console.error('Error creating fee');
@@ -470,8 +480,10 @@ exports.recordPayment = async (req, res) => {
         });
 
         await fee.save();
-        await fee.populate('batchId', 'name course');
-        await fee.populate('studentId', 'name rollNo email');
+        await Promise.all([
+            fee.populate('batchId', 'name course'),
+            fee.populate('studentId', 'name rollNo email')
+        ]);
 
         const latestPayment = fee.paymentHistory[fee.paymentHistory.length - 1] || null;
 
@@ -537,6 +549,7 @@ exports.recordPayment = async (req, res) => {
             }).catch(() => console.error('[fees.recordPayment.notification] Push notification dispatch failed'));
         }
 
+        await invalidateFeeReadCaches();
         return res.json({ success: true, receiptNo, fee });
     } catch (err) {
         console.error('Error recording payment');
@@ -552,25 +565,54 @@ exports.generateFeesBulk = async (req, res) => {
             return res.status(400).json({ message: 'Month, year and due date are required' });
         }
 
-        const students = await Student.find({ status: 'active' }).populate('batchId');
+        const students = await Student.find({ status: 'active' })
+            .select('_id batchId fees registrationFee discount')
+            .lean();
         if (!students.length) {
             return res.json({ success: true, created: 0 });
         }
 
+        const batchIds = Array.from(new Set(
+            students
+                .map((student) => String(student.batchId || '').trim())
+                .filter(Boolean)
+        ));
+
+        const [batches, existingFees] = await Promise.all([
+            batchIds.length > 0
+                ? Batch.find({ _id: { $in: batchIds } }).select('_id fees').lean()
+                : [],
+            Fee.find({
+                month,
+                year,
+                studentId: { $in: students.map((student) => student._id) }
+            })
+                .select('studentId')
+                .lean()
+        ]);
+
+        const batchFeeMap = new Map(
+            batches.map((batch) => [String(batch._id), Number(batch.fees || 0)])
+        );
+        const existingFeeStudentIds = new Set(
+            existingFees.map((fee) => String(fee.studentId))
+        );
+
+        const normalizedDueDate = new Date(dueDate);
+        const dueDateLabel = normalizedDueDate.toLocaleDateString('en-IN');
         const feesToCreate = [];
         const generatedFeeNotificationTargets = [];
         for (const student of students) {
-            const exists = await Fee.findOne({ studentId: student._id, month, year });
-            if (exists) continue;
+            if (existingFeeStudentIds.has(String(student._id))) continue;
 
-            const baseFee = student.batchId?.fees || student.fees || 0;
+            const baseFee = batchFeeMap.get(String(student.batchId || '')) ?? Number(student.fees || 0);
             const registrationFee = Number(student.registrationFee || 0);
             const discount = Math.max(Number(student.discount || 0), 0);
             const totalFee = Math.max(Number(baseFee) + registrationFee - discount, 0);
 
-            const fee = new Fee({
+            feesToCreate.push({
                 studentId: student._id,
-                batchId: student.batchId?._id,
+                batchId: student.batchId || null,
                 month,
                 year,
                 monthlyTuitionFee: Number(baseFee),
@@ -581,20 +623,19 @@ exports.generateFeesBulk = async (req, res) => {
                 amountPaid: 0,
                 pendingAmount: totalFee,
                 status: 'pending',
-                dueDate: new Date(dueDate)
+                dueDate: normalizedDueDate
             });
-            feesToCreate.push(fee);
             generatedFeeNotificationTargets.push({
                 studentId: student._id,
                 amount: totalFee,
                 month,
                 year,
-                dueDate: new Date(dueDate).toLocaleDateString('en-IN')
+                dueDate: dueDateLabel
             });
         }
 
         if (feesToCreate.length) {
-            await Fee.insertMany(feesToCreate);
+            await Fee.insertMany(feesToCreate, { ordered: false });
 
             generatedFeeNotificationTargets.forEach((target) => {
                 triggerAutomaticNotification({
@@ -612,6 +653,9 @@ exports.generateFeesBulk = async (req, res) => {
             });
         }
 
+        if (feesToCreate.length > 0) {
+            await invalidateFeeReadCaches();
+        }
         return res.json({ success: true, created: feesToCreate.length });
     } catch (err) {
         console.error('Error generating bulk fees');
@@ -656,6 +700,7 @@ exports.remindOverdue = async (req, res) => {
             }).catch(() => console.error('[fees.remindOverdue.notification] Notification dispatch failed'));
         });
 
+        await invalidateFeeReadCaches();
         return res.json({
             success: true,
             overdueCount: overdueFees.length,
@@ -674,10 +719,10 @@ exports.deleteFee = async (req, res) => {
         const { id } = req.params;
         const fee = await Fee.findByIdAndDelete(id);
         if (!fee) return res.status(404).json({ message: 'Fee record not found' });
+        await invalidateFeeReadCaches();
         res.json({ success: true, message: 'Fee record deleted successfully' });
     } catch (err) {
         console.error('[fees.deleteFee] Error deleting fee record');
         return res.status(500).json({ message: 'Server error', error: err.message });
     }
 };
-

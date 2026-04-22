@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 30
+    },
+    "auditLog": "C:\\Rishabh\\new_____erp___\\backend\\logs\\.7c69a9f1398e479ebfc1e517d4a9e76153d73c50-audit.json",
+    "files": [
+        {
+            "date": 1776834603413,
+            "name": "C:\\Rishabh\\new_____erp___\\backend\\logs\\error-2026-04-22.log",
+            "hash": "d921e2a7a901079d8afc6531e91f5d21d2d5f7e65ad0e63e3637bcc82ed78cb6"
+        }
+    ],
+    "hashType": "sha256"
+}

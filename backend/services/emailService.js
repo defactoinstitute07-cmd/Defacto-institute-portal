@@ -1,12 +1,21 @@
 const nodemailer = require('nodemailer');
 
-const createTransporter = (user, pass) => nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user,
-        pass
+const transporterCache = globalThis.__erpEmailTransporters || (globalThis.__erpEmailTransporters = new Map());
+
+const getTransporter = (user, pass) => {
+    const cacheKey = `${user}::${pass}`;
+    if (!transporterCache.has(cacheKey)) {
+        transporterCache.set(cacheKey, nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user,
+                pass
+            }
+        }));
     }
-});
+
+    return transporterCache.get(cacheKey);
+};
 
 const escapeHtml = (value) => String(value || '')
     .replace(/&/g, '&amp;')
@@ -100,7 +109,7 @@ exports.sendEmail = async ({
 
         for (const creds of credentialCandidates) {
             try {
-                const transporter = createTransporter(creds.email, creds.appPassword);
+                const transporter = getTransporter(creds.email, creds.appPassword);
 
                 const mailOptions = {
                     from: creds.email,

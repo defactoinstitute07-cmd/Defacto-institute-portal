@@ -1,4 +1,11 @@
 const attendanceService = require('../services/attendance.service');
+const { CACHE_PREFIXES, invalidateRouteCaches } = require('../middleware/responseCache');
+
+const invalidateAttendanceReadCaches = () => invalidateRouteCaches([
+    CACHE_PREFIXES.dashboard,
+    CACHE_PREFIXES.students,
+    CACHE_PREFIXES.attendance
+]);
 
 exports.getAdminSetup = async (_req, res) => {
     try {
@@ -36,6 +43,7 @@ exports.markAttendance = async (req, res) => {
             entries: req.body.entries
         });
 
+        await invalidateAttendanceReadCaches();
         res.status(201).json({
             message: 'Attendance saved successfully.',
             ...result
@@ -56,6 +64,7 @@ exports.updateAttendance = async (req, res) => {
             notes: req.body.notes
         });
 
+        await invalidateAttendanceReadCaches();
         res.json({
             message: 'Attendance updated successfully.',
             attendance

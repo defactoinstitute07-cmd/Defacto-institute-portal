@@ -3,8 +3,14 @@ const Student = require('../models/Student');
 const Teacher = require('../models/Teacher');
 const Admin = require('../models/Admin');
 const { getNotificationTemplateDefinition } = require('../config/notificationTemplates');
+const { getCacheValue, setCacheValue } = require('../config/redis');
 const { sendPushNotification } = require('./pushNotificationService');
 const { sendEmail } = require('./emailService');
+
+const ADMIN_CACHE_TTL_SECONDS = Math.max(parseInt(process.env.NOTIFICATION_ADMIN_CACHE_TTL_SECONDS || '60', 10) || 60, 5);
+const HISTORY_CLEANUP_INTERVAL_SECONDS = Math.max(parseInt(process.env.NOTIFICATION_HISTORY_CLEANUP_INTERVAL_SECONDS || '3600', 10) || 3600, 60);
+const NOTIFICATION_RECIPIENT_CONCURRENCY = Math.max(parseInt(process.env.NOTIFICATION_RECIPIENT_CONCURRENCY || '5', 10) || 5, 1);
+const NOTIFICATION_ADMIN_SELECT = '_id coachingName instituteLogo notificationsEnabled emailEvents pushEvents gmailEmail gmailAppPassword';
 
 const createHttpError = (message, status = 400) => {
     const error = new Error(message);
@@ -84,6 +90,79 @@ const deriveOverallStatus = (results) => {
     return 'failed';
 };
 
+const getCachedJson = async (key) => {
+    const raw = await getCacheValue(key);
+    if (!raw) {
+        return null;
+    }
+
+    if (typeof raw !== 'string') {
+        return raw;
+    }
+
+    try {
+        return JSON.parse(raw);
+    } catch {
+        return null;
+    }
+};
+
+const setCachedJson = async (key, value, ttlSeconds) => {
+    await setCacheValue(key, JSON.stringify(value), ttlSeconds);
+};
+
+const sanitizeNotificationAdmin = (admin) => {
+    if (!admin) {
+        return null;
+    }
+
+    return {
+        _id: admin._id,
+        coachingName: admin.coachingName || '',
+        instituteLogo: admin.instituteLogo || '',
+        notificationsEnabled: admin.notificationsEnabled !== false,
+        emailEvents: admin.emailEvents || {},
+        pushEvents: admin.pushEvents || {},
+        gmailEmail: admin.gmailEmail || '',
+        gmailAppPassword: admin.gmailAppPassword || ''
+    };
+};
+
+const getNotificationAdmin = async (adminId = null) => {
+    const cacheKey = adminId
+        ? `notifications:admin:${adminId}`
+        : 'notifications:admin:default';
+
+    const cachedAdmin = await getCachedJson(cacheKey);
+    if (cachedAdmin) {
+        return cachedAdmin;
+    }
+
+    const admin = adminId
+        ? await Admin.findById(adminId).select(NOTIFICATION_ADMIN_SELECT).lean()
+        : await Admin.findOne().select(NOTIFICATION_ADMIN_SELECT).lean();
+
+    const safeAdmin = sanitizeNotificationAdmin(admin);
+
+    if (safeAdmin) {
+        await setCachedJson(cacheKey, safeAdmin, ADMIN_CACHE_TTL_SECONDS);
+    }
+
+    return safeAdmin;
+};
+
+const cleanupOldNotificationsIfDue = async (days = 3) => {
+    const cacheKey = `notifications:history-cleanup:${days}`;
+    const hasRecentCleanup = await getCacheValue(cacheKey);
+    if (hasRecentCleanup) {
+        return null;
+    }
+
+    const result = await cleanupOldNotifications(days);
+    await setCacheValue(cacheKey, '1', HISTORY_CLEANUP_INTERVAL_SECONDS);
+    return result;
+};
+
 const sendNotificationBatch = async ({
     title,
     message,
@@ -116,10 +195,7 @@ const sendNotificationBatch = async ({
         return { status: 'scheduled', notification: notificationRecord };
     }
 
-    let admin = null;
-    if (adminId) {
-        admin = await Admin.findById(adminId).lean();
-    }
+    const admin = adminId ? await getNotificationAdmin(adminId) : null;
 
     const query = { status: 'active' };
     if (!sendToAll) {
@@ -142,62 +218,84 @@ const sendNotificationBatch = async ({
 
     const summary = { total: recipients.length, sent: 0, partial: 0, failed: 0, logged: 0 };
 
-    for (const recipient of recipients) {
-        const channelResults = [];
-        let pushResult;
-        let emailResult;
+    for (let index = 0; index < recipients.length; index += NOTIFICATION_RECIPIENT_CONCURRENCY) {
+        const recipientChunk = recipients.slice(index, index + NOTIFICATION_RECIPIENT_CONCURRENCY);
+        const chunkResults = await Promise.all(recipientChunk.map(async (recipient) => {
+            const channelResults = [];
+            let pushResult;
+            let emailResult;
+            const tasks = [];
 
-        if (methods.includes('push')) {
-            pushResult = await sendPushNotification({
-                student: recipient,
-                message,
-                title,
-                type,
-                recipientType
-            });
-            channelResults.push(pushResult);
-        }
+            if (methods.includes('push')) {
+                tasks.push(
+                    sendPushNotification({
+                        student: recipient,
+                        message,
+                        title,
+                        type,
+                        recipientType
+                    }).then((result) => {
+                        pushResult = result;
+                        channelResults.push(result);
+                    })
+                );
+            }
 
-        if (methods.includes('email')) {
-            const rawEmailResult = await sendEmail({
-                student: recipientType === 'student' ? recipient : null,
-                teacher: recipientType === 'teacher' ? recipient : null,
-                message,
-                admin,
-                subjectOverride: title,
-                messageType: type,
-                eventType: type,
-                recipientRole: recipientType
-            });
+            if (methods.includes('email')) {
+                tasks.push(
+                    sendEmail({
+                        student: recipientType === 'student' ? recipient : null,
+                        teacher: recipientType === 'teacher' ? recipient : null,
+                        message,
+                        admin,
+                        subjectOverride: title,
+                        messageType: type,
+                        eventType: type,
+                        recipientRole: recipientType
+                    }).then((rawEmailResult) => {
+                        emailResult = {
+                            status: rawEmailResult.success ? 'sent' : 'failed',
+                            providerMessageId: rawEmailResult.messageId || '',
+                            error: rawEmailResult.error || '',
+                            meta: rawEmailResult
+                        };
+                        channelResults.push(emailResult);
+                    })
+                );
+            }
 
-            // Transform for Notification model schema (requires 'status' field)
-            emailResult = {
-                status: rawEmailResult.success ? 'sent' : 'failed',
-                providerMessageId: rawEmailResult.messageId || '',
-                error: rawEmailResult.error || '',
-                meta: rawEmailResult
+            await Promise.all(tasks);
+
+            const status = deriveOverallStatus(channelResults);
+
+            return {
+                status,
+                notificationDoc: {
+                    title,
+                    message,
+                    type,
+                    studentId: recipientType === 'student' ? recipient._id : null,
+                    teacherId: recipientType === 'teacher' ? recipient._id : null,
+                    createdBy: adminId,
+                    deliveryType,
+                    status,
+                    pushResult,
+                    emailResult,
+                    target: 'individual',
+                    targetId: String(recipient._id),
+                    recipientType
+                }
             };
-            channelResults.push(emailResult);
-        }
+        }));
 
-        const status = deriveOverallStatus(channelResults);
-        summary[status] += 1;
-
-        await Notification.create({
-            title,
-            message,
-            type,
-            studentId: recipientType === 'student' ? recipient._id : null,
-            teacherId: recipientType === 'teacher' ? recipient._id : null,
-            createdBy: adminId,
-            deliveryType,
-            status,
-            pushResult,
-            emailResult,
-            target: 'individual',
-            targetId: String(recipient._id),
-            recipientType
+        chunkResults.forEach((result) => {
+            summary[result.status] += 1;
         });
+
+        await Notification.insertMany(
+            chunkResults.map((result) => result.notificationDoc),
+            { ordered: false }
+        );
     }
 
     return { summary, deliveryType };
@@ -267,9 +365,8 @@ const getRecipients = async ({ search = '', page = 1, limit = 25, status = 'acti
     };
 };
 
-const getNotificationHistory = async ({ page = 1, limit = 5, status = '', deliveryType = '', type = '', search = '' }) => {
-    // Automatically cleanup data older than 3 days
-    await cleanupOldNotifications(3);
+const getNotificationHistory = async ({ page = 1, limit = 5, status = '', deliveryType = '', type = '', search = '', emailStatus = '', pushStatus = '' }) => {
+    await cleanupOldNotificationsIfDue(3);
 
     const query = {};
 
@@ -281,6 +378,9 @@ const getNotificationHistory = async ({ page = 1, limit = 5, status = '', delive
     if (status) query.status = status;
     if (deliveryType) query.deliveryType = deliveryType;
     if (type) query.type = type;
+    if (emailStatus) query['emailResult.status'] = emailStatus;
+    if (pushStatus) query['pushResult.status'] = pushStatus;
+
 
     if (search) {
         const [students, teachers] = await Promise.all([
@@ -440,9 +540,7 @@ const triggerAutomaticNotification = async ({
             return;
         }
 
-        const admin = adminId
-            ? await Admin.findById(adminId).lean()
-            : await Admin.findOne().lean();
+        const admin = await getNotificationAdmin(adminId);
 
         if (!admin || !admin.notificationsEnabled) {
             return;
@@ -483,28 +581,38 @@ const triggerAutomaticNotification = async ({
 
         let emailResult = null;
         let pushResult = null;
-        // Dispatch Email
+        const deliveryTasks = [];
+
         if (methods.includes('email')) {
-            emailResult = await sendEmail({
-                student: recipientType === 'student' ? recipient : null,
-                teacher: recipientType === 'teacher' ? recipient : null,
-                message: bodyEmail,
-                admin,
-                subjectOverride: subjectEmail,
-                attachments
-            });
+            deliveryTasks.push(
+                sendEmail({
+                    student: recipientType === 'student' ? recipient : null,
+                    teacher: recipientType === 'teacher' ? recipient : null,
+                    message: bodyEmail,
+                    admin,
+                    subjectOverride: subjectEmail,
+                    attachments
+                }).then((result) => {
+                    emailResult = result;
+                })
+            );
         }
 
-        // Dispatch Push
         if (methods.includes('push')) {
-            pushResult = await sendPushNotification({
-                student: recipient,
-                message: bodyPush,
-                title: subjectPush,
-                type: eventType,
-                data: data
-            });
+            deliveryTasks.push(
+                sendPushNotification({
+                    student: recipient,
+                    message: bodyPush,
+                    title: subjectPush,
+                    type: eventType,
+                    data: data
+                }).then((result) => {
+                    pushResult = result;
+                })
+            );
         }
+
+        await Promise.all(deliveryTasks);
 
         // Record in Notification collection so it shows in history
         const channelResults = [];

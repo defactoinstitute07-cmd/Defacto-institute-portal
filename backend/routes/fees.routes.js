@@ -1,13 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const feesController = require('../controllers/fees.controller');
+const { CACHE_PREFIXES, cacheJsonResponse } = require('../middleware/responseCache');
 const verifyAdminPassword = require('../middleware/verifyAdminPassword');
 
 // Metrics must come before "/:id" style routes
-router.get('/metrics', feesController.getMetrics);
+router.get('/metrics', cacheJsonResponse({ prefix: CACHE_PREFIXES.fees, ttlSeconds: 30 }), feesController.getMetrics);
 
 router.route('/')
-    .get(feesController.getFees)
+    .get(cacheJsonResponse({ prefix: CACHE_PREFIXES.fees, ttlSeconds: 20 }), feesController.getFees)
     .post(verifyAdminPassword, feesController.createFee);
 
 router.post('/generate', verifyAdminPassword, feesController.generateFeesBulk);

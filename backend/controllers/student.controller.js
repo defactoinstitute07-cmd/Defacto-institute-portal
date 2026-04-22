@@ -5,6 +5,7 @@ const Fee = require('../models/Fee');
 const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
 const { triggerAutomaticNotification } = require('../services/notificationService');
+const { CACHE_PREFIXES, invalidateRouteCaches } = require('../middleware/responseCache');
 const { buildStudentRegistrationAttachments } = require('../services/studentProfileSetupPdf.service');
 
 const getStudentPortalUrl = () =>
@@ -110,6 +111,13 @@ const toActivityFilters = (query = {}) => {
     return { activityStatus, studentStatus };
 };
 
+const runInBatches = async (items, batchSize, handler) => {
+    for (let index = 0; index < items.length; index += batchSize) {
+        const chunk = items.slice(index, index + batchSize);
+        await Promise.all(chunk.map((item, chunkIndex) => handler(item, index + chunkIndex)));
+    }
+};
+
 const createAdmissionFeeRecord = async ({ student, batchId, admissionDate, adminId }) => {
     if (!student?._id || !batchId || !mongoose.Types.ObjectId.isValid(batchId)) {
         return null;
@@ -176,35 +184,58 @@ const createAdmissionFeeRecord = async ({ student, batchId, admissionDate, admin
     return fee;
 };
 
+const invalidateStudentReadCaches = () => invalidateRouteCaches([
+    CACHE_PREFIXES.dashboard,
+    CACHE_PREFIXES.students,
+    CACHE_PREFIXES.batches,
+    CACHE_PREFIXES.fees
+]);
+
 // GET /api/students/stats
 exports.getStudentStats = async (req, res) => {
     try {
-        const total = await Student.countDocuments();
-        const active = await Student.countDocuments({ status: 'active' });
-        const completed = await Student.countDocuments({ status: 'completed' });
-
         const feePending = 0;
 
-        // New admissions this month
         const startOfMonth = new Date();
         startOfMonth.setDate(1);
         startOfMonth.setHours(0, 0, 0, 0);
-        const newAdmissions = await Student.countDocuments({ admissionDate: { $gte: startOfMonth } });
 
         const { start, end } = getAttendanceDateRange();
-        const attendanceRows = await Attendance.aggregate([
-            { $match: { attendanceDate: { $gte: start, $lte: end } } },
-            { $group: { _id: '$status', count: { $sum: 1 } } }
+        const [studentTotals, newAdmissions, attendanceRows] = await Promise.all([
+            Student.aggregate([
+                {
+                    $group: {
+                        _id: null,
+                        total: { $sum: 1 },
+                        active: {
+                            $sum: {
+                                $cond: [{ $eq: ['$status', 'active'] }, 1, 0]
+                            }
+                        },
+                        completed: {
+                            $sum: {
+                                $cond: [{ $eq: ['$status', 'completed'] }, 1, 0]
+                            }
+                        }
+                    }
+                }
+            ]),
+            Student.countDocuments({ admissionDate: { $gte: startOfMonth } }),
+            Attendance.aggregate([
+                { $match: { attendanceDate: { $gte: start, $lte: end } } },
+                { $group: { _id: '$status', count: { $sum: 1 } } }
+            ])
         ]);
 
+        const counts = studentTotals[0] || {};
         const presentCount = attendanceRows.find((row) => row._id === 'Present')?.count || 0;
         const totalCount = attendanceRows.reduce((sum, row) => sum + row.count, 0);
         const attendanceAvg = totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0;
 
         res.json({
-            total,
-            active,
-            completed,
+            total: counts.total || 0,
+            active: counts.active || 0,
+            completed: counts.completed || 0,
             feePending,
             newAdmissions,
             attendanceAvg
@@ -357,14 +388,18 @@ exports.getAllStudents = async (req, res) => {
         if (className) query.className = className;
         if (signupStatus) query['portalAccess.signupStatus'] = signupStatus;
 
-        const skip = (parseInt(page) - 1) * parseInt(limit);
-        const total = await Student.countDocuments(query);
-        const students = await Student.find(query)
-            .populate('batchId', 'name subjects fees capacity')
-            .sort({ joinedAt: -1 })
-            .skip(skip)
-            .limit(parseInt(limit))
-            .lean();
+        const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
+        const safePage = Math.max(parseInt(page, 10) || 1, 1);
+        const skip = (safePage - 1) * safeLimit;
+        const [total, students] = await Promise.all([
+            Student.countDocuments(query),
+            Student.find(query)
+                .populate('batchId', 'name subjects fees capacity')
+                .sort({ joinedAt: -1 })
+                .skip(skip)
+                .limit(safeLimit)
+                .lean()
+        ]);
 
         const { start, end } = getAttendanceDateRange();
         const attendanceMap = await buildAttendanceSummaryMap(
@@ -384,7 +419,7 @@ exports.getAllStudents = async (req, res) => {
             }
         }));
 
-        res.json({ students: enriched, total, page: parseInt(page), pages: Math.ceil(total / limit) });
+        res.json({ students: enriched, total, page: safePage, pages: Math.ceil(total / safeLimit) });
     } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });
     }
@@ -480,6 +515,7 @@ exports.createStudent = async (req, res) => {
 
         const result = student.toObject();
         delete result.password;
+        await invalidateStudentReadCaches();
         res.status(201).json({
             message: student.batchId ? 'Student created successfully' : 'Student created (Batch Pending)',
             student: result
@@ -534,21 +570,43 @@ exports.updateStudent = async (req, res) => {
                 const unpaidFees = await Fee.find({
                     studentId: student._id,
                     status: { $in: ['pending', 'partial', 'overdue'] }
+                })
+                    .select('_id monthlyTuitionFee registrationFee fine amountPaid')
+                    .lean();
+
+                const feeOps = unpaidFees.map((fee) => {
+                    const totalFee = Math.max(
+                        Number(fee.monthlyTuitionFee || 0) +
+                        Number(fee.registrationFee || 0) +
+                        Number(fee.fine || 0) -
+                        newDiscount,
+                        0
+                    );
+
+                    const amountPaid = Number(fee.amountPaid || 0);
+                    const pendingAmount = Math.max(totalFee - amountPaid, 0);
+                    let nextStatus = 'pending';
+
+                    if (pendingAmount <= 0 && totalFee > 0) nextStatus = 'paid';
+                    else if (amountPaid > 0 && pendingAmount > 0) nextStatus = 'partial';
+
+                    return {
+                        updateOne: {
+                            filter: { _id: fee._id },
+                            update: {
+                                $set: {
+                                    discount: newDiscount,
+                                    totalFee,
+                                    pendingAmount,
+                                    status: nextStatus
+                                }
+                            }
+                        }
+                    };
                 });
 
-                for (const fee of unpaidFees) {
-                    fee.discount = newDiscount;
-                    fee.totalFee = Math.max((fee.monthlyTuitionFee || 0) + (fee.registrationFee || 0) + (fee.fine || 0) - newDiscount, 0);
-                    
-                    const amountPaid = Number(fee.amountPaid || 0);
-                    const pending = Math.max(fee.totalFee - amountPaid, 0);
-                    fee.pendingAmount = pending;
-
-                    if (pending <= 0 && fee.totalFee > 0) fee.status = 'paid';
-                    else if (amountPaid > 0 && pending > 0) fee.status = 'partial';
-                    else fee.status = 'pending';
-
-                    await fee.save();
+                if (feeOps.length > 0) {
+                    await Fee.bulkWrite(feeOps, { ordered: false });
                 }
             } catch (feeUpdateError) {
                 console.error('[updateStudent.retroactiveDiscount] Failed to update unpaid fees:', feeUpdateError.message);
@@ -566,6 +624,7 @@ exports.updateStudent = async (req, res) => {
             }
         }
 
+        await invalidateStudentReadCaches();
         res.json({
             message: isActivatingBatch ? 'Batch assigned successfully' : 'Updated',
             student
@@ -581,6 +640,7 @@ exports.deleteStudent = async (req, res) => {
         const student = await Student.findByIdAndDelete(req.params.id);
         if (!student) return res.status(404).json({ message: 'Student not found' });
 
+        await invalidateStudentReadCaches();
         res.json({ message: 'Deleted' });
     } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });
@@ -592,6 +652,7 @@ exports.deleteAllStudents = async (req, res) => {
     try {
         await Student.deleteMany({});
 
+        await invalidateStudentReadCaches();
         res.json({ message: 'All students deleted successfully' });
     } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });
@@ -642,7 +703,9 @@ exports.bulkUpload = async (req, res) => {
         };
 
         // Using individual save() to ensure pre-save hooks (password hashing) trigger
-        await Promise.all(students.map(async (s, i) => {
+        const bulkConcurrency = Math.max(parseInt(process.env.BULK_STUDENT_UPLOAD_CONCURRENCY || '10', 10) || 10, 1);
+
+        await runInBatches(students, bulkConcurrency, async (s, i) => {
             try {
                 // Flexible Field Mapping (Normalization)
                 const getValue = (keys) => {
@@ -713,8 +776,9 @@ exports.bulkUpload = async (req, res) => {
                 failedCount++;
                 errors.push({ name: s.name || 'Unknown', error: err.message });
             }
-        }));
+        });
 
+        await invalidateStudentReadCaches();
         res.status(201).json({
             message: `${successCount} students inserted, ${failedCount} failed.`,
             total: students.length,
@@ -748,15 +812,23 @@ exports.exportStudents = async (req, res) => {
 // GET all batches
 exports.getBatches = async (req, res) => {
     try {
-        const batches = await Batch.find({ isActive: true }).select('name subjects fees capacity course');
-        // Count enrolled for each batch
-        const batchDetails = await Promise.all(batches.map(async b => {
-            const enrolled = await Student.countDocuments({ batchId: b._id });
-            return {
-                ...b.toObject(),
-                enrolled
-            };
+        const [batches, enrollmentRows] = await Promise.all([
+            Batch.find({ isActive: true }).select('name subjects fees capacity course').lean(),
+            Student.aggregate([
+                { $match: { batchId: { $ne: null } } },
+                { $group: { _id: '$batchId', enrolled: { $sum: 1 } } }
+            ])
+        ]);
+
+        const enrollmentMap = new Map(
+            enrollmentRows.map((row) => [String(row._id), row.enrolled])
+        );
+
+        const batchDetails = batches.map((batch) => ({
+            ...batch,
+            enrolled: enrollmentMap.get(String(batch._id)) || 0
         }));
+
         res.json({ batches: batchDetails });
     } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });
