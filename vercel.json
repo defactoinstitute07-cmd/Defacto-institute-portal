@@ -1,7 +1,5 @@
 {
-    "$schema": "https://openapi.vercel.sh/vercel.json",
     "version": 2,
-    "fluid": true,
     "builds": [
         {
             "src": "backend/server.js",
@@ -18,18 +16,18 @@
     "rewrites": [
         {
             "source": "/api/:path*",
-            "destination": "/backend/server.js"
+            "destination": "backend/server.js"
         },
         {
             "source": "/admin/:path*",
-            "destination": "/backend/server.js"
+            "destination": "backend/server.js"
         },
         {
             "source": "/uploads/:path*",
-            "destination": "/backend/server.js"
+            "destination": "backend/server.js"
         },
         {
-            "source": "/(.*)",
+            "source": "/((?!api|admin|uploads|index.html|.*\\.).*)",
             "destination": "/index.html"
         }
     ]

@@ -13,11 +13,30 @@ const connectDB = require('../config/db');
 // Check if admin exists
 exports.checkAdmin = async (req, res) => {
     try {
-        const adminCount = await Admin.countDocuments();
+        // Prevent hanging on cold starts or DB connection issues
+        const mongoose = require('mongoose');
+        if (mongoose.connection.readyState !== 1) {
+            console.warn('[CheckAdmin] MongoDB not connected, attempting short-wait connection');
+            try {
+                // Try to connect with a short timeout and 1 retry
+                await connectDB(1, 1000);
+            } catch (dbErr) {
+                console.error('[CheckAdmin] DB connection failed during short-wait');
+                // Return a failure instead of hanging, frontend will auto-retry or fallback
+                return res.status(503).json({ 
+                    exists: true, // Safe fallback: assume admin exists to prevent accidental redirect to signup
+                    message: 'Database connection pending',
+                    loading: true 
+                });
+            }
+        }
+
+        const adminCount = await Admin.countDocuments().maxTimeMS(2000); // 2 second timeout for the query itself
         res.status(200).json({ exists: adminCount > 0 });
     } catch (error) {
-        console.error('[CheckAdminError] Unable to check admin status');
-        res.status(500).json({ message: 'Server error', error: error.message });
+        console.error('[CheckAdminError] Unable to check admin status:', error.message);
+        // On error, we default to 'exists: true' to prevent showing the signup page accidentally
+        res.status(200).json({ exists: true, error: error.message, isFallback: true });
     }
 };
 
