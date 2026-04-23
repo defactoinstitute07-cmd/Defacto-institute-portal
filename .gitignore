@@ -19,3 +19,5 @@ backend/node_modules/
 tutution_erp/node_modules/
 tutution_erp/frontend/node_modules/
 tutution_erp/backend/node_modules/
+
+.vercel

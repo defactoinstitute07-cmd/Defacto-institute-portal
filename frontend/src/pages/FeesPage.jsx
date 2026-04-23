@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Search, Plus, Download, AlertCircle, Loader2, History, CreditCard, LineChart, Clock, Settings, Bell, Trash2 } from 'lucide-react';
+import { Search, Plus, Download, AlertCircle, Loader2, History, CreditCard, LineChart, Clock, Settings, Bell, Trash2, Pencil, ChevronDown, ChevronUp } from 'lucide-react';
 import ERPLayout from '../components/ERPLayout';
 import ReceiptPreviewModal from '../components/fees/ReceiptPreviewModal';
 import RecordPaymentModal from '../components/fees/RecordPaymentModal';
@@ -38,11 +38,13 @@ const FeesPage = () => {
     const [total, setTotal] = useState(0);
     const [modal, setModal] = useState(false);
     const [selFee, setSelFee] = useState(null);
-    const [genForm, setGenForm] = useState({ month: '', year: String(new Date().getFullYear()), dueDate: '' });
+
     const [receiptConfig, setReceiptConfig] = useState(null);
     const [previewPdf, setPreviewPdf] = useState({ isOpen: false, blobUrl: null, filename: '' });
     const [actionState, setActionState] = useState({ isOpen: false, type: 'verify', title: '', desc: '', onConfirm: null, loading: false, error: '' });
     const [watermarkUrl, setWatermarkUrl] = useState('');
+    const [expandedYearlyGroups, setExpandedYearlyGroups] = useState({});
+    const [editFee, setEditFee] = useState(null);
 
     const loadBatches = async () => {
         try {
@@ -358,7 +360,14 @@ const FeesPage = () => {
     const confirmCreateFee = async (formData, password) => {
         setActionState((prev) => ({ ...prev, loading: true, error: '' }));
         try {
-            await apiClient.post('/fees', { ...formData, adminPassword: password });
+            if (formData._multiMonth) {
+                // Multi-month fee creation
+                const { _multiMonth, ...payload } = formData;
+                await apiClient.post('/fees/create-multi-month', { ...payload, adminPassword: password });
+            } else {
+                // Single month fee creation
+                await apiClient.post('/fees', { ...formData, adminPassword: password });
+            }
             setActionState((prev) => ({ ...prev, isOpen: false }));
             setModal(false);
             load();
@@ -380,30 +389,115 @@ const FeesPage = () => {
         });
     };
 
-    const confirmBulkGeneration = async (password) => {
-        setActionState((prev) => ({ ...prev, loading: true, error: '' }));
-        try {
-            await apiClient.post('/fees/generate', { ...genForm, adminPassword: password });
-            setActionState((prev) => ({ ...prev, isOpen: false }));
-            setModal(false);
-            load();
-            loadMetrics();
-        } catch (error) {
-            setActionState((prev) => ({ ...prev, loading: false, error: error.response?.data?.message || 'Bulk generation failed' }));
-        }
-    };
+    const handleGenerateFee = () => {
+        const genMonth = month || monthOptions[new Date().getMonth()];
+        const genYear = year || String(new Date().getFullYear());
+        // Default due date: 10th of the next month
+        const monthIdx = monthOptions.indexOf(genMonth);
+        const nextMonth = new Date(Number(genYear), monthIdx + 1, 10);
+        const dueDate = nextMonth.toISOString().split('T')[0];
 
-    const generate = (event) => {
-        event.preventDefault();
         setActionState({
             isOpen: true,
             type: 'warning',
-            title: 'Authorize Bulk Generation',
-            desc: `Generate fees for all active students for ${genForm.month} ${genForm.year}.`,
-            onConfirm: (password) => confirmBulkGeneration(password),
+            title: 'Generate Fees',
+            desc: `Generate fees for all monthly-mode students for ${genMonth} ${genYear}. Due date: ${new Date(dueDate).toLocaleDateString('en-IN')}.`,
+            onConfirm: async (password) => {
+                setActionState((prev) => ({ ...prev, loading: true, error: '' }));
+                try {
+                    const { data } = await apiClient.post('/fees/generate', { month: genMonth, year: genYear, dueDate, adminPassword: password });
+                    setActionState((prev) => ({ ...prev, isOpen: false }));
+                    load();
+                    loadMetrics();
+                    const msg = `${data.created} fee(s) generated.` + (data.skippedYearly ? ` ${data.skippedYearly} yearly student(s) skipped.` : '');
+                    alert(msg);
+                } catch (error) {
+                    setActionState((prev) => ({ ...prev, loading: false, error: error.response?.data?.message || 'Fee generation failed' }));
+                }
+            },
             loading: false,
             error: ''
         });
+    };
+
+    const handleEditFee = (fee) => {
+        setEditFee({
+            _id: fee._id,
+            studentId: fee.studentId?._id || fee.studentId,
+            batchId: fee.batchId?._id || fee.batchId,
+            studentName: fee.studentId?.name || 'Student',
+            monthlyTuitionFee: fee.monthlyTuitionFee || 0,
+            discount: fee.discount || 0,
+            fine: fee.fine || 0,
+            dueDate: fee.dueDate ? new Date(fee.dueDate).toISOString().split('T')[0] : '',
+            month: fee.month,
+            year: fee.year,
+            numberOfMonths: 1,
+            registrationFee: fee.registrationFee || 0
+        });
+        setModal('edit');
+    };
+
+    const getEditDuration = () => {
+        if (!editFee) return { months: [], label: '' };
+        const startIdx = monthOptions.indexOf(editFee.month);
+        if (startIdx === -1) return { months: [], label: editFee.month };
+        const count = Number(editFee.numberOfMonths) || 1;
+        const months = [];
+        for (let i = 0; i < count; i++) {
+            months.push(monthOptions[(startIdx + i) % 12]);
+        }
+        const endMonth = months[months.length - 1];
+        const label = count === 1
+            ? `${editFee.month} ${editFee.year}`
+            : `${editFee.month} ${editFee.year} → ${endMonth} ${editFee.year}`;
+        return { months, label };
+    };
+
+    const getEditTotals = () => {
+        if (!editFee) return { perMonth: 0, total: 0, netPayable: 0 };
+        const baseFee = Number(editFee.monthlyTuitionFee) || 0;
+        const count = Number(editFee.numberOfMonths) || 1;
+        const total = baseFee * count;
+        const disc = Number(editFee.discount) || 0;
+        const fine = Number(editFee.fine) || 0;
+        const netPayable = Math.max(total + fine - disc, 0);
+        return { perMonth: baseFee, total, netPayable };
+    };
+
+    const confirmEditFee = async (password) => {
+        setActionState((prev) => ({ ...prev, loading: true, error: '' }));
+        try {
+            const count = Number(editFee.numberOfMonths) || 1;
+
+            if (count > 1) {
+                // Convert to multi-month: delete original, create fresh batch
+                const { months } = getEditDuration();
+                await apiClient.post('/fees/create-multi-month', {
+                    studentId: editFee.studentId,
+                    batchId: editFee.batchId,
+                    months,
+                    year: editFee.year,
+                    dueDate: editFee.dueDate,
+                    discount: Number(editFee.discount) || 0,
+                    registrationFee: Number(editFee.registrationFee) || 0,
+                    adminPassword: password
+                });
+                // Delete the original single-month record if it was recreated by multi-month
+                try { await apiClient.delete(`/fees/${editFee._id}`, { data: { adminPassword: password } }); } catch (_) { /* may already be replaced */ }
+            } else {
+                // Single month edit
+                await apiClient.put(`/fees/${editFee._id}`, { ...editFee, adminPassword: password });
+            }
+
+            setActionState((prev) => ({ ...prev, isOpen: false }));
+            setModal(false);
+            setEditFee(null);
+            load();
+            loadMetrics();
+        } catch (error) {
+            setActionState((prev) => ({ ...prev, loading: false, error: error.response?.data?.message || 'Edit failed' }));
+        }
     };
 
     const handleRemindOverdue = () => {
@@ -496,7 +590,7 @@ const FeesPage = () => {
                             <button className="btn btn-outline" onClick={exportData}><Download size={16} /> Export CSV</button>
                             <button className="btn btn-outline" onClick={handleRemindOverdue}><Bell size={16} /> Remind Overdue</button>
                             <button className="btn btn-outline" onClick={() => setModal('receiptSettings')}><Settings size={16} /> Receipt Settings</button>
-                            <button className="btn btn-outline" onClick={() => setModal('generate')}><Plus size={16} /> Bulk Generate</button>
+                            <button className="btn btn-outline" onClick={handleGenerateFee}><Plus size={16} /> Generate Fee</button>
                             <button className="btn btn-primary" onClick={() => setModal('create')}><Plus size={16} /> Create Fee</button>
                         </div>
                     </div>
@@ -554,8 +648,21 @@ const FeesPage = () => {
                                     <tbody>
                                         {fees.length === 0 ? (
                                             <tr><td colSpan="5" className="py-10 text-center text-sm font-medium text-slate-500">No fee records found.</td></tr>
-                                        ) : fees.map((fee) => (
-                                            <tr key={fee._id}>
+                                        ) : (() => {
+                                            // Separate yearly and monthly fees
+                                            const monthlyFees = fees.filter(f => f.paymentType !== 'yearly');
+                                            const yearlyFees = fees.filter(f => f.paymentType === 'yearly');
+
+                                            // Group yearly fees by studentId + year
+                                            const yearlyGroupMap = {};
+                                            yearlyFees.forEach(f => {
+                                                const key = `${f.studentId?._id || f.studentId}_${f.year}`;
+                                                if (!yearlyGroupMap[key]) yearlyGroupMap[key] = [];
+                                                yearlyGroupMap[key].push(f);
+                                            });
+                                            const yearlyGroups = Object.entries(yearlyGroupMap);
+
+                                            const renderStudentCell = (fee) => (
                                                 <td data-label="Student">
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                                                         <div className="tb-avatar overflow-hidden border border-slate-200" style={{ width: 34, height: 34, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -567,21 +674,82 @@ const FeesPage = () => {
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td data-label="Period"><div className="td-bold">{fee.month} {fee.year}</div></td>
-                                                <td data-label="Financials">
-                                                    <div className="td-bold">Rs {fmt(fee.totalFee || 0)}</div>
-                                                    <div className="td-sm">Paid: Rs {fmt(fee.amountPaid)} | Remaining: Rs {fmt(fee.pendingAmount)}</div>
-                                                </td>
-                                                <td data-label="Status"><span className={`badge ${fee.status === 'paid' ? 'badge-active' : fee.status === 'overdue' ? 'badge-overdue' : ''}`}>{fee.status}</span></td>
-                                                <td data-label="Actions">
-                                                    <div className="flex gap-2">
-                                                        <button className="btn btn-outline btn-sm" onClick={() => { setSelFee(fee); setModal('history'); }} title="History"><History size={13} /></button>
-                                                        {fee.status !== 'paid' && <button className="btn btn-primary btn-sm" onClick={() => { setSelFee(fee); setModal('payment'); }} title="Pay"><CreditCard size={13} /></button>}
-                                                        {/* <button className="btn btn-outline btn-sm text-red-600 hover:bg-red-50 border-red-200" onClick={() => handleDeleteFee(fee)} title="Delete"><Trash2 size={13} /></button> */}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
+                                            );
+
+                                            return (
+                                                <>
+                                                    {/* Yearly grouped rows */}
+                                                    {yearlyGroups.map(([groupKey, groupFees]) => {
+                                                        const first = groupFees[0];
+                                                        const totalFee = groupFees.reduce((s, f) => s + (f.totalFee || 0), 0);
+                                                        const totalPaid = groupFees.reduce((s, f) => s + (f.amountPaid || 0), 0);
+                                                        const totalPending = Math.max(totalFee - totalPaid, 0);
+                                                        const allPaid = groupFees.every(f => f.status === 'paid');
+                                                        const anyPartial = groupFees.some(f => f.status === 'partial') || (groupFees.some(f => f.status === 'paid') && groupFees.some(f => f.status !== 'paid'));
+                                                        const groupStatus = allPaid ? 'paid' : anyPartial ? 'partial' : 'pending';
+                                                        const isExpanded = expandedYearlyGroups[groupKey];
+
+                                                        return (
+                                                            <React.Fragment key={groupKey}>
+                                                                <tr style={{ background: '#fefce8', cursor: 'pointer' }}
+                                                                    onClick={() => setExpandedYearlyGroups(prev => ({ ...prev, [groupKey]: !prev[groupKey] }))}>
+                                                                    {renderStudentCell(first)}
+                                                                    <td data-label="Period">
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                                            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                                                            <div>
+                                                                                <div className="td-bold" style={{ color: '#92400e' }}>Year {first.year} (Yearly)</div>
+                                                                                <div className="td-sm">{groupFees.length} months</div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td data-label="Financials">
+                                                                        <div className="td-bold">Rs {fmt(totalFee)}</div>
+                                                                        <div className="td-sm">Paid: Rs {fmt(totalPaid)} | Remaining: Rs {fmt(totalPending)}</div>
+                                                                    </td>
+                                                                    <td data-label="Status"><span className={`badge ${groupStatus === 'paid' ? 'badge-active' : groupStatus === 'overdue' ? 'badge-overdue' : ''}`}>{groupStatus}</span></td>
+                                                                    <td data-label="Actions">
+                                                                        <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                                                                            <button className="btn btn-outline btn-sm" onClick={() => { setSelFee(first); setModal('history'); }} title="History"><History size={13} /></button>
+                                                                            {groupStatus !== 'paid' && <button className="btn btn-primary btn-sm" onClick={() => { setSelFee({ ...first, _yearlyGroup: groupFees, totalFee, amountPaid: totalPaid, pendingAmount: totalPending, monthlyTuitionFee: totalFee, registrationFee: 0, discount: groupFees.reduce((s,f) => s + (f.discount||0), 0), fine: groupFees.reduce((s,f) => s + (f.fine||0), 0) }); setModal('payment'); }} title="Pay All"><CreditCard size={13} /></button>}
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                                {isExpanded && groupFees.map((fee) => (
+                                                                    <tr key={fee._id} style={{ background: '#fffbeb' }}>
+                                                                        <td></td>
+                                                                        <td data-label="Month" style={{ paddingLeft: 28 }}><span style={{ fontSize: '0.85rem', color: '#78716c' }}>{fee.month}</span></td>
+                                                                        <td data-label="Financials"><div className="td-sm">Rs {fmt(fee.totalFee)} | Paid: Rs {fmt(fee.amountPaid)}</div></td>
+                                                                        <td data-label="Status"><span className={`badge ${fee.status === 'paid' ? 'badge-active' : ''}`}>{fee.status}</span></td>
+                                                                        <td></td>
+                                                                    </tr>
+                                                                ))}
+                                                            </React.Fragment>
+                                                        );
+                                                    })}
+
+                                                    {/* Monthly individual rows */}
+                                                    {monthlyFees.map((fee) => (
+                                                        <tr key={fee._id}>
+                                                            {renderStudentCell(fee)}
+                                                            <td data-label="Period"><div className="td-bold">{fee.month} {fee.year}</div></td>
+                                                            <td data-label="Financials">
+                                                                <div className="td-bold">Rs {fmt(fee.totalFee || 0)}</div>
+                                                                <div className="td-sm">Paid: Rs {fmt(fee.amountPaid)} | Remaining: Rs {fmt(fee.pendingAmount)}</div>
+                                                            </td>
+                                                            <td data-label="Status"><span className={`badge ${fee.status === 'paid' ? 'badge-active' : fee.status === 'overdue' ? 'badge-overdue' : ''}`}>{fee.status}</span></td>
+                                                            <td data-label="Actions">
+                                                                <div className="flex gap-2">
+                                                                    <button className="btn btn-outline btn-sm" onClick={() => { setSelFee(fee); setModal('history'); }} title="History"><History size={13} /></button>
+                                                                    <button className="btn btn-outline btn-sm" onClick={() => handleEditFee(fee)} title="Edit"><Pencil size={13} /></button>
+                                                                    {fee.status !== 'paid' && <button className="btn btn-primary btn-sm" onClick={() => { setSelFee(fee); setModal('payment'); }} title="Pay"><CreditCard size={13} /></button>}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </>
+                                            );
+                                        })()}
                                     </tbody>
                                 </table>
                             </div>
@@ -601,29 +769,135 @@ const FeesPage = () => {
             {modal === 'create' && <CreateFeeModal onClose={() => setModal(false)} onSave={handleCreateFee} />}
             {modal === 'receiptSettings' && <ReceiptSettingsModal isOpen initialSettings={receiptConfig} onClose={() => setModal(false)} onSave={(settings) => setReceiptConfig(settings)} />}
 
-            {modal === 'generate' && (
+            {modal === 'edit' && editFee && (() => {
+                const duration = getEditDuration();
+                const totals = getEditTotals();
+                const count = Number(editFee.numberOfMonths) || 1;
+
+                return (
                 <div className="modal-overlay" onClick={(event) => event.target === event.currentTarget && setModal(false)}>
-                    <div className="modal" style={{ maxWidth: 460 }}>
-                        <div style={{ padding: '24px', background: 'var(--erp-primary)', color: '#fff' }}>
-                            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0 }}>Bulk Fee Generation</h2>
-                            <p style={{ fontSize: '0.85rem', opacity: 0.8, marginTop: 4 }}>Generate fees for all active students</p>
+                    <div className="modal" style={{ maxWidth: 520 }}>
+                        <div style={{ padding: '24px', background: '#0f172a', color: '#fff', position: 'relative', overflow: 'hidden' }}>
+                            <div style={{ position: 'absolute', right: -10, bottom: -20, opacity: 0.06 }}><Pencil size={100} /></div>
+                            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, position: 'relative' }}>Edit Fee Record</h2>
+                            <p style={{ fontSize: '0.85rem', opacity: 0.8, marginTop: 4, position: 'relative' }}>{editFee.studentName}</p>
                         </div>
-                        <form onSubmit={generate}>
-                            <div className="modal-body" style={{ padding: '24px' }}>
-                                <div className="mf-row">
-                                    <div className="mf"><label>Month</label><select value={genForm.month} onChange={(e) => setGenForm({ ...genForm, month: e.target.value })} required><option value="">Select Month</option>{monthOptions.map((month) => <option key={month} value={month}>{month}</option>)}</select></div>
-                                    <div className="mf"><label>Year</label><input value={genForm.year} onChange={(e) => setGenForm({ ...genForm, year: e.target.value })} required /></div>
+
+                        <div style={{ padding: '24px' }}>
+                            {/* Start Month & Number of Months */}
+                            <div className="mf-row">
+                                <div className="mf">
+                                    <label>Start Month</label>
+                                    <select value={editFee.month} onChange={(e) => setEditFee({ ...editFee, month: e.target.value })}>
+                                        {monthOptions.map((m) => <option key={m} value={m}>{m}</option>)}
+                                    </select>
                                 </div>
-                                <div className="mf"><label>Due Date</label><input type="date" value={genForm.dueDate} onChange={(e) => setGenForm({ ...genForm, dueDate: e.target.value })} required /></div>
+                                <div className="mf">
+                                    <label>Number of Months</label>
+                                    <select value={editFee.numberOfMonths} onChange={(e) => setEditFee({ ...editFee, numberOfMonths: Number(e.target.value) })}>
+                                        {[1,2,3,4,5,6,7,8,9,10,11,12].map((n) => <option key={n} value={n}>{n} month{n > 1 ? 's' : ''}</option>)}
+                                    </select>
+                                </div>
                             </div>
-                            <div className="modal-footer" style={{ padding: '16px 24px', background: 'var(--erp-bg2)', display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-                                <button type="button" className="btn btn-outline" onClick={() => setModal(false)}>Cancel</button>
-                                <button type="submit" className="btn btn-primary">Generate Fees</button>
+
+                            {/* Duration Display */}
+                            <div style={{
+                                margin: '12px 0 16px',
+                                padding: '12px 16px',
+                                background: count > 1 ? 'linear-gradient(135deg, #fef3c7, #fde68a)' : '#f1f5f9',
+                                borderRadius: 8,
+                                border: count > 1 ? '1px solid #fbbf24' : '1px solid #e2e8f0'
+                            }}>
+                                <div style={{ fontSize: '0.68rem', fontWeight: 800, color: count > 1 ? '#92400e' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+                                    Duration
+                                </div>
+                                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: count > 1 ? '#78350f' : '#0f172a' }}>
+                                    {duration.label}
+                                </div>
+                                {count > 1 && (
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                                        {duration.months.map((m) => (
+                                            <span key={m} style={{
+                                                padding: '3px 10px', borderRadius: 20, fontSize: '0.7rem', fontWeight: 700,
+                                                background: '#fff', color: '#92400e', border: '1px solid #f59e0b'
+                                            }}>{m}</span>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
-                        </form>
+
+                            {/* Fee Fields */}
+                            <div className="mf-row">
+                                <div className="mf">
+                                    <label>Monthly Tuition Fee</label>
+                                    <input type="number" value={editFee.monthlyTuitionFee} onChange={(e) => setEditFee({ ...editFee, monthlyTuitionFee: e.target.value })} />
+                                </div>
+                                <div className="mf">
+                                    <label>Total Discount</label>
+                                    <input type="number" value={editFee.discount} onChange={(e) => setEditFee({ ...editFee, discount: e.target.value })} />
+                                </div>
+                            </div>
+                            <div className="mf-row">
+                                <div className="mf">
+                                    <label>Fine</label>
+                                    <input type="number" value={editFee.fine} onChange={(e) => setEditFee({ ...editFee, fine: e.target.value })} />
+                                </div>
+                                <div className="mf">
+                                    <label>Due Date</label>
+                                    <input type="date" value={editFee.dueDate} onChange={(e) => setEditFee({ ...editFee, dueDate: e.target.value })} />
+                                </div>
+                            </div>
+
+                            {/* Calculation Panel */}
+                            <div style={{
+                                marginTop: 16, borderRadius: 8, overflow: 'hidden',
+                                border: '1px solid #e2e8f0'
+                            }}>
+                                <div style={{ background: '#f8fafc', padding: '10px 16px', display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#64748b', fontWeight: 700, borderBottom: '1px solid #e2e8f0' }}>
+                                    <span>Per Month</span>
+                                    <span>Rs {fmt(totals.perMonth)}</span>
+                                </div>
+                                {count > 1 && (
+                                    <div style={{ background: '#f8fafc', padding: '10px 16px', display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#64748b', fontWeight: 700, borderBottom: '1px solid #e2e8f0' }}>
+                                        <span>× {count} months</span>
+                                        <span>Rs {fmt(totals.total)}</span>
+                                    </div>
+                                )}
+                                {Number(editFee.discount) > 0 && (
+                                    <div style={{ background: '#fef2f2', padding: '10px 16px', display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#dc2626', fontWeight: 700, borderBottom: '1px solid #e2e8f0' }}>
+                                        <span>Discount</span>
+                                        <span>- Rs {fmt(Number(editFee.discount))}</span>
+                                    </div>
+                                )}
+                                <div style={{ background: '#0f172a', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', color: '#fff', fontWeight: 900 }}>
+                                    <span>Net Payable</span>
+                                    <span>Rs {fmt(totals.netPayable)}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="modal-footer" style={{ padding: '16px 24px', background: 'var(--erp-bg2)', display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                            <button type="button" className="btn btn-outline" onClick={() => { setModal(false); setEditFee(null); }}>Cancel</button>
+                            <button type="button" className="btn btn-primary" onClick={() => {
+                                setActionState({
+                                    isOpen: true,
+                                    type: 'verify',
+                                    title: 'Authorize Fee Edit',
+                                    desc: count > 1
+                                        ? `Create ${count}-month fee (${duration.label}) totaling Rs ${fmt(totals.netPayable)} for ${editFee.studentName}.`
+                                        : `Update the fee record for ${editFee.month} ${editFee.year}.`,
+                                    onConfirm: (password) => confirmEditFee(password),
+                                    loading: false,
+                                    error: ''
+                                });
+                            }}>Save Changes</button>
+                        </div>
                     </div>
                 </div>
-            )}
+                );
+            })()}
+
+
 
             <ReceiptPreviewModal isOpen={previewPdf.isOpen} onClose={() => setPreviewPdf({ ...previewPdf, isOpen: false })} blobUrl={previewPdf.blobUrl} filename={previewPdf.filename} onDownload={() => { const link = document.createElement('a'); link.href = previewPdf.blobUrl; link.download = previewPdf.filename; link.click(); }} />
 

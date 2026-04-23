@@ -18,6 +18,7 @@ const feeSchema = new mongoose.Schema({
 
     month: { type: String, required: true },
     year: { type: String, required: true },
+    paymentType: { type: String, enum: ['monthly', 'yearly'], default: 'monthly' },
 
     monthlyTuitionFee: { type: Number, default: 0 },
     registrationFee: { type: Number, default: 0 },

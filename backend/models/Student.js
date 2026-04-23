@@ -45,6 +45,7 @@ const studentSchema = new mongoose.Schema({
     session: { type: String },
     status: { type: String, enum: ['active', 'inactive', 'completed', 'batch_pending'], default: 'active', index: true },
     notes: { type: String },
+    paymentMode: { type: String, enum: ['monthly', 'full'], default: 'monthly' },
     profileImage: { type: String },
     fatherName: { type: String, trim: true },
     motherName: { type: String, trim: true },

@@ -5,7 +5,9 @@ import {
     BookOpen,
     BrainCircuit,
     Calendar,
+    ChevronDown,
     ChevronLeft,
+    ChevronUp,
     Clock,
     CheckCircle2,
     DownloadCloud,
@@ -308,51 +310,7 @@ const StudentProfilePage = () => {
                                     <InfoTile icon={MapPin} label="Address" value={student.address || '- '} wide />
                                 </div>
 
-                                <div className="border border-slate-200 rounded-md overflow-hidden">
-                                    <div className="px-5 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-3 flex-wrap">
-                                        <div className="flex items-center gap-2 text-slate-800">
-                                            <FileText size={18} className="text-blue-500" />
-                                            <h3 className="text-sm font-black uppercase tracking-[0.18em]">Fee Ledger</h3>
-                                        </div>
-                                        <span className="text-xs font-bold text-slate-500">{fees.length} record(s)</span>
-                                    </div>
-                                    <div style={{ overflowX: 'auto' }}>
-                                        <table className="erp-table stackable">
-                                            <thead>
-                                                <tr>
-                                                    <th>Month</th>
-                                                    <th>Total Fee</th>
-                                                    <th>Paid</th>
-                                                    <th>Due Date</th>
-                                                    <th>Status</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {fees.length === 0 ? (
-                                                    <tr>
-                                                        <td colSpan="5" style={{ padding: 28, textAlign: 'center', color: '#64748b' }}>
-                                                            No fee records available.
-                                                        </td>
-                                                    </tr>
-                                                ) : (
-                                                    fees.map((fee) => (
-                                                        <tr key={fee._id}>
-                                                            <td data-label="Month">{fee.month} {fee.year}</td>
-                                                            <td data-label="Total Fee">{formatCurrency(fee.totalFee)}</td>
-                                                            <td data-label="Paid">{formatCurrency(fee.amountPaid)}</td>
-                                                            <td data-label="Due Date">{formatDate(fee.dueDate)}</td>
-                                                            <td data-label="Status">
-                                                                <span className={`student-badge ${fee.status === 'paid' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : fee.status === 'partial' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>
-                                                                    {fee.status}
-                                                                </span>
-                                                            </td>
-                                                        </tr>
-                                                    ))
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
+                                <FeeLedger fees={fees} />
                             </div>
                         ) : (
                             <div className="space-y-6">
@@ -495,5 +453,158 @@ const InfoTile = ({ icon: Icon, label, value, wide = false }) => (
         <div className="text-sm font-bold text-slate-800 leading-6">{value}</div>
     </div>
 );
+
+// --- Year-wise Fee Ledger Component ---
+const FeeLedger = ({ fees }) => {
+    const [viewMode, setViewMode] = useState('yearly');
+    const [expandedYears, setExpandedYears] = useState({});
+
+    const toggleYear = (year) => {
+        setExpandedYears(prev => ({ ...prev, [year]: !prev[year] }));
+    };
+
+    // Group fees by year
+    const yearGroups = {};
+    fees.forEach(fee => {
+        const yr = fee.year || 'Unknown';
+        if (!yearGroups[yr]) yearGroups[yr] = [];
+        yearGroups[yr].push(fee);
+    });
+
+    const sortedYears = Object.keys(yearGroups).sort((a, b) => Number(b) - Number(a));
+
+    const getYearStatus = (yearFees) => {
+        const allPaid = yearFees.every(f => f.status === 'paid');
+        const anyPartial = yearFees.some(f => f.status === 'partial');
+        const anyPending = yearFees.some(f => f.status === 'pending' || f.status === 'overdue');
+        if (allPaid) return 'paid';
+        if (anyPartial || (yearFees.some(f => f.status === 'paid') && anyPending)) return 'partial';
+        return 'pending';
+    };
+
+    const statusBadge = (status) => {
+        const cls = status === 'paid'
+            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+            : status === 'partial'
+                ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                : 'bg-rose-50 text-rose-700 border border-rose-200';
+        return <span className={`student-badge ${cls}`}>{status}</span>;
+    };
+
+    return (
+        <div className="border border-slate-200 rounded-md overflow-hidden">
+            <div className="px-5 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2 text-slate-800">
+                    <FileText size={18} className="text-blue-500" />
+                    <h3 className="text-sm font-black uppercase tracking-[0.18em]">Fee Ledger</h3>
+                </div>
+                <div className="flex items-center gap-3">
+                    <span className="text-xs font-bold text-slate-500">{fees.length} record(s)</span>
+                    <div style={{ display: 'inline-flex', background: '#e2e8f0', borderRadius: 6, padding: 2 }}>
+                        {['monthly', 'yearly'].map(mode => (
+                            <button
+                                key={mode}
+                                type="button"
+                                onClick={() => setViewMode(mode)}
+                                style={{
+                                    padding: '5px 12px',
+                                    borderRadius: 5,
+                                    border: 'none',
+                                    background: viewMode === mode ? '#0f172a' : 'transparent',
+                                    color: viewMode === mode ? '#fff' : '#64748b',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 800,
+                                    cursor: 'pointer',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.06em',
+                                    transition: 'all 0.15s ease'
+                                }}
+                            >
+                                {mode}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+                <table className="erp-table stackable">
+                    <thead>
+                        <tr>
+                            <th>{viewMode === 'yearly' ? 'Year' : 'Month'}</th>
+                            <th>Total Fee</th>
+                            <th>Paid</th>
+                            <th>{viewMode === 'yearly' ? 'Pending' : 'Due Date'}</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {fees.length === 0 ? (
+                            <tr>
+                                <td colSpan="5" style={{ padding: 28, textAlign: 'center', color: '#64748b' }}>
+                                    No fee records available.
+                                </td>
+                            </tr>
+                        ) : viewMode === 'monthly' ? (
+                            fees.map((fee) => (
+                                <tr key={fee._id}>
+                                    <td data-label="Month">{fee.month} {fee.year}</td>
+                                    <td data-label="Total Fee">{formatCurrency(fee.totalFee)}</td>
+                                    <td data-label="Paid">{formatCurrency(fee.amountPaid)}</td>
+                                    <td data-label="Due Date">{formatDate(fee.dueDate)}</td>
+                                    <td data-label="Status">{statusBadge(fee.status)}</td>
+                                </tr>
+                            ))
+                        ) : (
+                            sortedYears.map(year => {
+                                const yearFees = yearGroups[year];
+                                const totalFee = yearFees.reduce((s, f) => s + (f.totalFee || 0), 0);
+                                const totalPaid = yearFees.reduce((s, f) => s + (f.amountPaid || 0), 0);
+                                const totalPending = Math.max(totalFee - totalPaid, 0);
+                                const yearStatus = getYearStatus(yearFees);
+                                const isExpanded = expandedYears[year];
+
+                                return (
+                                    <React.Fragment key={year}>
+                                        <tr
+                                            onClick={() => toggleYear(year)}
+                                            style={{ cursor: 'pointer', background: isExpanded ? '#f8fafc' : undefined, transition: 'background 0.15s' }}
+                                            onMouseEnter={(e) => { if (!isExpanded) e.currentTarget.style.background = '#fafbfc'; }}
+                                            onMouseLeave={(e) => { if (!isExpanded) e.currentTarget.style.background = ''; }}
+                                        >
+                                            <td data-label="Year">
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                    {isExpanded ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+                                                    <div>
+                                                        <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '0.95rem' }}>Year {year}</div>
+                                                        <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>{yearFees.length} month(s)</div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td data-label="Total Fee"><span style={{ fontWeight: 800 }}>{formatCurrency(totalFee)}</span></td>
+                                            <td data-label="Paid"><span style={{ fontWeight: 800, color: '#059669' }}>{formatCurrency(totalPaid)}</span></td>
+                                            <td data-label="Pending"><span style={{ fontWeight: 800, color: totalPending > 0 ? '#dc2626' : '#059669' }}>{formatCurrency(totalPending)}</span></td>
+                                            <td data-label="Status">{statusBadge(yearStatus)}</td>
+                                        </tr>
+                                        {isExpanded && yearFees.map((fee) => (
+                                            <tr key={fee._id} style={{ background: '#f1f5f9' }}>
+                                                <td data-label="Month" style={{ paddingLeft: 44 }}>
+                                                    <span style={{ fontSize: '0.85rem', color: '#475569' }}>{fee.month}</span>
+                                                </td>
+                                                <td data-label="Total Fee" style={{ color: '#475569' }}>{formatCurrency(fee.totalFee)}</td>
+                                                <td data-label="Paid" style={{ color: '#475569' }}>{formatCurrency(fee.amountPaid)}</td>
+                                                <td data-label="Due Date" style={{ color: '#475569' }}>{formatDate(fee.dueDate)}</td>
+                                                <td data-label="Status">{statusBadge(fee.status)}</td>
+                                            </tr>
+                                        ))}
+                                    </React.Fragment>
+                                );
+                            })
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+};
 
 export default StudentProfilePage;

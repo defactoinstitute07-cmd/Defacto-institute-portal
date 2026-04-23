@@ -12,9 +12,11 @@ router.route('/')
     .post(verifyAdminPassword, feesController.createFee);
 
 router.post('/generate', verifyAdminPassword, feesController.generateFeesBulk);
+router.post('/create-multi-month', verifyAdminPassword, feesController.createMultiMonthFee);
 router.post('/remind-overdue', verifyAdminPassword, feesController.remindOverdue);
 
 router.post('/:id/pay', verifyAdminPassword, feesController.recordPayment);
+router.put('/:id', verifyAdminPassword, feesController.updateFee);
 router.delete('/:id', verifyAdminPassword, feesController.deleteFee);
 
 

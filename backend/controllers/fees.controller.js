@@ -433,6 +433,164 @@ exports.createFee = async (req, res) => {
     }
 };
 
+// POST /api/fees/create-multi-month
+exports.createMultiMonthFee = async (req, res) => {
+    try {
+        const { studentId, batchId, months, year, dueDate, discount: rawDiscount } = req.body;
+
+        if (!studentId || !months || !Array.isArray(months) || months.length === 0 || !year || !dueDate) {
+            return res.status(400).json({ message: 'Missing required fields: studentId, months[], year, dueDate' });
+        }
+
+        const student = await Student.findById(studentId).populate('batchId');
+        if (!student) {
+            return res.status(404).json({ message: 'Student not found' });
+        }
+
+        const resolvedBatchId = batchId || (student.batchId && student.batchId._id);
+        let monthlyFee = 0;
+
+        if (resolvedBatchId) {
+            const batch = await Batch.findById(resolvedBatchId).select('fees').lean();
+            monthlyFee = Number(batch?.fees || 0);
+        }
+
+        if (monthlyFee <= 0) {
+            monthlyFee = Number(student.fees || 0);
+        }
+
+        const totalDiscount = Math.max(Number(rawDiscount || 0), 0);
+        const perMonthDiscount = months.length > 0 ? Math.round((totalDiscount / months.length) * 100) / 100 : 0;
+        const registrationFee = Number(student.registrationFee || 0);
+
+        // Check for existing fee records
+        const existingFees = await Fee.find({
+            studentId,
+            month: { $in: months },
+            year: String(year)
+        }).select('month').lean();
+        const existingMonthSet = new Set(existingFees.map(f => f.month));
+
+        const normalizedDueDate = new Date(dueDate);
+        const feesToCreate = [];
+        const skippedMonths = [];
+
+        for (const month of months) {
+            if (existingMonthSet.has(month)) {
+                skippedMonths.push(month);
+                continue;
+            }
+
+            const isFirstMonth = feesToCreate.length === 0;
+            const regFee = isFirstMonth ? registrationFee : 0;
+            const totalFee = Math.max(monthlyFee + regFee - perMonthDiscount, 0);
+
+            feesToCreate.push({
+                studentId,
+                batchId: resolvedBatchId || null,
+                month,
+                year: String(year),
+                paymentType: 'yearly',
+                monthlyTuitionFee: monthlyFee,
+                registrationFee: regFee,
+                discount: perMonthDiscount,
+                fine: 0,
+                totalFee,
+                amountPaid: 0,
+                pendingAmount: totalFee,
+                status: 'pending',
+                dueDate: normalizedDueDate
+            });
+        }
+
+        let createdCount = 0;
+        if (feesToCreate.length > 0) {
+            await Fee.insertMany(feesToCreate, { ordered: false });
+            createdCount = feesToCreate.length;
+
+            // Trigger notifications for each
+            const dueDateLabel = normalizedDueDate.toLocaleDateString('en-IN');
+            feesToCreate.forEach(feeData => {
+                triggerAutomaticNotification({
+                    eventType: 'feeGenerated',
+                    studentId: student._id,
+                    adminId: req.admin?.id || null,
+                    message: `New fee generated for ${feeData.month} ${year}. Due date: ${dueDateLabel}.`,
+                    data: {
+                        amount: feeData.totalFee,
+                        month: feeData.month,
+                        year,
+                        dueDate: dueDateLabel
+                    }
+                }).catch(() => console.error('[fees.createMultiMonthFee.notification] Notification dispatch failed'));
+            });
+        }
+
+        const subtotal = monthlyFee * months.length;
+        const grandTotal = feesToCreate.reduce((sum, f) => sum + f.totalFee, 0);
+
+        await invalidateFeeReadCaches();
+        return res.status(201).json({
+            success: true,
+            created: createdCount,
+            skipped: skippedMonths,
+            summary: {
+                monthlyFee,
+                selectedMonths: months.length,
+                subtotal,
+                discount: totalDiscount,
+                registrationFee,
+                grandTotal
+            }
+        });
+    } catch (err) {
+        console.error('Error creating multi-month fees');
+        return res.status(500).json({ message: 'Server error', error: err.message });
+    }
+};
+
+// PUT /api/fees/:id  — Edit a monthly fee record
+exports.updateFee = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { monthlyTuitionFee, discount, dueDate, month, year, fine } = req.body;
+
+        const fee = await Fee.findById(id);
+        if (!fee) return res.status(404).json({ message: 'Fee record not found' });
+
+        if (fee.paymentType === 'yearly') {
+            return res.status(400).json({ message: 'Cannot edit yearly fee records individually. Use the yearly view instead.' });
+        }
+
+        if (monthlyTuitionFee !== undefined) fee.monthlyTuitionFee = Number(monthlyTuitionFee);
+        if (discount !== undefined) fee.discount = Math.max(Number(discount), 0);
+        if (fine !== undefined) fee.fine = Math.max(Number(fine), 0);
+        if (dueDate) fee.dueDate = new Date(dueDate);
+        if (month) fee.month = month;
+        if (year) fee.year = String(year);
+
+        // Recalculate totals
+        fee.totalFee = Math.max((fee.monthlyTuitionFee || 0) + (fee.registrationFee || 0) + (fee.fine || 0) - (fee.discount || 0), 0);
+        fee.pendingAmount = Math.max(fee.totalFee - (fee.amountPaid || 0), 0);
+
+        if (fee.pendingAmount <= 0 && fee.totalFee > 0) {
+            fee.status = 'paid';
+        } else if (fee.amountPaid > 0) {
+            fee.status = 'partial';
+        } else {
+            fee.status = 'pending';
+        }
+
+        await fee.save();
+        await invalidateFeeReadCaches();
+
+        return res.json({ success: true, fee });
+    } catch (err) {
+        console.error('Error updating fee');
+        return res.status(500).json({ message: 'Server error', error: err.message });
+    }
+};
+
 // POST /api/fees/:id/pay
 exports.recordPayment = async (req, res) => {
     try {
@@ -566,7 +724,7 @@ exports.generateFeesBulk = async (req, res) => {
         }
 
         const students = await Student.find({ status: 'active' })
-            .select('_id batchId fees registrationFee discount')
+            .select('_id batchId fees registrationFee discount paymentMode')
             .lean();
         if (!students.length) {
             return res.json({ success: true, created: 0 });
@@ -602,8 +760,15 @@ exports.generateFeesBulk = async (req, res) => {
         const dueDateLabel = normalizedDueDate.toLocaleDateString('en-IN');
         const feesToCreate = [];
         const generatedFeeNotificationTargets = [];
+        let skippedYearly = 0;
         for (const student of students) {
             if (existingFeeStudentIds.has(String(student._id))) continue;
+
+            // Skip students on full/yearly payment mode — their fees are managed via multi-month flow
+            if (student.paymentMode === 'full') {
+                skippedYearly++;
+                continue;
+            }
 
             const baseFee = batchFeeMap.get(String(student.batchId || '')) ?? Number(student.fees || 0);
             const registrationFee = Number(student.registrationFee || 0);
@@ -656,7 +821,7 @@ exports.generateFeesBulk = async (req, res) => {
         if (feesToCreate.length > 0) {
             await invalidateFeeReadCaches();
         }
-        return res.json({ success: true, created: feesToCreate.length });
+        return res.json({ success: true, created: feesToCreate.length, skippedYearly });
     } catch (err) {
         console.error('Error generating bulk fees');
         return res.status(500).json({ message: 'Server error', error: err.message });

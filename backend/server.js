@@ -46,13 +46,22 @@ const envCorsOrigins = String(process.env.CORS_ORIGIN || '')
     .map((origin) => origin.trim())
     .filter(Boolean);
 
+const vercelOrigins = [
+    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '',
+    process.env.VERCEL_BRANCH_URL ? `https://${process.env.VERCEL_BRANCH_URL}` : '',
+    process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : ''
+]
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
 const allowedOrigins = [
     'http://localhost:5173',
     'http://localhost:5174', // Added for user's current frontend port
     'http://localhost:3000',
     'https://tutution-erp-demo.vercel.app',
     'https://tutution-erp-frontend.vercel.app',
-    ...envCorsOrigins
+    ...envCorsOrigins,
+    ...vercelOrigins
 ].filter(Boolean);
 
 app.use(cors({

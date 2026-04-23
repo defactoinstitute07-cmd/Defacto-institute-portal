@@ -293,6 +293,38 @@ const StudentFormModal = ({
                   </div>
                 </div>
 
+                {/* Payment Mode Toggle */}
+                <div>
+                  <label style={{ fontWeight: 800, fontSize: '0.7rem', color: '#475569', marginBottom: 8, display: 'block' }}>PAYMENT MODE</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    {[
+                      { value: 'monthly', label: 'Month-by-Month', desc: 'Fee generated each month' },
+                      { value: 'full', label: 'Full Payment', desc: 'All months paid at once' }
+                    ].map(opt => {
+                      const isActive = (form.paymentMode || 'monthly') === opt.value;
+                      return (
+                        <div
+                          key={opt.value}
+                          onClick={() => handleForm({ target: { name: 'paymentMode', value: opt.value } })}
+                          style={{
+                            padding: '14px 16px',
+                            borderRadius: '8px',
+                            border: isActive ? '2px solid #0f172a' : '1px solid #cbd5e1',
+                            background: isActive ? '#0f172a' : '#fff',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            position: 'relative'
+                          }}
+                        >
+                          <div style={{ fontWeight: 700, fontSize: '0.85rem', color: isActive ? '#fff' : '#1e293b' }}>{opt.label}</div>
+                          <div style={{ fontSize: '0.7rem', color: isActive ? 'rgba(255,255,255,0.7)' : '#94a3b8', marginTop: 2 }}>{opt.desc}</div>
+                          {isActive && <div style={{ position: 'absolute', top: -6, right: -6, background: '#059669', color: '#fff', borderRadius: '50%', width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>✓</div>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 <div style={{
                   border: '1px solid #e2e8f0',
                   borderRadius: '8px',
