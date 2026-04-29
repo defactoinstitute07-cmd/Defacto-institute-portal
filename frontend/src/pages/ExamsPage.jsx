@@ -300,11 +300,33 @@ const ExamsPage = () => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {displayedExams.map(exam => (
-                                            <tr key={exam._id}>
+                                        {displayedExams.map(exam => {
+                                            const isPastDue = (() => {
+                                                if (exam.status !== 'scheduled' || !exam.date) return false;
+                                                if (exam.hasResults) return false;
+                                                const tDate = new Date(exam.date);
+                                                const today = new Date();
+                                                tDate.setHours(0, 0, 0, 0);
+                                                today.setHours(0, 0, 0, 0);
+                                                return tDate < today;
+                                            })();
+
+                                            return (
+                                            <tr key={exam._id} style={isPastDue ? { background: '#fff1f2', borderLeft: '3px solid #f43f5e' } : {}}>
                                                 <td data-label="Test Name">
-                                                    <div className="td-bold">{exam.name}</div>
-                                                    <div className="td-sm" style={{ color: '#94a3b8', marginTop: 4 }}>{exam.chapter || 'General test'}</div>
+                                                    {isPastDue && (
+                                                        <div style={{ marginBottom: 6 }}>
+                                                            <span style={{
+                                                                background: '#fecdd3', color: '#be123c', padding: '3px 8px',
+                                                                borderRadius: 6, fontSize: '0.7rem', fontWeight: 800,
+                                                                display: 'inline-flex', alignItems: 'center', gap: 4
+                                                            }}>
+                                                                <AlertCircle size={11} /> Result Not Declared (Test Date Passed)
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    <div className="td-bold" style={isPastDue ? { color: '#be123c' } : {}}>{exam.name}</div>
+                                                    <div className="td-sm" style={{ color: isPastDue ? '#f43f5e' : '#94a3b8', marginTop: 4 }}>{exam.chapter || 'General test'}</div>
                                                 </td>
                                                 <td data-label="Batch">
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -314,8 +336,8 @@ const ExamsPage = () => {
                                                                     <span
                                                                         key={`${exam._id}-batch-${index}`}
                                                                         style={{
-                                                                            background: '#e0f2fe',
-                                                                            color: '#0369a1',
+                                                                            background: isPastDue ? '#ffe4e6' : '#e0f2fe',
+                                                                            color: isPastDue ? '#be123c' : '#0369a1',
                                                                             padding: '2px 8px',
                                                                             borderRadius: 6,
                                                                             fontSize: '0.78rem',
@@ -330,24 +352,32 @@ const ExamsPage = () => {
                                                         )}
                                                     </div>
                                                 </td>
-                                                <td className="td-sm" data-label="Subject">{exam.subject}</td>
+                                                <td className="td-sm" data-label="Subject" style={isPastDue ? { color: '#be123c' } : {}}>{exam.subject}</td>
                                                 <td className="td-sm" data-label="Test Date">
-                                                    <span style={{ fontWeight: 700, color: exam.date ? '#1e293b' : '#94a3b8' }}>{formatExamDate(exam.date)}</span>
+                                                    <span style={{ fontWeight: 700, color: isPastDue ? '#be123c' : (exam.date ? '#1e293b' : '#94a3b8') }}>{formatExamDate(exam.date)}</span>
                                                 </td>
-                                                <td className="td-sm" data-label="Total / Passing"><span style={{ fontWeight: 700 }}>{exam.totalMarks}</span> / <span style={{ color: '#64748b' }}>{exam.passingMarks}</span></td>
-                                                <td data-label="Status">{statusBadge(exam.status)}</td>
+                                                <td className="td-sm" data-label="Total / Passing" style={isPastDue ? { color: '#be123c' } : {}}>
+                                                    <span style={{ fontWeight: 700 }}>{exam.totalMarks}</span> / <span style={{ color: isPastDue ? '#f43f5e' : '#64748b' }}>{exam.passingMarks}</span>
+                                                </td>
+                                                <td data-label="Status">
+                                                    {isPastDue ? (
+                                                        <span className="badge badge-unpaid" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                                            <AlertCircle size={11} /> Pending Result
+                                                        </span>
+                                                    ) : statusBadge(exam.status)}
+                                                </td>
                                                 <td data-label="Actions">
                                                     <div style={{ display: 'flex', gap: 6 }}>
                                                         <button
                                                             className="btn btn-sm btn-outline"
-                                                            style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+                                                            style={isPastDue ? { borderColor: '#fda4af', color: '#be123c', display: 'flex', alignItems: 'center', gap: 4 } : { display: 'flex', alignItems: 'center', gap: 4 }}
                                                             onClick={() => setShowMarks(exam)}
                                                         >
                                                             <Edit3 size={13} /> Marks
                                                         </button>
                                                         <button
                                                             className="btn btn-sm btn-outline"
-                                                            style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+                                                            style={isPastDue ? { borderColor: '#fda4af', color: '#be123c', display: 'flex', alignItems: 'center', gap: 4 } : { display: 'flex', alignItems: 'center', gap: 4 }}
                                                             onClick={() => { fetchResults(exam); setTab('results'); }}
                                                         >
                                                             <ChevronRight size={13} /> Results
@@ -362,7 +392,8 @@ const ExamsPage = () => {
                                                     </div>
                                                 </td>
                                             </tr>
-                                        ))}
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>

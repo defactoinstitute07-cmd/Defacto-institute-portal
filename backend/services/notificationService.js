@@ -10,7 +10,7 @@ const { sendEmail } = require('./emailService');
 const ADMIN_CACHE_TTL_SECONDS = Math.max(parseInt(process.env.NOTIFICATION_ADMIN_CACHE_TTL_SECONDS || '60', 10) || 60, 5);
 const HISTORY_CLEANUP_INTERVAL_SECONDS = Math.max(parseInt(process.env.NOTIFICATION_HISTORY_CLEANUP_INTERVAL_SECONDS || '3600', 10) || 3600, 60);
 const NOTIFICATION_RECIPIENT_CONCURRENCY = Math.max(parseInt(process.env.NOTIFICATION_RECIPIENT_CONCURRENCY || '5', 10) || 5, 1);
-const NOTIFICATION_ADMIN_SELECT = '_id coachingName instituteLogo notificationsEnabled emailEvents pushEvents gmailEmail gmailAppPassword';
+const NOTIFICATION_ADMIN_SELECT = '_id coachingName instituteLogo notificationsEnabled emailEvents pushEvents gmailEmail gmailAppPassword brevoEmail brevoSmtpKey';
 
 const createHttpError = (message, status = 400) => {
     const error = new Error(message);
@@ -124,7 +124,9 @@ const sanitizeNotificationAdmin = (admin) => {
         emailEvents: admin.emailEvents || {},
         pushEvents: admin.pushEvents || {},
         gmailEmail: admin.gmailEmail || '',
-        gmailAppPassword: admin.gmailAppPassword || ''
+        gmailAppPassword: admin.gmailAppPassword || '',
+        brevoEmail: admin.brevoEmail || '',
+        brevoSmtpKey: admin.brevoSmtpKey || ''
     };
 };
 

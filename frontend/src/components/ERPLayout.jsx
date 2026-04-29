@@ -10,6 +10,7 @@ import {
     ClipboardCheck,
     Download,
     GraduationCap,
+    Headphones,
     LogOut,
     Menu,
     Settings,
@@ -51,6 +52,7 @@ const NAV_ITEMS = [
             // { to: '/templates', icon: Mail, label: 'Email Templates' },
             { to: '/notifications', icon: Bell, label: 'Notifications' },
             { to: '/apk-management', icon: Download, label: 'App Management' },
+            { to: '/technical-support', icon: Headphones, label: 'Technical Support' },
             { to: '/settings', icon: Settings, label: 'Settings' }
         ]
     }

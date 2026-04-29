@@ -2,19 +2,43 @@ const nodemailer = require('nodemailer');
 
 const transporterCache = globalThis.__erpEmailTransporters || (globalThis.__erpEmailTransporters = new Map());
 
-const getTransporter = (user, pass) => {
-    const cacheKey = `${user}::${pass}`;
-    if (!transporterCache.has(cacheKey)) {
-        transporterCache.set(cacheKey, nodemailer.createTransport({
-            service: 'gmail',
-            auth: {
-                user,
-                pass
-            }
-        }));
+/**
+ * Creates / retrieves a cached Brevo SMTP transporter.
+ * Falls back to Gmail SMTP when Brevo credentials are absent.
+ */
+const getTransporter = ({ brevoUser, brevoPass, gmailUser, gmailPass }) => {
+    // Prefer Brevo, fall back to Gmail
+    if (brevoUser && brevoPass) {
+        const cacheKey = `brevo::${brevoUser}::${brevoPass}`;
+        if (!transporterCache.has(cacheKey)) {
+            transporterCache.set(cacheKey, nodemailer.createTransport({
+                host: 'smtp-relay.brevo.com',
+                port: 587,
+                secure: false,
+                auth: {
+                    user: brevoUser,
+                    pass: brevoPass
+                }
+            }));
+        }
+        return { transporter: transporterCache.get(cacheKey), fromEmail: brevoUser, source: 'brevo' };
     }
 
-    return transporterCache.get(cacheKey);
+    if (gmailUser && gmailPass) {
+        const cacheKey = `gmail::${gmailUser}::${gmailPass}`;
+        if (!transporterCache.has(cacheKey)) {
+            transporterCache.set(cacheKey, nodemailer.createTransport({
+                service: 'gmail',
+                auth: {
+                    user: gmailUser,
+                    pass: gmailPass
+                }
+            }));
+        }
+        return { transporter: transporterCache.get(cacheKey), fromEmail: gmailUser, source: 'gmail' };
+    }
+
+    return null;
 };
 
 const escapeHtml = (value) => String(value || '')
@@ -85,21 +109,51 @@ exports.sendEmail = async ({
             return { success: false, reason: 'No email address' };
         }
 
-        const adminEmail = admin?.gmailEmail;
-        const adminAppPassword = admin?.gmailAppPassword;
-        const envEmail = process.env.GMAIL_USER || process.env.GMAIL_EMAIL;
-        const envAppPassword = process.env.GMAIL_APP_PASSWORD;
-
+        // Build credential candidates in priority order: Brevo → Gmail
         const credentialCandidates = [];
-        if (adminEmail && adminAppPassword) {
-            credentialCandidates.push({ email: adminEmail, appPassword: adminAppPassword, source: 'admin' });
+
+        // 1. Admin-level Brevo credentials (from DB)
+        if (admin?.brevoEmail && admin?.brevoSmtpKey) {
+            credentialCandidates.push({
+                brevoUser: admin.brevoEmail,
+                brevoPass: admin.brevoSmtpKey,
+                source: 'admin-brevo'
+            });
         }
-        if (envEmail && envAppPassword) {
-            credentialCandidates.push({ email: envEmail, appPassword: envAppPassword, source: 'env' });
+
+        // 2. Environment Brevo credentials
+        const envBrevoUser = process.env.BREVO_SMTP_USER || process.env.BREVO_EMAIL;
+        const envBrevoKey = process.env.BREVO_SMTP_KEY;
+        if (envBrevoUser && envBrevoKey) {
+            credentialCandidates.push({
+                brevoUser: envBrevoUser,
+                brevoPass: envBrevoKey,
+                source: 'env-brevo'
+            });
+        }
+
+        // 3. Admin-level Gmail credentials (legacy fallback)
+        if (admin?.gmailEmail && admin?.gmailAppPassword) {
+            credentialCandidates.push({
+                gmailUser: admin.gmailEmail,
+                gmailPass: admin.gmailAppPassword,
+                source: 'admin-gmail'
+            });
+        }
+
+        // 4. Environment Gmail credentials (legacy fallback)
+        const envGmailUser = process.env.GMAIL_USER || process.env.GMAIL_EMAIL;
+        const envGmailPass = process.env.GMAIL_APP_PASSWORD;
+        if (envGmailUser && envGmailPass) {
+            credentialCandidates.push({
+                gmailUser: envGmailUser,
+                gmailPass: envGmailPass,
+                source: 'env-gmail'
+            });
         }
 
         if (credentialCandidates.length === 0) {
-            console.log('[Email] Warning: Gmail Email or App Password not configured.');
+            console.log('[Email] Warning: No email credentials configured (Brevo or Gmail).');
             return { success: false, reason: 'Credentials not configured' };
         }
 
@@ -109,10 +163,13 @@ exports.sendEmail = async ({
 
         for (const creds of credentialCandidates) {
             try {
-                const transporter = getTransporter(creds.email, creds.appPassword);
+                const result = getTransporter(creds);
+                if (!result) continue;
+
+                const { transporter, fromEmail, source } = result;
 
                 const mailOptions = {
-                    from: creds.email,
+                    from: fromEmail,
                     to: recipient.email,
                     subject: subjectOverride || 'New Notification from Institute',
                     html: htmlBody,
@@ -120,12 +177,12 @@ exports.sendEmail = async ({
                     attachments: attachments || []
                 };
 
-                const result = await transporter.sendMail(mailOptions);
-                console.log(`[Email] Notification sent via ${creds.source} credentials`);
-                return { success: true, messageId: result.messageId };
+                const sendResult = await transporter.sendMail(mailOptions);
+                console.log(`[Email] Notification sent via ${creds.source || source} credentials`);
+                return { success: true, messageId: sendResult.messageId, provider: source };
             } catch (error) {
                 lastError = error;
-                console.error(`[Email] Send failed via ${creds.source} credentials`);
+                console.error(`[Email] Send failed via ${creds.source} credentials:`, error.message);
             }
         }
 

@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, Loader2, RefreshCw, Save, Users, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { CalendarDays, Loader2, RefreshCw, Save, Users, AlertCircle, CheckCircle2, X } from 'lucide-react';
 import ERPLayout from '../components/ERPLayout';
 import ToastContainer, { useToast } from '../components/Toast';
 import {
     getAdminAttendanceSetup,
     getAdminAttendanceRoster,
     markAdminAttendance,
-    getAdminAttendanceReport
+    getAdminAttendanceReport,
+    getAdminAttendanceOverview
 } from '../api/attendanceApi';
 
 const STATUS_OPTIONS = [
@@ -59,6 +60,11 @@ const AttendancePage = () => {
         subjectId: '',
         date: todayString()
     });
+    
+    const [overviewOpen, setOverviewOpen] = useState(false);
+    const [overviewData, setOverviewData] = useState([]);
+    const [loadingOverview, setLoadingOverview] = useState(false);
+
     const [historyFilters, setHistoryFilters] = useState({
         dateFrom: daysAgoString(30),
         dateTo: todayString()
@@ -230,6 +236,19 @@ const AttendancePage = () => {
         setRoster(prev => prev.map(s => ({ ...s, attendanceStatus: status })));
     };
 
+    const loadOverview = async () => {
+        try {
+            setLoadingOverview(true);
+            setOverviewOpen(true);
+            const response = await getAdminAttendanceOverview({ date: filters.date });
+            setOverviewData(response.data?.markedBatches || []);
+        } catch (error) {
+            toast.error('Failed to load overview.');
+        } finally {
+            setLoadingOverview(false);
+        }
+    };
+
     return (
         <ERPLayout title="Attendance Management">
             <ToastContainer toasts={toasts} onRemove={removeToast} />
@@ -254,6 +273,13 @@ const AttendancePage = () => {
                             value={filters.date}
                             onChange={(e) => setFilters(f => ({ ...f, date: e.target.value }))}
                         />
+                        <button
+                            type="button"
+                            onClick={loadOverview}
+                            className="ml-1 sm:ml-2 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold shadow-sm hover:bg-indigo-700 transition active:scale-95 flex items-center justify-center whitespace-nowrap w-full sm:w-auto"
+                        >
+                            View Overview
+                        </button>
                     </div>
                 </div>
 
@@ -619,6 +645,71 @@ const AttendancePage = () => {
                     cursor: pointer;
                 }
             `}</style>
+
+            {/* Overview Modal */}
+            {overviewOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-300">
+                        <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50">
+                            <div>
+                                <h2 className="text-xl font-black text-slate-800 tracking-tight">Attendance Overview</h2>
+                                <p className="text-sm font-semibold text-slate-500 mt-0.5">Date: {formatReadableDate(filters.date)}</p>
+                            </div>
+                            <button
+                                onClick={() => setOverviewOpen(false)}
+                                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 rounded-xl transition"
+                            >
+                                <X size={20} strokeWidth={2.5} />
+                            </button>
+                        </div>
+                        
+                        <div className="p-5 overflow-y-auto bg-slate-50 flex-1">
+                            {loadingOverview ? (
+                                <div className="flex flex-col items-center justify-center py-12">
+                                    <Loader2 className="w-8 h-8 animate-spin text-indigo-500 mb-4" />
+                                    <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">Loading Overview...</p>
+                                </div>
+                            ) : overviewData.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-12 text-center">
+                                    <div className="w-16 h-16 bg-white border-2 border-dashed border-slate-200 rounded-full flex items-center justify-center mb-4">
+                                        <CalendarDays className="text-slate-300" size={24} />
+                                    </div>
+                                    <h3 className="text-lg font-black text-slate-800">No Attendance Marked</h3>
+                                    <p className="text-slate-500 font-medium text-sm mt-1 max-w-xs">There are no attendance records for any batch on this selected date.</p>
+                                </div>
+                            ) : (
+                                <div className="grid gap-3">
+                                    {overviewData.map((item, idx) => (
+                                        <div key={idx} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center">
+                                                    <CheckCircle2 className="text-indigo-500" size={20} />
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-black text-slate-800">{item.batchName || 'Unknown Batch'}</h4>
+                                                    <p className="text-xs font-bold text-slate-500 mt-0.5">{item.subjectName || 'Unknown Subject'} <span className="text-slate-300 px-1">•</span> {item.classLevel || 'General'}</p>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Present/Marked</p>
+                                                <p className="text-lg font-black text-emerald-600 mt-0.5">{item.totalMarked}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-4 border-t border-slate-100 bg-white">
+                            <button
+                                onClick={() => setOverviewOpen(false)}
+                                className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition active:scale-[0.98]"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </ERPLayout>
     );
 };

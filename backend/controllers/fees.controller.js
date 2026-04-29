@@ -610,8 +610,21 @@ exports.recordPayment = async (req, res) => {
         const fineAmount = Number(fine || 0);
         const discAmount = Number(discount || 0);
 
+        if (paid < 0 || fineAmount < 0 || discAmount < 0) {
+            return res.status(400).json({ message: 'Payment, fine, and discount amounts cannot be negative' });
+        }
+
         if (paid <= 0 && fineAmount <= 0 && discAmount <= 0) {
             return res.status(400).json({ message: 'Payment or discount amount must be greater than zero' });
+        }
+
+        const updatedTotalFee = Math.max(Number(fee.totalFee || 0) + fineAmount - discAmount, 0);
+        const remainingBeforePayment = Math.max(updatedTotalFee - Number(fee.amountPaid || 0), 0);
+
+        if (paid > remainingBeforePayment) {
+            return res.status(400).json({
+                message: `Payment amount cannot exceed remaining balance of Rs ${formatCurrency(remainingBeforePayment)}`
+            });
         }
 
         if (fineAmount > 0) {

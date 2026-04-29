@@ -1,5 +1,5 @@
 import React from 'react';
-import { Filter, Search, Trash } from 'lucide-react';
+import { Filter, Search, Trash, ArrowUpDown } from 'lucide-react';
 
 const StudentFilters = ({
     search,
@@ -94,6 +94,17 @@ const StudentFilters = ({
                         ))}
                 </select>
 
+                <select
+                    className="tb-select"
+                    value={filters.sort || ''}
+                    onChange={(event) => setFilters({ ...filters, sort: event.target.value })}
+                    title="Sort students by activity"
+                >
+                    <option value="">Sort: Newest Joined</option>
+                    <option value="active_latest">Sort: Recent Activity</option>
+                    <option value="active_earlier">Sort: Active Earlier</option>
+                </select>
+
                 <button type="button" className="btn btn-danger btn-sm" onClick={onClearAll}>
                     <Trash size={13} /> Purge
                 </button>
@@ -103,3 +114,4 @@ const StudentFilters = ({
 };
 
 export default StudentFilters;
+

@@ -113,3 +113,15 @@ exports.getStudentAttendanceReport = async (req, res) => {
         res.status(status).json({ message: error.message || 'Failed to fetch attendance report.' });
     }
 };
+
+exports.getAttendanceOverview = async (req, res) => {
+    try {
+        const overview = await attendanceService.getAttendanceOverview({
+            date: req.query.date
+        });
+        res.json(overview);
+    } catch (error) {
+        const status = error.status || 500;
+        res.status(status).json({ message: error.message || 'Failed to fetch attendance overview.' });
+    }
+};

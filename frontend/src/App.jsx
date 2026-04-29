@@ -20,6 +20,7 @@ import SignupPage from './pages/SignupPage';
 import DashboardPage from './pages/DashboardPage';
 import TeacherDashboard from './pages/TeacherDashboard';
 import ApkManagementPage from './pages/ApkManagementPage';
+import TechnicalSupportPage from './pages/TechnicalSupportPage';
 import { checkAdminExists } from './api/adminApi';
 import AllStudentsPage from './pages/AllStudentsPage';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -115,6 +116,7 @@ function App() {
                 <Route path="/settings" element={<ProtectedRoute allowedRoles={['admin']}><SettingsPage /></ProtectedRoute>} />
                 <Route path="/exams" element={<ProtectedRoute allowedRoles={['admin']}><ExamsPage /></ProtectedRoute>} />
                 <Route path="/apk-management" element={<ProtectedRoute allowedRoles={['admin']}><ApkManagementPage /></ProtectedRoute>} />
+                <Route path="/technical-support" element={<ProtectedRoute allowedRoles={['admin']}><TechnicalSupportPage /></ProtectedRoute>} />
                 <Route path="/apps" element={<Navigate to="/apk-management" replace />} />
 
                 {/* Teacher / Student Portal Routes */}

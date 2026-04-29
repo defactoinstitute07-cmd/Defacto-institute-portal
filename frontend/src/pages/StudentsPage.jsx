@@ -34,7 +34,7 @@ const StudentsPage = () => {
     const [stats, setStats] = useState({ total: 0, active: 0, feePending: 0, attendanceAvg: 0, newAdmissions: 0 });
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
-    const [filters, setFilters] = useState({ batch: '', status: '', className: '', signupStatus: '' });
+    const [filters, setFilters] = useState({ batch: '', status: '', className: '', signupStatus: '', sort: '' });
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
@@ -80,10 +80,10 @@ const StudentsPage = () => {
             const apiStatus = isAllRecords ? '' : filters.status;
 
             // Check if user is searching/filtering
-            const isDefaultLoad = !search && !filters.batch && !filters.status && !filters.className && !filters.signupStatus && !isAllRecords;
+            const isDefaultLoad = !search && !filters.batch && !filters.status && !filters.className && !filters.signupStatus && !filters.sort && !isAllRecords;
             const limit = isDefaultLoad ? 5 : 10;
 
-            const params = { page, search, batch: filters.batch, status: apiStatus, className: filters.className, signupStatus: filters.signupStatus, limit };
+            const params = { page, search, batch: filters.batch, status: apiStatus, className: filters.className, signupStatus: filters.signupStatus, sort: filters.sort, limit };
 
             let stuReq = apiClient.get('/students', { params });
 
@@ -134,6 +134,7 @@ const StudentsPage = () => {
                     status: apiStatus, 
                     className: filters.className, 
                     signupStatus: filters.signupStatus, 
+                    sort: filters.sort, 
                     limit: 20 
                 };
 

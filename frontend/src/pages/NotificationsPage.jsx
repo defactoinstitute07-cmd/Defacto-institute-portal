@@ -803,7 +803,7 @@ const NotificationsPage = () => {
                   title="Delete records older than 3 days"
                 >
                   <RefreshCcw size={14} />
-                  Clean (>3 Days)
+                  {'Clean (>3 Days)'}
                 </button>
                 <button
                   type="button"

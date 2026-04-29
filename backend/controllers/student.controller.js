@@ -375,7 +375,7 @@ exports.getStudentActivity = async (req, res) => {
 // GET /api/students
 exports.getAllStudents = async (req, res) => {
     try {
-        const { search = '', batch = '', status = '', className = '', signupStatus = '', page = 1, limit = 20 } = req.query;
+        const { search = '', batch = '', status = '', className = '', signupStatus = '', sort = '', page = 1, limit = 20 } = req.query;
 
         const query = {};
         if (search) query.$or = [
@@ -388,6 +388,14 @@ exports.getAllStudents = async (req, res) => {
         if (className) query.className = className;
         if (signupStatus) query['portalAccess.signupStatus'] = signupStatus;
 
+        // Determine sort order
+        let sortOrder = { joinedAt: -1 }; // default
+        if (sort === 'active_latest') {
+            sortOrder = { lastActiveAt: -1, lastAppOpenAt: -1, joinedAt: -1 };
+        } else if (sort === 'active_earlier') {
+            sortOrder = { lastActiveAt: 1, lastAppOpenAt: 1, joinedAt: 1 };
+        }
+
         const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
         const safePage = Math.max(parseInt(page, 10) || 1, 1);
         const skip = (safePage - 1) * safeLimit;
@@ -395,7 +403,7 @@ exports.getAllStudents = async (req, res) => {
             Student.countDocuments(query),
             Student.find(query)
                 .populate('batchId', 'name subjects fees capacity')
-                .sort({ joinedAt: -1 })
+                .sort(sortOrder)
                 .skip(skip)
                 .limit(safeLimit)
                 .lean()

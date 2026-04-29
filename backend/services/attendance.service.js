@@ -1052,3 +1052,55 @@ exports.getAttendanceReport = async ({
         }
     };
 };
+
+exports.getAttendanceOverview = async ({ date }) => {
+    const attendanceDate = normalizeAttendanceDate(date || new Date());
+    
+    // Group records by batchId and subjectId for the specific date
+    const pipeline = [
+        { $match: { attendanceDate } },
+        { 
+            $group: {
+                _id: { batchId: '$batchId', subjectId: '$subjectId' },
+                totalMarked: { $sum: 1 }
+            }
+        },
+        {
+            $lookup: {
+                from: 'batches',
+                localField: '_id.batchId',
+                foreignField: '_id',
+                as: 'batch'
+            }
+        },
+        {
+            $lookup: {
+                from: 'subjects',
+                localField: '_id.subjectId',
+                foreignField: '_id',
+                as: 'subject'
+            }
+        },
+        { $unwind: { path: '$batch', preserveNullAndEmptyArrays: true } },
+        { $unwind: { path: '$subject', preserveNullAndEmptyArrays: true } },
+        {
+            $project: {
+                _id: 0,
+                batchId: '$_id.batchId',
+                subjectId: '$_id.subjectId',
+                batchName: '$batch.name',
+                subjectName: '$subject.name',
+                classLevel: '$subject.classLevel',
+                totalMarked: 1
+            }
+        },
+        { $sort: { 'batchName': 1, 'subjectName': 1 } }
+    ];
+
+    const results = await Attendance.aggregate(pipeline);
+    
+    return {
+        date: attendanceDate,
+        markedBatches: results
+    };
+};

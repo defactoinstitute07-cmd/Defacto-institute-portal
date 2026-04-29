@@ -1,7 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-    X, CreditCard, AlertCircle, Loader2,
-    ShieldCheck, Smartphone, Banknote
+    CreditCard,
+    AlertCircle,
+    Loader2,
+    ShieldCheck,
+    Smartphone,
+    Banknote
 } from 'lucide-react';
 
 const accentBlue = '#2563eb';
@@ -27,16 +31,42 @@ const RecordPaymentModal = ({ fee, onClose, onSave }) => {
     const [error, setError] = useState('');
 
     useEffect(() => {
-        if (fee) {
-            const remaining = fee.pendingAmount || 0;
-            setForm(prev => ({ ...prev, amountPaid: remaining.toString() }));
-        }
+        if (!fee) return;
+
+        const remaining = Math.max(Number(fee.pendingAmount || 0), 0);
+        setForm((prev) => ({
+            ...prev,
+            amountPaid: remaining.toString(),
+            fine: '0',
+            discount: '0'
+        }));
     }, [fee]);
+
+    const existingTotalFee = Number(fee?.totalFee || 0);
+    const existingAmountPaid = Number(fee?.amountPaid || 0);
+    const additionalFine = Math.max(Number(form.fine || 0), 0);
+    const additionalDiscount = Math.max(Number(form.discount || 0), 0);
+    const updatedTotalFee = Math.max(existingTotalFee + additionalFine - additionalDiscount, 0);
+    const remainingBalance = Math.max(updatedTotalFee - existingAmountPaid, 0);
+
+    useEffect(() => {
+        if (!fee) return;
+
+        setForm((prev) => {
+            if (prev.amountPaid === '') return prev;
+
+            const currentAmount = Number(prev.amountPaid || 0);
+            if (currentAmount <= remainingBalance) return prev;
+
+            return { ...prev, amountPaid: remainingBalance.toString() };
+        });
+    }, [fee, remainingBalance]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setSaving(true);
         setError('');
+
         try {
             await onSave(form);
             onClose();
@@ -48,11 +78,6 @@ const RecordPaymentModal = ({ fee, onClose, onSave }) => {
     };
 
     if (!fee) return null;
-
-    const totalOriginal = (fee.monthlyTuitionFee || 0) + (fee.registrationFee || 0) + (fee.fine || 0);
-    const currentTotalDiscount = (fee.discount || 0) + (Number(form.discount || 0));
-    const payableAmount = Math.max(totalOriginal - currentTotalDiscount, 0);
-    const remainingBalance = Math.max(payableAmount - (fee.amountPaid || 0), 0);
 
     return (
         <div
@@ -92,28 +117,39 @@ const RecordPaymentModal = ({ fee, onClose, onSave }) => {
                 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
             `}</style>
 
-            <div className="pay-modal-container" onClick={e => e.stopPropagation()}>
-                {/* --- HEADER --- */}
-                <header style={{
-                    width: '100%',
-                    padding: '20px 24px',
-                    background: headingColor,
-                    position: 'relative',
-                    color: '#fff',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    flexShrink: 0
-                }}>
-                    <CreditCard size={100} style={{ position: 'absolute', right: -15, bottom: -25, opacity: 0.08, color: '#fff' }} />
+            <div className="pay-modal-container" onClick={(e) => e.stopPropagation()}>
+                <header
+                    style={{
+                        width: '100%',
+                        padding: '20px 24px',
+                        background: headingColor,
+                        position: 'relative',
+                        color: '#fff',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexShrink: 0
+                    }}
+                >
+                    <CreditCard
+                        size={100}
+                        style={{ position: 'absolute', right: -15, bottom: -25, opacity: 0.08, color: '#fff' }}
+                    />
 
                     <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div style={{
-                            width: 38, height: 38, borderRadius: '8px',
-                            background: 'rgba(255,255,255,0.1)',
-                            border: '1px solid rgba(255,255,255,0.2)', display: 'flex',
-                            alignItems: 'center', justifyContent: 'center', flexShrink: 0
-                        }}>
+                        <div
+                            style={{
+                                width: 38,
+                                height: 38,
+                                borderRadius: '8px',
+                                background: 'rgba(255,255,255,0.1)',
+                                border: '1px solid rgba(255,255,255,0.2)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0
+                            }}
+                        >
                             <CreditCard size={18} color="#fff" />
                         </div>
                         <div>
@@ -126,115 +162,322 @@ const RecordPaymentModal = ({ fee, onClose, onSave }) => {
                         </div>
                     </div>
 
-                    <button type="button" onClick={onClose} style={{
-                        position: 'relative', zIndex: 1,
-                        background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.2)',
-                        borderRadius: '8px', color: '#fff', padding: '5px 10px',
-                        cursor: 'pointer', fontSize: '0.65rem', fontWeight: 700
-                    }}>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        style={{
+                            position: 'relative',
+                            zIndex: 1,
+                            background: 'rgba(255,255,255,0.15)',
+                            border: '1px solid rgba(255,255,255,0.2)',
+                            borderRadius: '8px',
+                            color: '#fff',
+                            padding: '5px 10px',
+                            cursor: 'pointer',
+                            fontSize: '0.65rem',
+                            fontWeight: 700
+                        }}
+                    >
                         CLOSE
                     </button>
                 </header>
 
                 <div style={{ flex: 1, overflowY: 'auto' }}>
                     <form onSubmit={handleSubmit}>
-
-                        {/* --- BILL SUMMARY --- */}
-                        <div style={{ padding: '20px 24px', background: '#f8fafc', borderBottom: `1px solid ${borderColor}` }}>
+                        <div
+                            style={{
+                                padding: '20px 24px',
+                                background: '#f8fafc',
+                                borderBottom: `1px solid ${borderColor}`
+                            }}
+                        >
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                                <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Total Amount</span>
-                                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1e293b' }}>₹ {totalOriginal.toLocaleString()}</span>
+                                <span
+                                    style={{
+                                        fontSize: '0.72rem',
+                                        color: '#94a3b8',
+                                        fontWeight: 700,
+                                        textTransform: 'uppercase'
+                                    }}
+                                >
+                                    Current Total
+                                </span>
+                                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1e293b' }}>
+                                    Rs {existingTotalFee.toLocaleString()}
+                                </span>
                             </div>
 
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                                <span style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>Discount</span>
-                                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#dc2626' }}>- ₹ {currentTotalDiscount.toLocaleString()}</span>
+                            {additionalFine > 0 && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                                    <span
+                                        style={{
+                                            fontSize: '0.72rem',
+                                            color: '#94a3b8',
+                                            fontWeight: 700,
+                                            textTransform: 'uppercase'
+                                        }}
+                                    >
+                                        Additional Fine
+                                    </span>
+                                    <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#b45309' }}>
+                                        + Rs {additionalFine.toLocaleString()}
+                                    </span>
+                                </div>
+                            )}
+
+                            {additionalDiscount > 0 && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                                    <span
+                                        style={{
+                                            fontSize: '0.72rem',
+                                            color: '#94a3b8',
+                                            fontWeight: 700,
+                                            textTransform: 'uppercase'
+                                        }}
+                                    >
+                                        Additional Discount
+                                    </span>
+                                    <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#dc2626' }}>
+                                        - Rs {additionalDiscount.toLocaleString()}
+                                    </span>
+                                </div>
+                            )}
+
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    marginBottom: 12,
+                                    padding: '8px 12px',
+                                    background: '#f1f5f9',
+                                    borderRadius: '4px',
+                                    marginTop: 12
+                                }}
+                            >
+                                <span
+                                    style={{
+                                        fontSize: '0.72rem',
+                                        color: '#64748b',
+                                        fontWeight: 700,
+                                        textTransform: 'uppercase'
+                                    }}
+                                >
+                                    Total Payable
+                                </span>
+                                <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>
+                                    Rs {updatedTotalFee.toLocaleString()}
+                                </span>
                             </div>
 
-                            <div style={{ 
-                                display: 'flex', justifyContent: 'space-between', marginBottom: 12, 
-                                padding: '8px 12px', background: '#f1f5f9', borderRadius: '4px', marginTop: 12 
-                            }}>
-                                <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Total Payable</span>
-                                <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>₹ {payableAmount.toLocaleString()}</span>
-                            </div>
-
-                            <div style={{
-                                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                paddingTop: 12, borderTop: `1px solid ${borderColor}`, marginTop: 8
-                            }}>
-                                <div style={{ fontSize: '0.72rem', fontWeight: 900, color: accentBlue, textTransform: 'uppercase' }}>Remaining to Pay</div>
-                                <div style={{ fontSize: '1.2rem', fontWeight: 900, color: accentBlue }}>₹ {remainingBalance.toLocaleString()}</div>
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    paddingTop: 12,
+                                    borderTop: `1px solid ${borderColor}`,
+                                    marginTop: 8
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        fontSize: '0.72rem',
+                                        fontWeight: 900,
+                                        color: accentBlue,
+                                        textTransform: 'uppercase'
+                                    }}
+                                >
+                                    Remaining to Pay
+                                </div>
+                                <div style={{ fontSize: '1.2rem', fontWeight: 900, color: accentBlue }}>
+                                    Rs {remainingBalance.toLocaleString()}
+                                </div>
                             </div>
                         </div>
 
-                        {/* --- FORM FIELDS --- */}
                         <div style={{ padding: '24px' }}>
                             {error && (
-                                <div style={{ padding: '10px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: sharpRadius, color: '#991b1b', fontSize: '0.78rem', fontWeight: 700, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <div
+                                    style={{
+                                        padding: '10px',
+                                        background: '#fef2f2',
+                                        border: '1px solid #fca5a5',
+                                        borderRadius: sharpRadius,
+                                        color: '#991b1b',
+                                        fontSize: '0.78rem',
+                                        fontWeight: 700,
+                                        marginBottom: 16,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 8
+                                    }}
+                                >
                                     <AlertCircle size={15} /> {error}
                                 </div>
                             )}
 
-                            {/* Amount to Pay */}
                             <div style={{ marginBottom: 18 }}>
-                                <label style={{ fontSize: '0.68rem', fontWeight: 800, color: labelColor, display: 'block', marginBottom: 6 }}>AMOUNT TO PAY *</label>
+                                <label
+                                    style={{
+                                        fontSize: '0.68rem',
+                                        fontWeight: 800,
+                                        color: labelColor,
+                                        display: 'block',
+                                        marginBottom: 6
+                                    }}
+                                >
+                                    AMOUNT TO PAY *
+                                </label>
                                 <div style={{ position: 'relative' }}>
-                                    <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontWeight: 800, color: '#94a3b8' }}>₹</span>
+                                    <span
+                                        style={{
+                                            position: 'absolute',
+                                            left: 12,
+                                            top: '50%',
+                                            transform: 'translateY(-50%)',
+                                            fontWeight: 800,
+                                            color: '#94a3b8'
+                                        }}
+                                    >
+                                        Rs
+                                    </span>
                                     <input
-                                        type="number" required max={Math.max(remainingBalance - Number(form.discount || 0), 0)} step="0.01"
-                                        style={{ borderRadius: sharpRadius, padding: '11px 11px 11px 28px', border: `1px solid ${borderColor}`, fontSize: '0.88rem', fontWeight: 700, background: '#fcfdfd', width: '100%', boxSizing: 'border-box' }}
+                                        type="number"
+                                        required
+                                        min="0"
+                                        max={remainingBalance}
+                                        step="0.01"
+                                        style={{
+                                            borderRadius: sharpRadius,
+                                            padding: '11px 11px 11px 34px',
+                                            border: `1px solid ${borderColor}`,
+                                            fontSize: '0.88rem',
+                                            fontWeight: 700,
+                                            background: '#fcfdfd',
+                                            width: '100%',
+                                            boxSizing: 'border-box'
+                                        }}
                                         value={form.amountPaid}
-                                        onChange={e => {
+                                        onChange={(e) => {
                                             let val = e.target.value;
-                                            const maxAllowed = Math.max(remainingBalance - Number(form.discount || 0), 0);
-                                            if (Number(val) > maxAllowed) val = maxAllowed.toString();
+                                            if (val !== '' && Number(val) > remainingBalance) {
+                                                val = remainingBalance.toString();
+                                            }
                                             setForm({ ...form, amountPaid: val });
                                         }}
                                     />
                                 </div>
                             </div>
 
-                            {/* Late Fine */}
                             <div style={{ marginBottom: 18 }}>
-                                <label style={{ fontSize: '0.68rem', fontWeight: 800, color: labelColor, display: 'block', marginBottom: 6 }}>LATE FINE</label>
+                                <label
+                                    style={{
+                                        fontSize: '0.68rem',
+                                        fontWeight: 800,
+                                        color: labelColor,
+                                        display: 'block',
+                                        marginBottom: 6
+                                    }}
+                                >
+                                    LATE FINE
+                                </label>
                                 <input
                                     type="number"
-                                    style={{ borderRadius: sharpRadius, padding: '11px', border: `1px solid ${borderColor}`, fontSize: '0.88rem', fontWeight: 700, background: '#fcfdfd', width: '100%', boxSizing: 'border-box' }}
+                                    min="0"
+                                    step="0.01"
+                                    style={{
+                                        borderRadius: sharpRadius,
+                                        padding: '11px',
+                                        border: `1px solid ${borderColor}`,
+                                        fontSize: '0.88rem',
+                                        fontWeight: 700,
+                                        background: '#fcfdfd',
+                                        width: '100%',
+                                        boxSizing: 'border-box'
+                                    }}
                                     value={form.fine}
-                                    onChange={e => setForm({ ...form, fine: e.target.value })}
+                                    onChange={(e) => setForm({ ...form, fine: e.target.value })}
                                 />
                             </div>
 
-                            {/* Payment Date */}
                             <div style={{ marginBottom: 18 }}>
-                                <label style={{ fontSize: '0.68rem', fontWeight: 800, color: labelColor, display: 'block', marginBottom: 6 }}>PAYMENT DATE *</label>
+                                <label
+                                    style={{
+                                        fontSize: '0.68rem',
+                                        fontWeight: 800,
+                                        color: labelColor,
+                                        display: 'block',
+                                        marginBottom: 6
+                                    }}
+                                >
+                                    PAYMENT DATE *
+                                </label>
                                 <input
-                                    type="date" required
-                                    style={{ borderRadius: sharpRadius, padding: '11px', border: `1px solid ${borderColor}`, fontSize: '0.88rem', fontWeight: 700, background: '#fcfdfd', width: '100%', boxSizing: 'border-box' }}
+                                    type="date"
+                                    required
+                                    style={{
+                                        borderRadius: sharpRadius,
+                                        padding: '11px',
+                                        border: `1px solid ${borderColor}`,
+                                        fontSize: '0.88rem',
+                                        fontWeight: 700,
+                                        background: '#fcfdfd',
+                                        width: '100%',
+                                        boxSizing: 'border-box'
+                                    }}
                                     value={form.date}
-                                    onChange={e => setForm({ ...form, date: e.target.value })}
+                                    onChange={(e) => setForm({ ...form, date: e.target.value })}
                                 />
                             </div>
 
-                            {/* Additional Discount */}
                             <div style={{ marginBottom: 18 }}>
-                                <label style={{ fontSize: '0.68rem', fontWeight: 800, color: labelColor, display: 'block', marginBottom: 6 }}>ADDITIONAL DISCOUNT</label>
+                                <label
+                                    style={{
+                                        fontSize: '0.68rem',
+                                        fontWeight: 800,
+                                        color: labelColor,
+                                        display: 'block',
+                                        marginBottom: 6
+                                    }}
+                                >
+                                    ADDITIONAL DISCOUNT
+                                </label>
                                 <input
                                     type="number"
-                                    style={{ borderRadius: sharpRadius, padding: '11px', border: `1px solid ${borderColor}`, fontSize: '0.88rem', fontWeight: 700, background: '#fcfdfd', width: '100%', boxSizing: 'border-box' }}
+                                    min="0"
+                                    step="0.01"
+                                    style={{
+                                        borderRadius: sharpRadius,
+                                        padding: '11px',
+                                        border: `1px solid ${borderColor}`,
+                                        fontSize: '0.88rem',
+                                        fontWeight: 700,
+                                        background: '#fcfdfd',
+                                        width: '100%',
+                                        boxSizing: 'border-box'
+                                    }}
                                     value={form.discount}
-                                    onChange={e => setForm({ ...form, discount: e.target.value })}
+                                    onChange={(e) => setForm({ ...form, discount: e.target.value })}
                                 />
                             </div>
 
-                            {/* Payment Method */}
                             <div style={{ marginBottom: 24 }}>
-                                <label style={{ fontSize: '0.68rem', fontWeight: 800, color: labelColor, display: 'block', marginBottom: 8 }}>PAYMENT METHOD</label>
+                                <label
+                                    style={{
+                                        fontSize: '0.68rem',
+                                        fontWeight: 800,
+                                        color: labelColor,
+                                        display: 'block',
+                                        marginBottom: 8
+                                    }}
+                                >
+                                    PAYMENT METHOD
+                                </label>
                                 <div className="pay-mode-grid">
                                     {PAYMENT_MODES.map(({ value, label, icon: Icon }) => (
                                         <button
-                                            key={value} type="button"
+                                            key={value}
+                                            type="button"
                                             onClick={() => setForm({ ...form, mode: value })}
                                             style={{
                                                 padding: '12px 8px',
@@ -259,21 +502,45 @@ const RecordPaymentModal = ({ fee, onClose, onSave }) => {
                                 </div>
                             </div>
 
-                            {/* Actions */}
                             <div style={{ display: 'flex', gap: 12 }}>
-                                <button type="button" onClick={onClose} disabled={saving}
-                                    style={{ flex: 1, padding: '13px', borderRadius: sharpRadius, border: `1.5px solid ${borderColor}`, background: '#fff', color: '#64748b', fontWeight: 800, cursor: 'pointer', fontSize: '0.68rem' }}>
+                                <button
+                                    type="button"
+                                    onClick={onClose}
+                                    disabled={saving}
+                                    style={{
+                                        flex: 1,
+                                        padding: '13px',
+                                        borderRadius: sharpRadius,
+                                        border: `1.5px solid ${borderColor}`,
+                                        background: '#fff',
+                                        color: '#64748b',
+                                        fontWeight: 800,
+                                        cursor: 'pointer',
+                                        fontSize: '0.68rem'
+                                    }}
+                                >
                                     Discard
                                 </button>
-                                <button type="submit" disabled={saving}
+                                <button
+                                    type="submit"
+                                    disabled={saving}
                                     style={{
                                         flex: 2,
                                         background: saving ? '#94a3b8' : '#001f3f',
-                                        color: '#fff', borderRadius: sharpRadius, padding: '13px', fontWeight: 900, border: 'none',
+                                        color: '#fff',
+                                        borderRadius: sharpRadius,
+                                        padding: '13px',
+                                        fontWeight: 900,
+                                        border: 'none',
                                         cursor: saving ? 'not-allowed' : 'pointer',
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                                        fontSize: '0.68rem', textTransform: 'uppercase'
-                                    }}>
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: 8,
+                                        fontSize: '0.68rem',
+                                        textTransform: 'uppercase'
+                                    }}
+                                >
                                     {saving ? <Loader2 size={15} className="spin" /> : <ShieldCheck size={15} />}
                                     Finalize Payment
                                 </button>
