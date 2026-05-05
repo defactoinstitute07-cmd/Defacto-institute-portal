@@ -247,9 +247,9 @@ const CreateFeeModal = ({ onClose, onSave }) => {
                             {/* Batch & Year Row */}
                             <div className="mf-row" style={{ display: 'flex', gap: 14, marginBottom: 20 }}>
                                 <div style={{ flex: 1 }}>
-                                    <label style={{ fontWeight: 800, fontSize: '0.7rem', color: '#475569', display: 'block', marginBottom: 6 }}>BATCH</label>
+                                    <label style={{ fontWeight: 800, fontSize: '0.7rem', color: '#475569', display: 'block', marginBottom: 6 }}>STUDENT CLASS</label>
                                     <select value={form.batchId} disabled style={{ ...inputStyle, background: '#f1f5f9', cursor: 'not-allowed' }}>
-                                        <option value="">No Batch</option>
+                                        <option value="">No Class Assigned</option>
                                         {batches.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
                                     </select>
                                 </div>

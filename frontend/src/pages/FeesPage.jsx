@@ -8,8 +8,10 @@ import ReceiptPreviewModal from '../components/fees/ReceiptPreviewModal';
 import RecordPaymentModal from '../components/fees/RecordPaymentModal';
 import PaymentHistoryModal from '../components/fees/PaymentHistoryModal';
 import CreateFeeModal from '../components/fees/CreateFeeModal';
+import GenerateFeesModal from '../components/fees/GenerateFeesModal';
 import ReceiptSettingsModal from '../components/fees/ReceiptSettingsModal';
 import ActionModal from '../components/common/ActionModal';
+import SuccessModal from '../components/common/SuccessModal';
 import apiClient, { API_BASE_URL } from '../api/apiConfig';
 import { hasClientSession } from '../utils/authSession';
 
@@ -42,6 +44,7 @@ const FeesPage = () => {
     const [receiptConfig, setReceiptConfig] = useState(null);
     const [previewPdf, setPreviewPdf] = useState({ isOpen: false, blobUrl: null, filename: '' });
     const [actionState, setActionState] = useState({ isOpen: false, type: 'verify', title: '', desc: '', onConfirm: null, loading: false, error: '' });
+    const [successState, setSuccessState] = useState({ isOpen: false, title: '', message: '' });
     const [watermarkUrl, setWatermarkUrl] = useState('');
     const [expandedYearlyGroups, setExpandedYearlyGroups] = useState({});
     const [editFee, setEditFee] = useState(null);
@@ -390,27 +393,31 @@ const FeesPage = () => {
     };
 
     const handleGenerateFee = () => {
-        const genMonth = month || monthOptions[new Date().getMonth()];
-        const genYear = year || String(new Date().getFullYear());
-        // Default due date: 10th of the next month
-        const monthIdx = monthOptions.indexOf(genMonth);
-        const nextMonth = new Date(Number(genYear), monthIdx + 1, 10);
-        const dueDate = nextMonth.toISOString().split('T')[0];
+        setModal('generate');
+    };
 
+    const handleGenerateFeeSubmit = (formData) => {
+        const { month, year, dueDate, batchId, batchName } = formData;
+        const scopeDesc = batchId === 'all' ? 'all students' : `students in ${batchName}`;
+        
         setActionState({
             isOpen: true,
             type: 'warning',
             title: 'Generate Fees',
-            desc: `Generate fees for all monthly-mode students for ${genMonth} ${genYear}. Due date: ${new Date(dueDate).toLocaleDateString('en-IN')}.`,
+            desc: `Issue fee records for ${scopeDesc} for ${month} ${year}. Final due date will be set to ${new Date(dueDate).toLocaleDateString('en-IN')}.`,
             onConfirm: async (password) => {
                 setActionState((prev) => ({ ...prev, loading: true, error: '' }));
                 try {
-                    const { data } = await apiClient.post('/fees/generate', { month: genMonth, year: genYear, dueDate, adminPassword: password });
+                    const payload = { month, year, dueDate, adminPassword: password };
+                    if (batchId !== 'all') payload.batchId = batchId;
+
+                    const { data } = await apiClient.post('/fees/generate', payload);
                     setActionState((prev) => ({ ...prev, isOpen: false }));
+                    setModal(false);
                     load();
                     loadMetrics();
-                    const msg = `${data.created} fee(s) generated.` + (data.skippedYearly ? ` ${data.skippedYearly} yearly student(s) skipped.` : '');
-                    alert(msg);
+                    const msg = `${data.created} fee record(s) issued successfully.` + (data.skippedYearly ? ` ${data.skippedYearly} yearly student(s) skipped.` : '');
+                    setSuccessState({ isOpen: true, title: 'Fees Generated', message: msg });
                 } catch (error) {
                     setActionState((prev) => ({ ...prev, loading: false, error: error.response?.data?.message || 'Fee generation failed' }));
                 }
@@ -511,7 +518,7 @@ const FeesPage = () => {
                 try {
                     await apiClient.post('/fees/remind-overdue', { adminPassword: password });
                     setActionState((prev) => ({ ...prev, isOpen: false }));
-                    alert('Reminders sent successfully');
+                    setSuccessState({ isOpen: true, title: 'Reminders Sent', message: 'All overdue reminders have been queued for delivery.' });
                 } catch (error) {
                     setActionState((prev) => ({ ...prev, loading: false, error: error.response?.data?.message || 'Reminder operation failed' }));
                 }
@@ -549,7 +556,7 @@ const FeesPage = () => {
 
     const exportData = () => {
         if (fees.length === 0) return;
-        const rows = [['Student Name', 'Roll No', 'Batch', 'Month', 'Year', 'Status', 'Total Amount', 'Paid Amount', 'Pending Amount'].join(',')];
+        const rows = [['Student Name', 'Roll No', 'Class', 'Month', 'Year', 'Status', 'Total Amount', 'Paid Amount', 'Pending Amount'].join(',')];
         fees.forEach((fee) => {
             rows.push([
                 `"${fee.studentId?.name || 'Deactivated'}"`,
@@ -620,10 +627,10 @@ const FeesPage = () => {
                                 <option value="overdue">Overdue</option>
                             </select>
                             <select className="tb-select" value={batchId} onChange={(e) => setBatchId(e.target.value)}>
-                                <option value="">Batch</option>
+                                <option value="">Class</option>
                                 {batches.map((batch) => <option key={batch._id} value={batch._id}>{batch.name}</option>)}
                             </select>
-                            <input className="tb-search" style={{ minWidth: 180 }} placeholder="Course" value={course} onChange={(e) => setCourse(e.target.value)} autoComplete="new-password" />
+                            <input className="tb-search" style={{ minWidth: 180 }} placeholder="Subject / Course" value={course} onChange={(e) => setCourse(e.target.value)} autoComplete="new-password" />
                         </div>
                     </div>
 
@@ -721,7 +728,11 @@ const FeesPage = () => {
                                                                         <td data-label="Month" style={{ paddingLeft: 28 }}><span style={{ fontSize: '0.85rem', color: '#78716c' }}>{fee.month}</span></td>
                                                                         <td data-label="Financials"><div className="td-sm">Rs {fmt(fee.totalFee)} | Paid: Rs {fmt(fee.amountPaid)}</div></td>
                                                                         <td data-label="Status"><span className={`badge ${fee.status === 'paid' ? 'badge-active' : ''}`}>{fee.status}</span></td>
-                                                                        <td></td>
+                                                                        <td data-label="Actions">
+                                                                            <div className="flex gap-2">
+                                                                                <button className="btn btn-outline btn-sm text-red-600 hover:bg-red-50 hover:border-red-200" onClick={(e) => { e.stopPropagation(); handleDeleteFee(fee); }} title="Delete"><Trash2 size={13} /></button>
+                                                                            </div>
+                                                                        </td>
                                                                     </tr>
                                                                 ))}
                                                             </React.Fragment>
@@ -743,6 +754,7 @@ const FeesPage = () => {
                                                                     <button className="btn btn-outline btn-sm" onClick={() => { setSelFee(fee); setModal('history'); }} title="History"><History size={13} /></button>
                                                                     <button className="btn btn-outline btn-sm" onClick={() => handleEditFee(fee)} title="Edit"><Pencil size={13} /></button>
                                                                     {fee.status !== 'paid' && <button className="btn btn-primary btn-sm" onClick={() => { setSelFee(fee); setModal('payment'); }} title="Pay"><CreditCard size={13} /></button>}
+                                                                    <button className="btn btn-outline btn-sm text-red-600 hover:bg-red-50 hover:border-red-200" onClick={() => handleDeleteFee(fee)} title="Delete"><Trash2 size={13} /></button>
                                                                 </div>
                                                             </td>
                                                         </tr>
@@ -767,6 +779,7 @@ const FeesPage = () => {
             {modal === 'payment' && selFee && <RecordPaymentModal fee={selFee} onClose={() => setModal(false)} onSave={handleRecordPayment} />}
             {modal === 'history' && selFee && <PaymentHistoryModal fee={selFee} onClose={() => setModal(false)} onViewReceipt={async (payment) => { setModal(false); const url = await generateReceipt(selFee, payment, true); setPreviewPdf({ isOpen: true, blobUrl: url, filename: `Receipt_${payment.receiptNo}.pdf` }); }} />}
             {modal === 'create' && <CreateFeeModal onClose={() => setModal(false)} onSave={handleCreateFee} />}
+            {modal === 'generate' && <GenerateFeesModal batches={batches} monthOptions={monthOptions} onClose={() => setModal(false)} onSave={handleGenerateFeeSubmit} />}
             {modal === 'receiptSettings' && <ReceiptSettingsModal isOpen initialSettings={receiptConfig} onClose={() => setModal(false)} onSave={(settings) => setReceiptConfig(settings)} />}
 
             {modal === 'edit' && editFee && (() => {
@@ -902,6 +915,8 @@ const FeesPage = () => {
             <ReceiptPreviewModal isOpen={previewPdf.isOpen} onClose={() => setPreviewPdf({ ...previewPdf, isOpen: false })} blobUrl={previewPdf.blobUrl} filename={previewPdf.filename} onDownload={() => { const link = document.createElement('a'); link.href = previewPdf.blobUrl; link.download = previewPdf.filename; link.click(); }} />
 
             <ActionModal isOpen={actionState.isOpen} onClose={() => setActionState((prev) => ({ ...prev, isOpen: false }))} onConfirm={actionState.onConfirm} title={actionState.title} description={actionState.desc} actionType={actionState.type} loading={actionState.loading} error={actionState.error} />
+
+            <SuccessModal isOpen={successState.isOpen} title={successState.title} message={successState.message} onClose={() => setSuccessState({ ...successState, isOpen: false })} />
         </ERPLayout>
     );
 };

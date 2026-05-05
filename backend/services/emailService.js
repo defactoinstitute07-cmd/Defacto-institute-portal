@@ -6,7 +6,7 @@ const transporterCache = globalThis.__erpEmailTransporters || (globalThis.__erpE
  * Creates / retrieves a cached Brevo SMTP transporter.
  * Falls back to Gmail SMTP when Brevo credentials are absent.
  */
-const getTransporter = ({ brevoUser, brevoPass, gmailUser, gmailPass }) => {
+const getTransporter = ({ brevoUser, brevoPass, senderEmail, gmailUser, gmailPass }) => {
     // Prefer Brevo, fall back to Gmail
     if (brevoUser && brevoPass) {
         const cacheKey = `brevo::${brevoUser}::${brevoPass}`;
@@ -21,7 +21,7 @@ const getTransporter = ({ brevoUser, brevoPass, gmailUser, gmailPass }) => {
                 }
             }));
         }
-        return { transporter: transporterCache.get(cacheKey), fromEmail: brevoUser, source: 'brevo' };
+        return { transporter: transporterCache.get(cacheKey), fromEmail: senderEmail || brevoUser, source: 'brevo' };
     }
 
     if (gmailUser && gmailPass) {
@@ -117,6 +117,7 @@ exports.sendEmail = async ({
             credentialCandidates.push({
                 brevoUser: admin.brevoEmail,
                 brevoPass: admin.brevoSmtpKey,
+                senderEmail: admin?.email || admin?.brevoEmail,
                 source: 'admin-brevo'
             });
         }
@@ -124,36 +125,21 @@ exports.sendEmail = async ({
         // 2. Environment Brevo credentials
         const envBrevoUser = process.env.BREVO_SMTP_USER || process.env.BREVO_EMAIL;
         const envBrevoKey = process.env.BREVO_SMTP_KEY;
+        const envSenderEmail = process.env.BREVO_SENDER_EMAIL || process.env.GMAIL_USER || admin?.email || 'defactoinstitute07@gmail.com';
+        
         if (envBrevoUser && envBrevoKey) {
             credentialCandidates.push({
                 brevoUser: envBrevoUser,
                 brevoPass: envBrevoKey,
+                senderEmail: envSenderEmail,
                 source: 'env-brevo'
             });
         }
 
-        // 3. Admin-level Gmail credentials (legacy fallback)
-        if (admin?.gmailEmail && admin?.gmailAppPassword) {
-            credentialCandidates.push({
-                gmailUser: admin.gmailEmail,
-                gmailPass: admin.gmailAppPassword,
-                source: 'admin-gmail'
-            });
-        }
 
-        // 4. Environment Gmail credentials (legacy fallback)
-        const envGmailUser = process.env.GMAIL_USER || process.env.GMAIL_EMAIL;
-        const envGmailPass = process.env.GMAIL_APP_PASSWORD;
-        if (envGmailUser && envGmailPass) {
-            credentialCandidates.push({
-                gmailUser: envGmailUser,
-                gmailPass: envGmailPass,
-                source: 'env-gmail'
-            });
-        }
 
         if (credentialCandidates.length === 0) {
-            console.log('[Email] Warning: No email credentials configured (Brevo or Gmail).');
+            console.log('[Email] Warning: No email credentials configured (Brevo).');
             return { success: false, reason: 'Credentials not configured' };
         }
 

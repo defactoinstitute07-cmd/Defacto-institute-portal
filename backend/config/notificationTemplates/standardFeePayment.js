@@ -24,8 +24,8 @@ module.exports = {
         ctaText: 'View Payment History',
         ctaLink: 'https://student.defactoinstitute.in/'
     }),
-    subjectPush: 'शुल्क भुगतान प्राप्त हुआ - रसीद {{receiptNo}}',
-    bodyPush: 'नमस्ते {{studentName}}, हमें आपका रु {{amountPaid}} का भुगतान सफलतापूर्वक प्राप्त हो गया है।',
+    subjectPush: '₹{{amountPaid}} जमा हो गया',
+    bodyPush: 'Hello {{studentName}}, your payment of ₹{{amountPaid}} has been successfully received',
     placeholders: ['studentName', 'amountPaid', 'receiptNo', 'instituteName'],
     legacyBodies: [legacyBody]
 };

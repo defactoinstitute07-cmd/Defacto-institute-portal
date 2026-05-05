@@ -731,12 +731,17 @@ exports.recordPayment = async (req, res) => {
 // POST /api/fees/generate
 exports.generateFeesBulk = async (req, res) => {
     try {
-        const { month, year, dueDate } = req.body;
+        const { month, year, dueDate, batchId } = req.body;
         if (!month || !year || !dueDate) {
             return res.status(400).json({ message: 'Month, year and due date are required' });
         }
 
-        const students = await Student.find({ status: 'active' })
+        const query = { status: 'active' };
+        if (batchId && batchId !== 'all') {
+            query.batchId = batchId;
+        }
+
+        const students = await Student.find(query)
             .select('_id batchId fees registrationFee discount paymentMode')
             .lean();
         if (!students.length) {
@@ -902,5 +907,19 @@ exports.deleteFee = async (req, res) => {
     } catch (err) {
         console.error('[fees.deleteFee] Error deleting fee record');
         return res.status(500).json({ message: 'Server error', error: err.message });
+    }
+};
+
+// GET /api/fees/generation-status?month=...&year=...
+exports.getGenerationStatus = async (req, res) => {
+    try {
+        const { month, year } = req.query;
+        if (!month || !year) return res.status(400).json({ message: 'Month and year are required' });
+
+        const generatedBatches = await Fee.distinct('batchId', { month, year });
+        return res.json({ success: true, generatedBatchIds: generatedBatches });
+    } catch (err) {
+        console.error('[fees.getGenerationStatus] Error:', err.message);
+        return res.status(500).json({ message: 'Server error' });
     }
 };

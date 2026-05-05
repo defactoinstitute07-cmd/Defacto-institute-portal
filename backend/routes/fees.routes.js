@@ -6,6 +6,7 @@ const verifyAdminPassword = require('../middleware/verifyAdminPassword');
 
 // Metrics must come before "/:id" style routes
 router.get('/metrics', cacheJsonResponse({ prefix: CACHE_PREFIXES.fees, ttlSeconds: 30 }), feesController.getMetrics);
+router.get('/generation-status', feesController.getGenerationStatus);
 
 router.route('/')
     .get(cacheJsonResponse({ prefix: CACHE_PREFIXES.fees, ttlSeconds: 20 }), feesController.getFees)

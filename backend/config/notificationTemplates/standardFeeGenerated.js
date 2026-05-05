@@ -24,8 +24,8 @@ module.exports = {
         ctaText: 'View Fee Details',
         ctaLink: 'https://student.defactoinstitute.in/'
     }),
-    subjectPush: 'नया शुल्क जारी किया गया',
-    bodyPush: '{{month}} {{year}} के लिए शुल्क जारी किया गया है।',
+    subjectPush: '{{month}} {{year}} के लिए फीस जारी की गई है',
+    bodyPush: 'The fee for {{studentName}} for {{month}} {{year}} has been generated.',
     placeholders: ['studentName', 'amount', 'month', 'year', 'dueDate', 'instituteName', 'portalUrl'],
     legacyBodies: [legacyBody]
 };
