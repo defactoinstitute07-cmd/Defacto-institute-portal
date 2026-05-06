@@ -191,6 +191,43 @@ const invalidateStudentReadCaches = () => invalidateRouteCaches([
     CACHE_PREFIXES.fees
 ]);
 
+const generateSequentialRollNo = async (prefix) => {
+    const lastStudent = await Student.findOne({ rollNo: new RegExp(`^${prefix}`) }, 'rollNo').sort({ rollNo: -1 });
+
+    let nextNum = 1;
+    if (lastStudent && lastStudent.rollNo) {
+        const numPart = lastStudent.rollNo.replace(prefix, '');
+        const num = parseInt(numPart, 10);
+        if (!isNaN(num)) nextNum = num + 1;
+    }
+
+    return `${prefix}${String(nextNum).padStart(2, '0')}`;
+};
+
+const generateOfficialRollNo = () => {
+    const currentYear = new Date().getFullYear() % 100;
+    return generateSequentialRollNo(`STU${currentYear}`);
+};
+
+const generateRegistrationRollNo = generateOfficialRollNo;
+
+const sendStudentOnboardingNotification = async ({ student, password, adminId }) => {
+    const portalUrl = getStudentPortalUrl();
+    const attachments = await buildStudentRegistrationAttachments({ portalUrl });
+
+    await triggerAutomaticNotification({
+        studentId: student._id,
+        message: `Welcome ${student.name}! Your registration is successful. Roll No: ${student.rollNo}, Password: ${password}. Please login to your portal to complete your profile.`,
+        eventType: 'studentRegistration',
+        adminId: adminId || null,
+        data: {
+            password,
+            portalUrl
+        },
+        attachments
+    });
+};
+
 // GET /api/students/stats
 exports.getStudentStats = async (req, res) => {
     try {
@@ -448,26 +485,13 @@ exports.createStudent = async (req, res) => {
             delete data.batchId;
         }
 
-        // Auto-generate roll number: STU + YEAR + 4-digit Sequential
-        const currentYear = new Date().getFullYear() % 100;
-        const yearPrefix = `STU${currentYear}`;
-
-        // Find the last student admitted THIS year
-        const lastStudent = await Student.findOne({ rollNo: new RegExp(`^${yearPrefix}`) }, 'rollNo').sort({ rollNo: -1 });
-
-        let nextNum = 1;
-        if (lastStudent && lastStudent.rollNo) {
-            const numPart = lastStudent.rollNo.replace(yearPrefix, '');
-            const num = parseInt(numPart, 10);
-            if (!isNaN(num)) nextNum = num + 1;
-        }
-        const rollNo = `${yearPrefix}${String(nextNum).padStart(2, '0')}`;
+        const rollNo = await generateOfficialRollNo();
 
         // Capacity check
         if (data.batchId) {
             const batch = await Batch.findById(data.batchId);
             if (batch && batch.capacity > 0) {
-                const enrolled = await Student.countDocuments({ batchId: data.batchId });
+                const enrolled = await Student.countDocuments({ batchId: data.batchId, status: { $ne: 'registration_pending' } });
                 if (enrolled >= batch.capacity) {
                     return res.status(400).json({ message: 'Batch capacity reached' });
                 }
@@ -503,23 +527,11 @@ exports.createStudent = async (req, res) => {
             });
         }
 
-        // Send onboarding notification
-        if (student) {
-            const portalUrl = getStudentPortalUrl();
-            const attachments = await buildStudentRegistrationAttachments({ portalUrl });
-
-            await triggerAutomaticNotification({
-                studentId: student._id,
-                message: `Welcome ${student.name}! Your registration is successful. Roll No: ${student.rollNo}, Password: ${req.body.password || 'student@123'}. Please login to your portal to complete your profile.`,
-                eventType: 'studentRegistration',
-                adminId: req.admin?.id,
-                data: {
-                    password: req.body.password || 'student@123',
-                    portalUrl
-                },
-                attachments
-            });
-        }
+        await sendStudentOnboardingNotification({
+            student,
+            password: req.body.password || 'student@123',
+            adminId: req.admin?.id
+        });
 
         const result = student.toObject();
         delete result.password;
@@ -530,6 +542,63 @@ exports.createStudent = async (req, res) => {
         });
     } catch (err) {
         console.error('[createStudent] Failed to create student');
+        res.status(500).json({ message: 'Server error', error: err.message });
+    }
+};
+
+// POST /api/students/register
+exports.registerStudent = async (req, res) => {
+    try {
+        const data = req.body;
+        if (!data.name) return res.status(400).json({ message: 'Name is required' });
+
+        if (req.file?.path) {
+            data.profileImage = req.file.path;
+        }
+
+        if (!data.batchId) {
+            delete data.batchId;
+        }
+
+        if (data.batchId) {
+            const batch = await Batch.findById(data.batchId);
+            if (batch && batch.capacity > 0) {
+                const enrolled = await Student.countDocuments({ batchId: data.batchId, status: { $ne: 'registration_pending' } });
+                if (enrolled >= batch.capacity) {
+                    return res.status(400).json({ message: 'Batch capacity reached' });
+                }
+            }
+        }
+
+        const student = new Student({
+            ...data,
+            rollNo: await generateRegistrationRollNo(),
+            password: undefined,
+            phoneLockedByAdmin: false,
+            contact: data.contact || data.phone,
+            portalAccess: { signupStatus: 'no' },
+            fees: data.fees || 0,
+            discount: Math.max(Number(data.discount || 0), 0),
+            registrationFee: data.registrationFee || 0,
+            fatherName: data.fatherName,
+            motherName: data.motherName,
+            parentPhone: data.parentPhone,
+            currentYear: data.currentYear || '1',
+            status: 'registration_pending'
+        });
+
+        await student.save();
+
+        const result = student.toObject();
+        delete result.password;
+        await invalidateStudentReadCaches();
+
+        res.status(201).json({
+            message: 'Registration submitted successfully. The admin will review and approve it.',
+            student: result
+        });
+    } catch (err) {
+        console.error('[registerStudent] Failed to submit registration');
         res.status(500).json({ message: 'Server error', error: err.message });
     }
 };
@@ -552,6 +621,22 @@ exports.updateStudent = async (req, res) => {
 
         const discountChanged = data.discount !== undefined && Number(data.discount) !== oldStudent.discount;
         const isActivatingBatch = !oldStudent.batchId && data.batchId;
+        const isApprovingRegistration = oldStudent.status === 'registration_pending' && data.status === 'active';
+        const approvalBatchId = data.batchId || oldStudent.batchId;
+
+        if (isApprovingRegistration && approvalBatchId) {
+            const batch = await Batch.findById(approvalBatchId);
+            if (batch && batch.capacity > 0) {
+                const enrolled = await Student.countDocuments({
+                    _id: { $ne: oldStudent._id },
+                    batchId: approvalBatchId,
+                    status: { $ne: 'registration_pending' }
+                });
+                if (enrolled >= batch.capacity) {
+                    return res.status(400).json({ message: 'Batch capacity reached' });
+                }
+            }
+        }
 
         if (data.password !== undefined) {
             if (String(data.password).trim()) {
@@ -568,6 +653,19 @@ exports.updateStudent = async (req, res) => {
 
         if (isActivatingBatch && oldStudent.status === 'batch_pending') {
             data.status = 'active';
+        }
+
+        if (isApprovingRegistration) {
+            if (!approvalBatchId) {
+                data.status = 'batch_pending';
+            }
+            if (!oldStudent.rollNo || String(oldStudent.rollNo).startsWith('REG')) {
+                data.rollNo = await generateOfficialRollNo();
+            }
+            if (!oldStudent.password) {
+                data.password = await bcrypt.hash('student@123', 10);
+            }
+            data.phoneLockedByAdmin = !!(data.contact || data.phone || oldStudent.contact);
         }
 
         const student = await Student.findByIdAndUpdate(req.params.id, data, { returnDocument: 'after' });
@@ -632,9 +730,26 @@ exports.updateStudent = async (req, res) => {
             }
         }
 
+        if (isApprovingRegistration) {
+            if (student && approvalBatchId) {
+                await createAdmissionFeeRecord({
+                    student,
+                    batchId: approvalBatchId,
+                    admissionDate: student.admissionDate,
+                    adminId: req.admin?.id
+                });
+            }
+
+            await sendStudentOnboardingNotification({
+                student,
+                password: 'student@123',
+                adminId: req.admin?.id
+            });
+        }
+
         await invalidateStudentReadCaches();
         res.json({
-            message: isActivatingBatch ? 'Batch assigned successfully' : 'Updated',
+            message: isApprovingRegistration ? 'Student registration approved successfully' : isActivatingBatch ? 'Batch assigned successfully' : 'Updated',
             student
         });
     } catch (err) {
@@ -823,7 +938,7 @@ exports.getBatches = async (req, res) => {
         const [batches, enrollmentRows] = await Promise.all([
             Batch.find({ isActive: true }).select('name subjects fees capacity course').lean(),
             Student.aggregate([
-                { $match: { batchId: { $ne: null } } },
+                { $match: { batchId: { $ne: null }, status: { $ne: 'registration_pending' } } },
                 { $group: { _id: '$batchId', enrolled: { $sum: 1 } } }
             ])
         ]);

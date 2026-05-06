@@ -43,7 +43,7 @@ const studentSchema = new mongoose.Schema({
     className: { type: String },
     admissionDate: { type: Date, default: Date.now },
     session: { type: String },
-    status: { type: String, enum: ['active', 'inactive', 'completed', 'batch_pending'], default: 'active', index: true },
+    status: { type: String, enum: ['active', 'inactive', 'completed', 'batch_pending', 'registration_pending'], default: 'active', index: true },
     notes: { type: String },
     paymentMode: { type: String, enum: ['monthly', 'full'], default: 'monthly' },
     profileImage: { type: String },

@@ -21,6 +21,7 @@ import DashboardPage from './pages/DashboardPage';
 import TeacherDashboard from './pages/TeacherDashboard';
 import ApkManagementPage from './pages/ApkManagementPage';
 import TechnicalSupportPage from './pages/TechnicalSupportPage';
+import StudentRegistrationPage from './pages/StudentRegistrationPage';
 import { checkAdminExists } from './api/adminApi';
 import AllStudentsPage from './pages/AllStudentsPage';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -82,6 +83,7 @@ function App() {
                 <Route path="/admin-login" element={<Navigate to="/login" replace />} />
                 <Route path="/portal" element={<Navigate to="/login" replace />} />
                 <Route path="/student-login" element={<Navigate to="/login" replace />} />
+                <Route path="/student/new/registration" element={<StudentRegistrationPage />} />
                 <Route
                     path="/signup"
                     element={

@@ -260,13 +260,14 @@ const StudentsPage = () => {
 
     const toggleStudentStatus = (s) => {
         const isCurrentlyActive = s.status === 'active';
+        const isRegistrationPending = s.status === 'registration_pending';
         const newStatus = isCurrentlyActive ? 'inactive' : 'active';
 
         setActionState({
             isOpen: true,
             type: isCurrentlyActive ? 'danger' : 'verify',
-            title: isCurrentlyActive ? 'Deactivate Student' : 'Activate Student',
-            desc: `Enter admin password to ${isCurrentlyActive ? 'deactivate' : 'activate'} "${s.name}".`,
+            title: isCurrentlyActive ? 'Deactivate Student' : isRegistrationPending ? 'Approve Registration' : 'Activate Student',
+            desc: `Enter admin password to ${isCurrentlyActive ? 'deactivate' : isRegistrationPending ? 'approve registration for' : 'activate'} "${s.name}".`,
             onConfirm: (pwd) => confirmStatusToggle(s, newStatus, pwd),
             loading: false,
             error: ''
@@ -277,7 +278,7 @@ const StudentsPage = () => {
         setActionState(prev => ({ ...prev, loading: true, error: '' }));
         try {
             await apiClient.put(`/students/${student._id}`, { status: newStatus, adminPassword: pwd });
-            addToast(`Student ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully`);
+            addToast(student.status === 'registration_pending' ? 'Student approved successfully' : `Student ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully`);
             setActionState(prev => ({ ...prev, isOpen: false }));
             loadData();
         } catch (e) {

@@ -16,6 +16,14 @@ const ACTIVITY_BADGES = {
     inactive: { bg: '#fff7ed', color: '#ea580c', border: '#fed7aa', label: 'Inactive' }
 };
 
+const STUDENT_STATUS_BADGES = {
+    active: { bg: '#f0fff4', color: '#16a34a', border: '#bbf7d0', label: 'Active' },
+    registration_pending: { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe', label: 'Registration Pending' },
+    batch_pending: { bg: '#fffbeb', color: '#d97706', border: '#fde68a', label: 'Batch Pending' },
+    completed: { bg: '#f8fafc', color: '#475569', border: '#e2e8f0', label: 'Completed' },
+    inactive: { bg: '#fef2f2', color: '#dc2626', border: '#fecaca', label: 'Inactive' }
+};
+
 const StudentTable = ({
     students,
     loading,
@@ -77,6 +85,7 @@ const StudentTable = ({
                         const attendancePercent = Number.isFinite(attendance.percentage) ? attendance.percentage : 0;
                         const attendanceLabel = attendanceTotal > 0 ? `${attendancePercent}%` : '--';
                         const attendanceMeta = attendanceTotal > 0 ? `${attendance.present || 0}/${attendanceTotal}` : 'No data';
+                        const studentStatusBadge = STUDENT_STATUS_BADGES[s.status] || STUDENT_STATUS_BADGES.inactive;
 
                         return (
                         <tr key={s._id} className="hover:bg-slate-50 transition-colors">
@@ -130,12 +139,12 @@ const StudentTable = ({
                                 <div style={{ marginTop: 4 }}>
                                     <span style={{
                                         padding: '2px 8px', borderRadius: '2px', fontSize: '10px', fontWeight: 800,
-                                        background: s.status === 'active' ? '#f0fff4' : s.status === 'batch_pending' ? '#fffbeb' : '#fef2f2',
-                                        color: s.status === 'active' ? '#16a34a' : s.status === 'batch_pending' ? '#d97706' : '#dc2626',
+                                        background: studentStatusBadge.bg,
+                                        color: studentStatusBadge.color,
                                         textTransform: 'uppercase',
-                                        border: s.status === 'active' ? '1px solid #bbf7d0' : s.status === 'batch_pending' ? '1px solid #fde68a' : '1px solid #fecaca'
+                                        border: `1px solid ${studentStatusBadge.border}`
                                     }}>
-                                        {s.status === 'batch_pending' ? 'Batch Pending' : s.status}
+                                        {studentStatusBadge.label}
                                     </span>
                                 </div>
                             </td>
@@ -155,7 +164,7 @@ const StudentTable = ({
                                         <Pencil size={15} />
                                     </button>
                                     <button className={`btn btn-ghost btn-outline btn-sm ${s.status === 'active' ? '!text-rose-500 hover:bg-rose-50' : '!text-indigo-600 hover:bg-indigo-50'}`}
-                                        title={s.status === 'active' ? "Deactivate Student" : "Activate Student"}
+                                        title={s.status === 'active' ? "Deactivate Student" : s.status === 'registration_pending' ? "Approve Registration" : "Activate Student"}
                                         onClick={() => onToggleStatus(s)}>
                                         {s.status === 'active' ? <UserX size={15} /> : <UserCheck size={15} />}
                                     </button>

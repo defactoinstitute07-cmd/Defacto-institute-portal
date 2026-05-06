@@ -351,8 +351,11 @@ const StudentFormModal = ({
                   <div style={{ flex: 1 }}>
                     <label style={{ fontWeight: 800, fontSize: '0.7rem', color: '#475569' }}>STATUS</label>
                     <select name="status" value={form.status} onChange={handleForm} style={inputStyle}>
+                      <option value="registration_pending">Registration Pending</option>
                       <option value="active">Active</option>
                       <option value="inactive">Inactive</option>
+                      <option value="batch_pending">Batch Pending</option>
+                      <option value="completed">Completed</option>
                     </select>
                   </div>
                 </div>

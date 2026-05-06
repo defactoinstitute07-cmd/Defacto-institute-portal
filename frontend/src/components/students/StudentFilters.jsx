@@ -57,6 +57,7 @@ const StudentFilters = ({
                     <option value="">Status</option>
                     <option value="all">All Records</option>
                     <option value="active">Active</option>
+                    <option value="registration_pending">Registration Pending</option>
                     <option value="batch_pending">Batch Pending</option>
                     <option value="inactive">Inactive</option>
                     <option value="completed">Completed</option>
